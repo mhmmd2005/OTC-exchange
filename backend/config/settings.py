@@ -15,12 +15,23 @@ env = environ.Env(
     OTP_MAX_ATTEMPTS=(int, 5),
     OTP_MAX_SENDS=(int, 3),
     OTP_SEND_WINDOW_SECONDS=(int, 3600),
+    OTP_IP_MAX_REQUESTS=(int, 20),
+    OTP_IP_WINDOW_SECONDS=(int, 3600),
 )
+
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="development-secret-key-change-me")
+SECRET_KEY = env(
+    "DJANGO_SECRET_KEY",
+    default="development-secret-key-change-me",
+)
+
 DEBUG = env("DJANGO_DEBUG")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "0.0.0.0"])
+
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1", "0.0.0.0"],
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -75,7 +86,11 @@ TEMPLATES = [
     },
 ]
 
-USE_SQLITE_FOR_DEV = env("USE_SQLITE_FOR_DEV", default=False)
+USE_SQLITE_FOR_DEV = env(
+    "USE_SQLITE_FOR_DEV",
+    default=False,
+)
+
 if USE_SQLITE_FOR_DEV:
     DATABASES = {
         "default": {
@@ -96,11 +111,21 @@ else:
     }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-    {"NAME": "apps.accounts.validators.PasswordComplexityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+    {
+        "NAME": "apps.accounts.validators.PasswordComplexityValidator",
+    },
 ]
 
 LANGUAGE_CODE = "en-us"
@@ -110,6 +135,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -120,10 +146,16 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5173"],
 )
-CSRF_TRUSTED_ORIGINS = [origin for origin in CORS_ALLOWED_ORIGINS] + [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+
+CSRF_TRUSTED_ORIGINS = list(
+    dict.fromkeys(
+        CORS_ALLOWED_ORIGINS
+        + [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    )
+)
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -139,8 +171,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env("JWT_ACCESS_MINUTES")),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=env("JWT_REFRESH_DAYS")),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=env("JWT_ACCESS_MINUTES")
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=env("JWT_REFRESH_DAYS")
+    ),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
@@ -151,9 +187,21 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
 }
 
-REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+REDIS_URL = env(
+    "REDIS_URL",
+    default="redis://127.0.0.1:6379/0",
+)
+
+CELERY_BROKER_URL = env(
+    "CELERY_BROKER_URL",
+    default=REDIS_URL,
+)
+
+CELERY_RESULT_BACKEND = env(
+    "CELERY_RESULT_BACKEND",
+    default=CELERY_BROKER_URL,
+)
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -164,7 +212,13 @@ OTP_RESEND_COOLDOWN_SECONDS = env("OTP_RESEND_COOLDOWN_SECONDS")
 OTP_MAX_ATTEMPTS = env("OTP_MAX_ATTEMPTS")
 OTP_MAX_SENDS = env("OTP_MAX_SENDS")
 OTP_SEND_WINDOW_SECONDS = env("OTP_SEND_WINDOW_SECONDS")
-SMS_PROVIDER = env("SMS_PROVIDER", default="console")
+OTP_IP_MAX_REQUESTS = env("OTP_IP_MAX_REQUESTS")
+OTP_IP_WINDOW_SECONDS = env("OTP_IP_WINDOW_SECONDS")
+
+SMS_PROVIDER = env(
+    "SMS_PROVIDER",
+    default="console",
+)
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "OTC Exchange API",

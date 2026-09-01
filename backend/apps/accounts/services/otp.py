@@ -3,10 +3,16 @@ import secrets
 from datetime import timedelta
 
 import redis
+from apps.accounts.models import OTPVerification
 from django.conf import settings
 from django.utils import timezone
 
-from apps.accounts.models import OTPVerification
+
+def get_redis_client():
+    return redis.Redis.from_url(
+        settings.REDIS_URL,
+        decode_responses=True,
+    )
 
 
 def generate_otp():
@@ -15,10 +21,6 @@ def generate_otp():
 
 def hash_otp(code):
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
-
-
-def get_redis_client():
-    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
 def store_otp_code(challenge_id, code, ttl_seconds):
@@ -44,29 +46,81 @@ def invalidate_previous_challenges(phone_number, purpose):
         purpose=purpose,
         is_used=False,
         expires_at__gt=timezone.now(),
-    ).update(is_used=True, verified_at=timezone.now())
+    ).update(
+        is_used=True,
+        verified_at=timezone.now(),
+    )
 
 
 def can_resend(phone_number, purpose):
     last_request = (
-        OTPVerification.objects.filter(phone_number=phone_number, purpose=purpose)
+        OTPVerification.objects
+        .filter(
+            phone_number=phone_number,
+            purpose=purpose,
+        )
         .order_by("-created_at")
         .first()
     )
+
     if not last_request:
         return True
-    if last_request.created_at + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS) > timezone.now():
-        return False
-    return True
+
+    cooldown_until = (
+            last_request.created_at
+            + timedelta(
+        seconds=settings.OTP_RESEND_COOLDOWN_SECONDS
+    )
+    )
+
+    return cooldown_until <= timezone.now()
 
 
 def challenge_send_count(phone_number, purpose):
-    window_start = timezone.now() - timedelta(seconds=settings.OTP_SEND_WINDOW_SECONDS)
-    return OTPVerification.objects.filter(
-        phone_number=phone_number,
-        purpose=purpose,
-        created_at__gte=window_start,
-    ).count()
+    window_start = (
+            timezone.now()
+            - timedelta(
+        seconds=settings.OTP_SEND_WINDOW_SECONDS
+    )
+    )
+
+    return (
+        OTPVerification.objects
+        .filter(
+            phone_number=phone_number,
+            purpose=purpose,
+            created_at__gte=window_start,
+        )
+        .count()
+    )
+
+
+def check_and_increment_ip_rate_limit(ip_address):
+    ip_address = ip_address or "unknown"
+
+    client = get_redis_client()
+    key = f"otp:ip-rate:{ip_address}"
+
+    max_requests = settings.OTP_IP_MAX_REQUESTS
+    window_seconds = settings.OTP_IP_WINDOW_SECONDS
+
+    current_count = client.incr(key)
+
+    if current_count == 1:
+        client.expire(key, window_seconds)
+
+    remaining = max(max_requests - current_count, 0)
+    ttl = client.ttl(key)
+
+    if ttl is None or ttl < 0:
+        ttl = window_seconds
+
+    return {
+        "allowed": current_count <= max_requests,
+        "count": current_count,
+        "remaining": remaining,
+        "retry_after": ttl,
+    }
 
 
 class OTPService:
@@ -97,3 +151,11 @@ class OTPService:
     @staticmethod
     def invalidate_previous_challenges(phone_number, purpose):
         invalidate_previous_challenges(phone_number, purpose)
+
+    @staticmethod
+    def challenge_send_count(phone_number, purpose):
+        return challenge_send_count(phone_number, purpose)
+
+    @staticmethod
+    def check_and_increment_ip_rate_limit(ip_address):
+        return check_and_increment_ip_rate_limit(ip_address)
