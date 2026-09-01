@@ -9,16 +9,30 @@ lerna-debug.log*
 
 # Dependencies
 node_modules/
+backend/.venv/
+.venv/
+__pycache__/
+*.pyc
 
 # Build output
 dist/
 dist-ssr/
+backend/staticfiles/
+backend/media/
+backend/db.sqlite3
 
 # Local environment files
 .env
 .env.*
 !.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
 *.local
+
+# Python / Django generated files
+.pytest_cache/
+*.sqlite3
 
 # Editor directories and files
 .vscode/

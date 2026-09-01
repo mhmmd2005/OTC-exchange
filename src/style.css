@@ -4980,3 +4980,143 @@ select option {
         animation: none !important;
     }
 }
+/* =========================================================
+   AUTH FLOW — PHONE / OTP / PASSWORD
+========================================================= */
+
+.auth-step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 18px;
+}
+
+.step-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.step-pill.active {
+    background: rgba(212, 169, 90, 0.14);
+    border-color: rgba(212, 169, 90, 0.34);
+    color: var(--gold-light);
+}
+
+.step-pill.done {
+    background: rgba(22, 199, 132, 0.10);
+    border-color: rgba(22, 199, 132, 0.30);
+    color: var(--success);
+}
+
+.otp-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.otp-summary strong {
+    color: var(--text-primary);
+    font-weight: 800;
+}
+
+.otp-input-wrap {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    width: min(100%, 360px);
+    margin: 0 auto 16px;
+}
+
+.otp-input-box {
+    width: 100%;
+    height: 52px;
+    border-radius: 12px;
+    border: 1px solid var(--border-default);
+    background: var(--surface-input);
+    color: var(--text-primary);
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: 800;
+    direction: ltr;
+    unicode-bidi: plaintext;
+}
+
+.otp-input-box:focus {
+    outline: none;
+    border-color: rgba(212, 169, 90, 0.70);
+    box-shadow: 0 0 0 4px rgba(212, 169, 90, 0.12);
+}
+
+.otp-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 18px;
+}
+
+.password-requirements {
+    display: grid;
+    gap: 8px;
+    margin: 6px 0 18px;
+}
+
+.password-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.password-check span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.password-check.valid {
+    color: var(--success);
+}
+
+.password-check.valid span {
+    background: rgba(22, 199, 132, 0.14);
+    color: var(--success);
+}
+
+@media (max-width: 640px) {
+    .otp-input-wrap {
+        gap: 6px;
+    }
+
+    .otp-input-box {
+        height: 46px;
+        font-size: 1.1rem;
+    }
+
+    .otp-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
