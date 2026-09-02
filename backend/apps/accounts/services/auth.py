@@ -37,7 +37,10 @@ class AuthService:
     def request_otp(phone_number, purpose, request_ip=None, user_agent=""):
         normalized_phone = normalize_phone_number(phone_number)
 
-        ip_limit = check_and_increment_ip_rate_limit(request_ip)
+        ip_limit = check_and_increment_ip_rate_limit(
+            request_ip,
+            "request",
+        )
 
         if not ip_limit["allowed"]:
             raise Throttled(
@@ -161,6 +164,17 @@ class AuthService:
 
         if not otp.isdigit() or len(otp) != 6:
             raise ValidationError("Invalid OTP.")
+
+        rate_limit = check_and_increment_ip_rate_limit(
+            request_ip,
+            "verify",
+        )
+
+        if not rate_limit["allowed"]:
+            raise Throttled(
+                detail="Too many OTP requests from this IP. Please try again later.",
+                wait=rate_limit["retry_after"],
+            )
 
         try:
             challenge = OTPVerification.objects.get(

@@ -95,16 +95,21 @@ def challenge_send_count(phone_number, purpose):
     )
 
 
-def check_and_increment_ip_rate_limit(ip_address):
+def check_and_increment_ip_rate_limit(ip_address, action):
     ip_address = ip_address or "unknown"
 
     client = get_redis_client()
-    key = f"otp:ip-rate:{ip_address}"
+    key = f"otp:ip-rate:{action}:{ip_address}"
 
     max_requests = settings.OTP_IP_MAX_REQUESTS
     window_seconds = settings.OTP_IP_WINDOW_SECONDS
 
     current_count = client.incr(key)
+
+    print(
+        f"IP RATE LIMIT | ACTION={action} | "
+        f"IP={ip_address} | COUNT={current_count}"
+    )
 
     if current_count == 1:
         client.expire(key, window_seconds)
@@ -157,5 +162,8 @@ class OTPService:
         return challenge_send_count(phone_number, purpose)
 
     @staticmethod
-    def check_and_increment_ip_rate_limit(ip_address):
-        return check_and_increment_ip_rate_limit(ip_address)
+    def check_and_increment_ip_rate_limit(ip_address, action):
+        return check_and_increment_ip_rate_limit(
+            ip_address,
+            action,
+        )
