@@ -1,35 +1,39 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 12000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1',
+    timeout: 12000,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('otc-token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+    const token = localStorage.getItem('otc-access-token')
+    if (token) config.headers.Authorization = `Bearer ${token}`
+    return config
 }, (error) => Promise.reject(error))
 
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error?.response?.status
-    const message = error?.response?.data?.detail || error?.response?.data?.message || 'خطایی رخ داد.'
+    (response) => response,
+    (error) => {
+        const status = error?.response?.status
+        const data = error?.response?.data
+        const message = data?.detail || data?.message || 'خطایی رخ داد.'
+        const normalizedError = new Error(message)
 
-    if (status === 401) {
-      localStorage.removeItem('otc-token')
-      localStorage.removeItem('otc-user')
-      window.location.href = '/login'
-    }
+        normalizedError.status = status
+        normalizedError.response = error?.response
+        normalizedError.data = data
 
-    return Promise.reject(new Error(message))
-  },
+        if (status === 401) {
+            localStorage.removeItem('otc-access-token')
+            localStorage.removeItem('otc-refresh-token')
+            localStorage.removeItem('otc-user')
+        }
+
+        return Promise.reject(normalizedError)
+    },
 )
 
 export default api

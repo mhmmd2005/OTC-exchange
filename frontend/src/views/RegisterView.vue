@@ -154,7 +154,7 @@ function goBack() {
   router.push('/')
 }
 
-onMounted(async () => {
+onMounted(() => {
   const prefilledPhone = route.query.phone ? String(route.query.phone) : ''
 
   if (prefilledPhone) {
@@ -162,8 +162,7 @@ onMounted(async () => {
     phone.value = normalized
     auth.phone = normalized
     auth.authMode = 'register'
-    auth.authStep = 'otp'
-    await handlePhoneSubmit()
+    auth.authStep = 'phone'
   }
 })
 </script>
@@ -204,9 +203,9 @@ onMounted(async () => {
         </button>
 
         <div class="auth-step-indicator" aria-label="مراحل ثبت‌نام">
-          <span :class="['step-pill', { active: stepIndex === 0, done: stepIndex > 0 }]">01</span>
-          <span :class="['step-pill', { active: stepIndex === 1, done: stepIndex > 1 }]">02</span>
-          <span :class="['step-pill', { active: stepIndex === 2, done: stepIndex > 2 }]">03</span>
+          <span :class="['step-pill', {active: stepIndex === 0, done: stepIndex > 0}]">01</span>
+          <span :class="['step-pill', {active: stepIndex === 1, done: stepIndex > 1}]">02</span>
+          <span :class="['step-pill', {active: stepIndex === 2, done: stepIndex > 2}]">03</span>
         </div>
 
         <div class="auth-header">
@@ -261,8 +260,7 @@ onMounted(async () => {
             <div class="password-wrap">
               <input v-model="password" :type="showPassword ? 'text' : 'password'" class="input"
                      placeholder="رمز عبور"/>
-              <button type="button" class="password-toggle" @click="showPassword = !showPassword"
-                      aria-label="نمایش یا مخفی کردن رمز عبور">
+              <button type="button" class="password-toggle" @click="showPassword = !showPassword">
                 <Eye v-if="!showPassword" :size="16"/>
                 <EyeOff v-else :size="16"/>
               </button>
@@ -274,8 +272,7 @@ onMounted(async () => {
             <div class="password-wrap">
               <input v-model="confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" class="input"
                      placeholder="تکرار رمز عبور"/>
-              <button type="button" class="password-toggle" @click="showConfirmPassword = !showConfirmPassword"
-                      aria-label="نمایش یا مخفی کردن تکرار رمز عبور">
+              <button type="button" class="password-toggle" @click="showConfirmPassword = !showConfirmPassword">
                 <Eye v-if="!showConfirmPassword" :size="16"/>
                 <EyeOff v-else :size="16"/>
               </button>
@@ -283,8 +280,7 @@ onMounted(async () => {
           </div>
 
           <div class="password-requirements" aria-live="polite">
-            <div v-for="item in passwordRequirements" :key="item.key"
-                 :class="['password-check', { valid: item.valid }]">
+            <div v-for="item in passwordRequirements" :key="item.key" :class="['password-check', {valid: item.valid}]">
               <span>{{ item.valid ? '✓' : '•' }}</span>
               <small>{{ item.label }}</small>
             </div>

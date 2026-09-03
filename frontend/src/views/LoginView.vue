@@ -59,6 +59,7 @@ async function handlePhoneSubmit() {
 
   phone.value = normalized
   auth.phone = normalized
+
   const result = await auth.requestLoginOtp(normalized)
 
   if (!result.ok) {
@@ -122,6 +123,7 @@ async function resendOtp() {
     return
   }
 
+  otp.value = ''
   startResendTimer()
 }
 
@@ -149,7 +151,6 @@ onMounted(() => {
     auth.phone = normalized
     auth.authMode = 'login'
     auth.authStep = 'otp'
-    auth.requestLoginOtp(normalized)
   }
 })
 </script>
@@ -196,16 +197,15 @@ onMounted(() => {
         </button>
 
         <div class="auth-step-indicator" aria-label="مراحل ورود">
-          <span :class="['step-pill', { active: stepIndex === 0, done: stepIndex > 0 }]">01</span>
-          <span :class="['step-pill', { active: stepIndex === 1, done: stepIndex > 1 }]">02</span>
-          <span :class="['step-pill', { active: stepIndex === 2, done: stepIndex > 2 }]">03</span>
+          <span :class="['step-pill', {active: stepIndex === 0, done: stepIndex > 0}]">01</span>
+          <span :class="['step-pill', {active: stepIndex === 1, done: stepIndex > 1}]">02</span>
+          <span :class="['step-pill', {active: stepIndex === 2, done: stepIndex > 2}]">03</span>
         </div>
 
         <div class="auth-header">
           <h2 v-if="step === 'phone'">ورود به حساب</h2>
           <h2 v-else-if="step === 'otp'">تأیید شماره موبایل</h2>
           <h2 v-else>ورود به حساب</h2>
-
           <p v-if="step === 'phone'">شماره موبایل خود را وارد کنید.</p>
           <p v-else-if="step === 'otp'">کد تأیید ارسال‌شده را وارد کنید.</p>
           <p v-else>رمز عبور خود را وارد کنید.</p>
@@ -253,8 +253,7 @@ onMounted(() => {
             <div class="password-wrap">
               <input v-model="password" :type="showPassword ? 'text' : 'password'" class="input"
                      placeholder="رمز عبور"/>
-              <button type="button" class="password-toggle" @click="showPassword = !showPassword"
-                      aria-label="نمایش یا مخفی کردن رمز عبور">
+              <button type="button" class="password-toggle" @click="showPassword = !showPassword">
                 <Eye v-if="!showPassword" :size="16"/>
                 <EyeOff v-else :size="16"/>
               </button>

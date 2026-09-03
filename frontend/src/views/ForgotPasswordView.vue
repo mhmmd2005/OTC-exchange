@@ -1,15 +1,45 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft, CheckCircle2, Mail } from 'lucide-vue-next'
+import {ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {ArrowLeft} from 'lucide-vue-next'
+import {useAuthStore} from '../stores/auth'
 
 const router = useRouter()
-const email = ref('')
-const sent = ref(false)
+const auth = useAuthStore()
+const phone = ref('')
+const otp = ref('')
+const step = ref('phone')
+const error = ref('')
 
-function submit() {
-  if (!email.value) return
-  sent.value = true
+async function requestOtp() {
+  error.value = ''
+
+  const result = await auth.requestPasswordResetOtp(phone.value)
+
+  if (!result?.ok) {
+    error.value = auth.error || result?.message || 'ارسال کد انجام نشد.'
+    return
+  }
+
+  step.value = 'otp'
+}
+
+async function verifyOtp() {
+  error.value = ''
+
+  if (otp.value.length !== 6) {
+    error.value = 'کد تأیید باید ۶ رقمی باشد.'
+    return
+  }
+
+  const result = await auth.verifyOtp(otp.value)
+
+  if (!result?.ok) {
+    error.value = auth.error || result?.message || 'کد تأیید صحیح نیست.'
+    return
+  }
+
+  await router.push('/reset-password')
 }
 </script>
 
@@ -18,30 +48,47 @@ function submit() {
     <div class="auth-card compact-card">
       <div class="auth-form-panel full-panel">
         <button class="text-action" type="button" @click="router.push('/login')">
-          <ArrowLeft :size="16" /> بازگشت
+          <ArrowLeft :size="16"/>
+          بازگشت
         </button>
 
-        <div v-if="!sent" class="auth-header">
+        <div v-if="step === 'phone'" class="auth-header">
           <h2>بازیابی رمز عبور</h2>
-          <p>ایمیل یا نام کاربری خود را وارد کنید تا لینک بازیابی ارسال شود.</p>
+          <p>شماره موبایل خود را وارد کنید.</p>
         </div>
 
-        <form v-if="!sent" class="auth-form" @submit.prevent="submit">
+        <form v-if="step === 'phone'" class="auth-form" @submit.prevent="requestOtp">
           <div class="field">
-            <label>ایمیل</label>
-            <div class="input-icon-wrap">
-              <Mail :size="16" />
-              <input v-model="email" class="input" type="email" placeholder="you@example.com" />
-            </div>
+            <label>شماره موبایل</label>
+            <input v-model="phone" class="input" type="tel" dir="ltr" inputmode="numeric" placeholder="09123456780"/>
           </div>
-          <button class="primary-btn large" type="submit">ارسال لینک بازیابی</button>
+
+          <p v-if="error" class="form-error">{{ error }}</p>
+
+          <button class="primary-btn large" type="submit" :disabled="auth.loading">
+            {{ auth.loading ? 'در حال ارسال...' : 'ارسال کد تأیید' }}
+          </button>
         </form>
 
-        <div v-else class="success-box">
-          <CheckCircle2 :size="40" />
-          <h3>لینک بازیابی ارسال شد</h3>
-          <p>ایمیل با لینک بازیابی برای شما ارسال شد. لطفاً صندوق ورودی را بررسی کنید.</p>
-          <button class="primary-btn large" type="button" @click="router.push('/reset-password')">تغییر رمز عبور</button>
+        <div v-else-if="step === 'otp'">
+          <div class="auth-header">
+            <h2>تأیید شماره</h2>
+            <p>کد ارسال‌شده به {{ auth.phone }} را وارد کنید.</p>
+          </div>
+
+          <form class="auth-form" @submit.prevent="verifyOtp">
+            <div class="field">
+              <label>کد تأیید</label>
+              <input v-model="otp" class="input" type="text" inputmode="numeric" maxlength="6" dir="ltr"
+                     placeholder="123456"/>
+            </div>
+
+            <p v-if="error" class="form-error">{{ error }}</p>
+
+            <button class="primary-btn large" type="submit" :disabled="auth.loading || otp.length !== 6">
+              {{ auth.loading ? 'در حال بررسی...' : 'تأیید کد' }}
+            </button>
+          </form>
         </div>
       </div>
     </div>

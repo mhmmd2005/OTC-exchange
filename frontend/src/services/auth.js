@@ -1,217 +1,344 @@
-import { mockUser } from '../mock/data'
-import { isValidIranianMobile, normalizePhone } from '../utils/phone'
-import { validatePassword } from '../utils/passwordValidation'
+import {isValidIranianMobile, normalizePhone} from '../utils/phone'
 
-const DEV_OTP = '123456'
-const DEV_PASSWORD = 'Demo@1234'
+const USERS_KEY = 'otc-mock-users'
+const OTP_KEY = 'otc-mock-otp'
+const FLOW_KEY = 'otc-mock-flow'
+const OTP_CODE = '123456'
 
-const demoUser = {
-  ...mockUser,
-  id: 1,
-  phone_number: '+989123456789',
-  fullName: 'مهدی قاسمی',
-  avatar: 'MG',
-  kycStatus: 'تأیید شده',
-  kycLevel: 'سطح ۲',
+function getUsers() {
+    try {
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || 'null')
+        if (Array.isArray(users) && users.length) return users
+    } catch {
+    }
+
+    const defaults = [{
+        id: 1,
+        phone_number: '+989123456780',
+        full_name: 'کاربر تستی',
+        avatar: null,
+        password: 'Aa123456!',
+        is_phone_verified: true,
+        kyc_status: 'not_started',
+        kyc_level: 'basic',
+        created_at: new Date().toISOString(),
+    }]
+
+    localStorage.setItem(USERS_KEY, JSON.stringify(defaults))
+    return defaults
 }
 
-const userStore = new Map([[demoUser.phone_number, { user: demoUser, password: DEV_PASSWORD }]])
-const mockChallenges = new Map()
-
-function sleep(ms = 450) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function saveUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users))
 }
 
-function buildUserFromPhone(phone, overrides = {}) {
-  return {
-    id: Date.now() + Math.random(),
-    phone_number: phone,
-    fullName: overrides.fullName || 'کاربر جدید',
-    email: '',
-    avatar: overrides.avatar || 'U',
-    kycStatus: 'در حال بررسی',
-    kycLevel: 'سطح ۱',
-    ...overrides,
-  }
+function findUser(phone) {
+    const normalized = normalizePhone(phone)
+    return getUsers().find(user => user.phone_number === normalized || user.phone_number === `+98${normalized.slice(1)}`)
 }
 
-function findChallengeByToken(flowToken) {
-  for (const challenge of mockChallenges.values()) {
-    if (challenge.flowToken === flowToken) return challenge
-  }
-  return null
+function createToken(prefix) {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function createOtpChallenge(phone, purpose) {
+    const challengeId = String(Date.now())
+    const flowToken = createToken(`mock-${purpose}`)
+
+    localStorage.setItem(OTP_KEY, JSON.stringify({
+        challengeId,
+        phone,
+        purpose,
+        otp: OTP_CODE,
+        expiresAt: Date.now() + 180000,
+        verified: false,
+        flowToken,
+    }))
+
+    return {challengeId, flowToken}
+}
+
+function getOtpChallenge() {
+    try {
+        return JSON.parse(localStorage.getItem(OTP_KEY) || 'null')
+    } catch {
+        return null
+    }
+}
+
+function getFlow(flowToken) {
+    try {
+        const flow = JSON.parse(localStorage.getItem(FLOW_KEY) || 'null')
+        if (!flow || flow.flowToken !== flowToken || flow.expiresAt < Date.now()) return null
+        return flow
+    } catch {
+        return null
+    }
+}
+
+function createFlow(challenge, flowToken) {
+    localStorage.setItem(FLOW_KEY, JSON.stringify({
+        flowToken,
+        challengeId: challenge.challengeId,
+        phone: challenge.phone,
+        purpose: challenge.purpose,
+        expiresAt: Date.now() + 600000,
+    }))
+}
+
+function mapUser(user) {
+    if (!user) return null
+    const {password, ...safeUser} = user
+    return safeUser
+}
+
+function buildAuthResponse(user) {
+    return {
+        ok: true,
+        access: createToken('mock-access'),
+        refresh: createToken('mock-refresh'),
+        user: mapUser(user),
+    }
 }
 
 export const authService = {
-  async requestLoginOtp(phone) {
-    await sleep()
+    async requestLoginOtp(phone) {
+        const normalized = normalizePhone(phone)
 
-    const normalized = normalizePhone(phone)
-    if (!isValidIranianMobile(normalized)) {
-      return { ok: false, message: 'شماره موبایل معتبر نیست.' }
-    }
+        if (!isValidIranianMobile(normalized)) {
+            return {ok: false, message: 'شماره موبایل معتبر نیست.'}
+        }
 
-    if (userStore.has(normalized)) {
-      const challengeId = `login-${Date.now()}`
-      const challenge = {
-        challengeId,
-        phone: normalized,
-        mode: 'login',
-        otp: DEV_OTP,
-        expiresAt: Date.now() + 120000,
-      }
-      mockChallenges.set(challengeId, challenge)
+        const user = findUser(normalized)
 
-      return {
-        ok: true,
-        challengeId,
-        phone: normalized,
-        expiresAt: challenge.expiresAt,
-        mode: 'login',
-        needsRegistration: false,
-      }
-    }
+        if (!user) {
+            return {
+                ok: true,
+                phone: normalized,
+                needsRegistration: true,
+                mode: 'register',
+                message: 'برای این شماره حسابی وجود ندارد.',
+            }
+        }
 
-    const challengeId = `register-${Date.now()}`
-    const challenge = {
-      challengeId,
-      phone: normalized,
-      mode: 'register',
-      otp: DEV_OTP,
-      expiresAt: Date.now() + 120000,
-    }
-    mockChallenges.set(challengeId, challenge)
+        const challenge = createOtpChallenge(normalized, 'login')
 
-    return {
-      ok: true,
-      challengeId,
-      phone: normalized,
-      expiresAt: challenge.expiresAt,
-      mode: 'register',
-      needsRegistration: true,
-    }
-  },
+        return {
+            ok: true,
+            challengeId: challenge.challengeId,
+            phone: normalized,
+            expiresIn: 180,
+            resendAvailableIn: 120,
+            needsRegistration: false,
+            mode: 'login',
+        }
+    },
 
-  async requestRegistrationOtp(phone) {
-    await sleep()
+    async requestRegistrationOtp(phone) {
+        const normalized = normalizePhone(phone)
 
-    const normalized = normalizePhone(phone)
-    if (!isValidIranianMobile(normalized)) {
-      return { ok: false, message: 'شماره موبایل معتبر نیست.' }
-    }
+        if (!isValidIranianMobile(normalized)) {
+            return {ok: false, message: 'شماره موبایل معتبر نیست.'}
+        }
 
-    if (userStore.has(normalized)) {
-      return {
-        ok: true,
-        alreadyRegistered: true,
-        phone: normalized,
-        message: 'این شماره قبلا ثبت شده است.',
-      }
-    }
+        const user = findUser(normalized)
 
-    const challengeId = `register-${Date.now()}`
-    const challenge = {
-      challengeId,
-      phone: normalized,
-      mode: 'register',
-      otp: DEV_OTP,
-      expiresAt: Date.now() + 120000,
-    }
-    mockChallenges.set(challengeId, challenge)
+        if (user) {
+            return {
+                ok: true,
+                alreadyRegistered: true,
+                phone: normalized,
+                message: 'این شماره قبلاً ثبت شده است.',
+            }
+        }
 
-    return {
-      ok: true,
-      challengeId,
-      phone: normalized,
-      expiresAt: challenge.expiresAt,
-      alreadyRegistered: false,
-      mode: 'register',
-    }
-  },
+        const challenge = createOtpChallenge(normalized, 'registration')
 
-  async verifyOtp(challengeId, otp) {
-    await sleep(320)
+        return {
+            ok: true,
+            challengeId: challenge.challengeId,
+            phone: normalized,
+            expiresIn: 180,
+            resendAvailableIn: 120,
+            alreadyRegistered: false,
+            mode: 'register',
+        }
+    },
 
-    const challenge = mockChallenges.get(challengeId)
-    if (!challenge) {
-      return { ok: false, message: 'کد تایید صحیح نیست.' }
-    }
+    async requestPasswordResetOtp(phone) {
+        const normalized = normalizePhone(phone)
 
-    if (Date.now() > challenge.expiresAt) {
-      mockChallenges.delete(challengeId)
-      return { ok: false, expired: true, message: 'کد تایید منقضی شده است.' }
-    }
+        if (!isValidIranianMobile(normalized)) {
+            return {ok: false, message: 'شماره موبایل معتبر نیست.'}
+        }
 
-    if (String(otp).trim() !== String(challenge.otp)) {
-      return { ok: false, message: 'کد تایید صحیح نیست.' }
-    }
+        const user = findUser(normalized)
 
-    const flowToken = `flow-${Date.now()}`
-    challenge.flowToken = flowToken
-    mockChallenges.set(challengeId, challenge)
+        if (!user) {
+            return {ok: false, message: 'حسابی با این شماره پیدا نشد.'}
+        }
 
-    return {
-      ok: true,
-      flowToken,
-      mode: challenge.mode,
-      phone: challenge.phone,
-    }
-  },
+        const challenge = createOtpChallenge(normalized, 'password_reset')
 
-  async verifyLoginPassword(flowToken, password) {
-    await sleep(420)
+        return {
+            ok: true,
+            challengeId: challenge.challengeId,
+            phone: normalized,
+            expiresIn: 180,
+            resendAvailableIn: 120,
+        }
+    },
 
-    const challenge = findChallengeByToken(flowToken)
-    if (!challenge) {
-      return { ok: false, message: 'رمز عبور صحیح نیست.' }
-    }
+    async verifyOtp(challengeId, otp) {
+        const challenge = getOtpChallenge()
 
-    const userRecord = userStore.get(challenge.phone)
-    if (!userRecord) {
-      return { ok: false, message: 'رمز عبور صحیح نیست.' }
-    }
+        if (!challenge || challenge.challengeId !== String(challengeId)) {
+            return {ok: false, message: 'درخواست تأیید معتبر نیست.'}
+        }
 
-    if (String(password) !== userRecord.password) {
-      return { ok: false, message: 'رمز عبور صحیح نیست.' }
-    }
+        if (challenge.expiresAt < Date.now()) {
+            return {ok: false, message: 'کد تأیید منقضی شده است.'}
+        }
 
-    return { ok: true, user: userRecord.user }
-  },
+        if (String(otp) !== OTP_CODE) {
+            return {ok: false, message: 'کد تأیید صحیح نیست.'}
+        }
 
-  async registerWithPassword(flowToken, password, confirmPassword) {
-    await sleep(420)
+        const flowToken = createToken(`mock-${challenge.purpose}`)
 
-    const challenge = findChallengeByToken(flowToken)
-    if (!challenge) {
-      return { ok: false, message: 'جلسه احراز هویت نامعتبر است.' }
-    }
+        challenge.verified = true
+        challenge.flowToken = flowToken
 
-    if (!password || !confirmPassword) {
-      return { ok: false, message: 'رمز عبور را وارد کنید.' }
-    }
+        localStorage.setItem(OTP_KEY, JSON.stringify(challenge))
+        createFlow(challenge, flowToken)
 
-    if (password !== confirmPassword) {
-      return { ok: false, message: 'رمزهای عبور یکسان نیستند.' }
-    }
+        return {
+            ok: true,
+            flowToken,
+            nextStep: challenge.purpose === 'password_reset' ? 'password_reset' : 'password',
+            expiresIn: 600,
+        }
+    },
 
-    if (!validatePassword(password)) {
-      return { ok: false, message: 'رمز عبور شرایط لازم را ندارد.' }
-    }
+    async verifyLoginPassword(flowToken, password) {
+        const flow = getFlow(flowToken)
 
-    const user = buildUserFromPhone(challenge.phone, {
-      fullName: 'کاربر جدید',
-      avatar: 'U',
-    })
+        if (!flow || flow.purpose !== 'login') {
+            return {ok: false, message: 'درخواست ورود معتبر نیست.'}
+        }
 
-    userStore.set(challenge.phone, { user, password })
+        const user = findUser(flow.phone)
 
-    return { ok: true, user }
-  },
+        if (!user || user.password !== password) {
+            return {ok: false, message: 'رمز عبور صحیح نیست.'}
+        }
 
-  async getCurrentUser() {
-    await sleep(120)
-    return { data: { user: demoUser } }
-  },
+        return buildAuthResponse(user)
+    },
+
+    async registerWithPassword(flowToken, password, confirmPassword) {
+        const flow = getFlow(flowToken)
+
+        if (!flow || flow.purpose !== 'registration') {
+            return {ok: false, message: 'درخواست ثبت‌نام معتبر نیست.'}
+        }
+
+        if (password !== confirmPassword) {
+            return {ok: false, message: 'رمزهای عبور یکسان نیستند.'}
+        }
+
+        if (password.length < 6) {
+            return {ok: false, message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.'}
+        }
+
+        const users = getUsers()
+
+        if (findUser(flow.phone)) {
+            return {ok: false, message: 'این شماره قبلاً ثبت شده است.'}
+        }
+
+        const user = {
+            id: Date.now(),
+            phone_number: `+98${flow.phone.slice(1)}`,
+            full_name: '',
+            avatar: null,
+            password,
+            is_phone_verified: true,
+            kyc_status: 'not_started',
+            kyc_level: 'basic',
+            created_at: new Date().toISOString(),
+        }
+
+        users.push(user)
+        saveUsers(users)
+
+        return buildAuthResponse(user)
+    },
+
+    async resetPassword(flowToken, password, confirmPassword) {
+        const flow = getFlow(flowToken)
+
+        if (!flow || flow.purpose !== 'password_reset') {
+            return {ok: false, message: 'درخواست بازیابی معتبر نیست.'}
+        }
+
+        if (password !== confirmPassword) {
+            return {ok: false, message: 'رمزهای عبور یکسان نیستند.'}
+        }
+
+        if (password.length < 6) {
+            return {ok: false, message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.'}
+        }
+
+        const users = getUsers()
+        const index = users.findIndex(user =>
+            user.phone_number === flow.phone ||
+            user.phone_number === `+98${flow.phone.slice(1)}`
+        )
+
+        if (index === -1) {
+            return {ok: false, message: 'حسابی با این شماره پیدا نشد.'}
+        }
+
+        users[index].password = password
+        saveUsers(users)
+
+        localStorage.removeItem(OTP_KEY)
+        localStorage.removeItem(FLOW_KEY)
+
+        return {
+            ok: true,
+            message: 'رمز عبور با موفقیت تغییر کرد.',
+        }
+    },
+
+    async getCurrentUser() {
+        const token = localStorage.getItem('otc-access-token')
+        const savedUser = localStorage.getItem('otc-user')
+
+        if (!token || !savedUser) {
+            throw new Error('کاربر وارد نشده است.')
+        }
+
+        return {
+            data: {
+                user: JSON.parse(savedUser),
+            },
+        }
+    },
+
+    async refresh(refreshToken) {
+        if (!refreshToken) throw new Error('Refresh token موجود نیست.')
+
+        return {
+            access: createToken('mock-access'),
+            refresh: refreshToken,
+        }
+    },
+
+    async logout() {
+        return {message: 'خروج با موفقیت انجام شد.'}
+    },
 }
 
 export default authService
