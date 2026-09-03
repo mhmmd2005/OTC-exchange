@@ -1,23 +1,25 @@
 <script setup>
-import { computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useRouter } from 'vue-router'
+import {computed} from 'vue'
+import {useAuthStore} from '../stores/auth'
+import {useRouter} from 'vue-router'
 
 const auth = useAuthStore()
 const router = useRouter()
 const isLoggedIn = computed(() => auth.isAuthenticated)
 
 const navItems = [
-  { label: 'بازار', href: '#market' },
-  { label: 'OTC', href: '#otc' },
-  { label: 'درباره ما', href: '#about' },
-  { label: 'امنیت', href: '#security' },
-  { label: 'پشتیبانی', href: '#support' },
+  {label: 'بازار', href: '#market'},
+  {label: 'OTC', href: '#otc'},
+  {label: 'درباره ما', href: '#about'},
+  {label: 'امنیت', href: '#security'},
+  {label: 'پشتیبانی', href: '#support'},
 ]
 
 function goLogin() {
   router.push('/login')
 }
+
+const goRegister = () => router.push('/register')
 
 function goDashboard() {
   router.push('/dashboard')
@@ -44,7 +46,9 @@ function goDashboard() {
       <div class="nav-actions">
         <button v-if="isLoggedIn" class="nav-btn primary" type="button" @click="goDashboard">داشبورد</button>
         <button v-else class="nav-btn ghost" type="button" @click="goLogin">ورود</button>
-        <button class="nav-btn primary" type="button" @click="isLoggedIn ? goDashboard() : goLogin()">{{ isLoggedIn ? 'حساب من' : 'ایجاد حساب' }}</button>
+        <button class="nav-btn primary" type="button" @click="isLoggedIn ? goDashboard() : goRegister()">
+          {{ isLoggedIn ? 'حساب من' : 'ایجاد حساب' }}
+        </button>
       </div>
     </nav>
   </header>
