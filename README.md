@@ -1,20 +1,22 @@
 # OTC Exchange
 
-This repository contains the existing Vue 3 + Vite frontend at the project root and a new Django + DRF backend under `backend/`.
+This repository contains a Django + DRF backend under `backend/` and a Vue 3 + Vite frontend under `frontend/`.
 
 ## Current project structure
 
-- Frontend: `/` (Vue 3, Vite, Pinia, Router)
+- Frontend: `/frontend` (Vue 3, Vite, Pinia, Router)
 - Backend: `/backend` (Django REST API foundation)
+- Project root: shared repository files and metadata that are not tied to either application
 
 ## Frontend setup
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
 
-The frontend remains in place and is not connected to the backend in this phase.
+The frontend remains independent of the backend in this phase.
 
 ## Backend setup
 

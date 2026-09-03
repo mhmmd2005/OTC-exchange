@@ -16,6 +16,8 @@ __pycache__/
 
 # Build output
 dist/
+frontend/dist/
+frontend/.vite/
 dist-ssr/
 backend/staticfiles/
 backend/media/
