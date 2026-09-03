@@ -1,23 +1,14 @@
-from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework import serializers
-
 from apps.accounts.models import User
 from apps.accounts.services.phone import normalize_phone_number
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = [
-            "id",
-            "phone_number",
-            "full_name",
-            "avatar",
-            "is_phone_verified",
-            "kyc_status",
-            "kyc_level",
-            "created_at",
-        ]
+        fields = ["id", "phone_number", "full_name", "avatar", "is_phone_verified", "kyc_status", "kyc_level",
+                  "created_at"]
         read_only_fields = ["id", "created_at"]
 
 
@@ -42,6 +33,12 @@ class LoginPasswordSerializer(serializers.Serializer):
 
 
 class RegistrationPasswordSerializer(serializers.Serializer):
+    flow_token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+
+class PasswordResetSerializer(serializers.Serializer):
     flow_token = serializers.CharField()
     password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)

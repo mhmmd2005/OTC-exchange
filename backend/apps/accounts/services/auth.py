@@ -20,11 +20,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import (
-    AuthenticationFailed,
-    PermissionDenied,
-    Throttled,
-)
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, Throttled
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
@@ -37,23 +33,15 @@ class AuthService:
     def request_otp(phone_number, purpose, request_ip=None, user_agent=""):
         normalized_phone = normalize_phone_number(phone_number)
 
-        ip_limit = check_and_increment_ip_rate_limit(
-            request_ip,
-            "request",
-        )
+        ip_limit = check_and_increment_ip_rate_limit(request_ip, "request")
 
         if not ip_limit["allowed"]:
             raise Throttled(
-                detail=(
-                    "Too many OTP requests from this IP. "
-                    "Please try again later."
-                ),
+                detail="Too many OTP requests from this IP. Please try again later.",
                 wait=ip_limit["retry_after"],
             )
 
-        account_exists = User.objects.filter(
-            phone_number=normalized_phone
-        ).exists()
+        account_exists = User.objects.filter(phone_number=normalized_phone).exists()
 
         if purpose == "login" and not account_exists:
             return {
@@ -72,26 +60,22 @@ class AuthService:
                 "phone_number": normalized_phone,
             }
 
+        if purpose == "password_reset" and not account_exists:
+            return {
+                "allowed": False,
+                "account_exists": False,
+                "message": "No account was found for this phone number.",
+                "next_step": "password_reset",
+                "phone_number": normalized_phone,
+            }
+
         if not can_resend(normalized_phone, purpose):
-            raise PermissionDenied(
-                "Please wait before requesting a new OTP."
-            )
+            raise PermissionDenied("Please wait before requesting a new OTP.")
 
-        if (
-                challenge_send_count(
-                    normalized_phone,
-                    purpose,
-                )
-                >= settings.OTP_MAX_SENDS
-        ):
-            raise PermissionDenied(
-                "Too many OTP requests. Please try again later."
-            )
+        if challenge_send_count(normalized_phone, purpose) >= settings.OTP_MAX_SENDS:
+            raise PermissionDenied("Too many OTP requests. Please try again later.")
 
-        invalidate_previous_challenges(
-            normalized_phone,
-            purpose,
-        )
+        invalidate_previous_challenges(normalized_phone, purpose)
 
         code = generate_otp()
 
@@ -99,34 +83,20 @@ class AuthService:
             phone_number=normalized_phone,
             purpose=purpose,
             code_hash=hash_otp(code),
-            expires_at=(
-                    timezone.now()
-                    + timedelta(
-                seconds=settings.OTP_TTL_SECONDS
-            )
-            ),
+            expires_at=timezone.now() + timedelta(seconds=settings.OTP_TTL_SECONDS),
             max_attempts=settings.OTP_MAX_ATTEMPTS,
             request_ip=request_ip,
             user_agent=user_agent[:500],
         )
 
-        store_otp_code(
-            challenge.id,
-            code,
-            settings.OTP_TTL_SECONDS,
-        )
+        store_otp_code(challenge.id, code, settings.OTP_TTL_SECONDS)
 
-        transaction.on_commit(
-            lambda: send_otp_sms_task.delay(challenge.id)
-        )
+        transaction.on_commit(lambda: send_otp_sms_task.delay(challenge.id))
 
         SecurityEvent.objects.create(
             user=None,
             event_type="otp_requested",
-            description=(
-                f"OTP requested for "
-                f"{normalized_phone} ({purpose})"
-            ),
+            description=f"OTP requested for {normalized_phone} ({purpose})",
             ip_address=request_ip,
         )
 
@@ -134,41 +104,27 @@ class AuthService:
             "allowed": True,
             "challenge_id": str(challenge.id),
             "expires_in": settings.OTP_TTL_SECONDS,
-            "resend_available_in": (
-                settings.OTP_RESEND_COOLDOWN_SECONDS
-            ),
+            "resend_available_in": settings.OTP_RESEND_COOLDOWN_SECONDS,
             "next_step": "otp",
             "account_exists": account_exists,
         }
 
     @staticmethod
-    def verify_otp(
-            challenge_id,
-            otp,
-            request_ip=None,
-            user_agent="",
-    ):
+    def verify_otp(challenge_id, otp, request_ip=None, user_agent=""):
         try:
             challenge_id = int(challenge_id)
         except (TypeError, ValueError):
-            raise ValidationError(
-                "Invalid verification challenge."
-            )
+            raise ValidationError("Invalid verification challenge.")
 
         if challenge_id <= 0:
-            raise ValidationError(
-                "Invalid verification challenge."
-            )
+            raise ValidationError("Invalid verification challenge.")
 
         otp = str(otp or "").strip()
 
         if not otp.isdigit() or len(otp) != 6:
             raise ValidationError("Invalid OTP.")
 
-        rate_limit = check_and_increment_ip_rate_limit(
-            request_ip,
-            "verify",
-        )
+        rate_limit = check_and_increment_ip_rate_limit(request_ip, "verify")
 
         if not rate_limit["allowed"]:
             raise Throttled(
@@ -177,33 +133,22 @@ class AuthService:
             )
 
         try:
-            challenge = OTPVerification.objects.get(
-                id=challenge_id
-            )
+            challenge = OTPVerification.objects.get(id=challenge_id)
         except OTPVerification.DoesNotExist as exc:
-            raise ValidationError(
-                "Invalid verification challenge."
-            ) from exc
+            raise ValidationError("Invalid verification challenge.") from exc
 
         if challenge.is_used:
-            raise ValidationError(
-                "This OTP challenge has already been used."
-            )
+            raise ValidationError("This OTP challenge has already been used.")
 
         if is_expired(challenge):
             challenge.is_used = True
             challenge.save(update_fields=["is_used"])
-            raise ValidationError(
-                "OTP has expired. Please request a new one."
-            )
+            raise ValidationError("OTP has expired. Please request a new one.")
 
         if challenge.attempts >= challenge.max_attempts:
             challenge.is_used = True
             challenge.save(update_fields=["is_used"])
-            raise ValidationError(
-                "OTP verification limit reached. "
-                "Please request a new one."
-            )
+            raise ValidationError("OTP verification limit reached. Please request a new one.")
 
         submitted_hash = hash_otp(otp)
 
@@ -214,10 +159,7 @@ class AuthService:
             SecurityEvent.objects.create(
                 user=None,
                 event_type="otp_failed",
-                description=(
-                    f"OTP failed for "
-                    f"{challenge.phone_number}"
-                ),
+                description=f"OTP failed for {challenge.phone_number}",
                 ip_address=request_ip,
             )
 
@@ -225,21 +167,12 @@ class AuthService:
 
         challenge.is_used = True
         challenge.verified_at = timezone.now()
-
-        challenge.save(
-            update_fields=[
-                "is_used",
-                "verified_at",
-            ]
-        )
+        challenge.save(update_fields=["is_used", "verified_at"])
 
         SecurityEvent.objects.create(
             user=None,
             event_type="otp_verified",
-            description=(
-                f"OTP verified for "
-                f"{challenge.phone_number}"
-            ),
+            description=f"OTP verified for {challenge.phone_number}",
             ip_address=request_ip,
         )
 
@@ -248,12 +181,7 @@ class AuthService:
                 "challenge_id": str(challenge.id),
                 "phone_number": challenge.phone_number,
                 "purpose": challenge.purpose,
-                "exp": int(
-                    (
-                            timezone.now()
-                            + timedelta(minutes=10)
-                    ).timestamp()
-                ),
+                "exp": int((timezone.now() + timedelta(minutes=10)).timestamp()),
             },
             salt="auth-flow-token",
             compress=True,
@@ -268,76 +196,35 @@ class AuthService:
     @staticmethod
     def validate_flow_token(flow_token, expected_purpose=None):
         try:
-            payload = signing.loads(
-                flow_token,
-                salt="auth-flow-token",
-                max_age=600,
-            )
-        except (
-                signing.BadSignature,
-                signing.SignatureExpired,
-        ):
-            raise AuthenticationFailed(
-                "Invalid or expired flow token."
-            )
+            payload = signing.loads(flow_token, salt="auth-flow-token", max_age=600)
+        except (signing.BadSignature, signing.SignatureExpired):
+            raise AuthenticationFailed("Invalid or expired flow token.")
 
         challenge_id = payload.get("challenge_id")
 
         try:
             challenge_id = int(challenge_id)
         except (TypeError, ValueError):
-            raise AuthenticationFailed(
-                "Invalid flow token."
-            )
+            raise AuthenticationFailed("Invalid flow token.")
 
-        challenge = (
-            OTPVerification.objects
-            .filter(id=challenge_id)
-            .first()
-        )
+        challenge = OTPVerification.objects.filter(id=challenge_id).first()
 
         if not challenge:
-            raise AuthenticationFailed(
-                "Invalid flow token."
-            )
+            raise AuthenticationFailed("Invalid flow token.")
 
-        if (
-                expected_purpose
-                and challenge.purpose != expected_purpose
-        ):
-            raise AuthenticationFailed(
-                "Flow validation failed."
-            )
+        if expected_purpose and challenge.purpose != expected_purpose:
+            raise AuthenticationFailed("Flow validation failed.")
 
-        if (
-                not challenge.is_used
-                or not challenge.verified_at
-        ):
-            raise AuthenticationFailed(
-                "OTP validation is required before proceeding."
-            )
+        if not challenge.is_used or not challenge.verified_at:
+            raise AuthenticationFailed("OTP validation is required before proceeding.")
 
         return challenge, payload
 
     @staticmethod
-    def verify_login_password(
-            flow_token,
-            password,
-            request_ip=None,
-            user_agent="",
-    ):
-        challenge, _ = AuthService.validate_flow_token(
-            flow_token,
-            expected_purpose="login",
-        )
+    def verify_login_password(flow_token, password, request_ip=None, user_agent=""):
+        challenge, _ = AuthService.validate_flow_token(flow_token, expected_purpose="login")
 
-        user = (
-            User.objects
-            .filter(
-                phone_number=challenge.phone_number
-            )
-            .first()
-        )
+        user = User.objects.filter(phone_number=challenge.phone_number).first()
 
         if not user or not user.is_active:
             LoginHistory.objects.create(
@@ -346,31 +233,16 @@ class AuthService:
                 user_agent=user_agent[:500],
                 success=False,
             )
+            raise AuthenticationFailed("Invalid credentials.")
 
-            raise AuthenticationFailed(
-                "Invalid credentials."
-            )
-
-        cache_key = (
-            f"login-failures:{user.phone_number}"
-        )
-
-        failed_attempts = cache.get(
-            cache_key,
-            0,
-        )
+        cache_key = f"login-failures:{user.phone_number}"
+        failed_attempts = cache.get(cache_key, 0)
 
         if failed_attempts >= 5:
-            raise AuthenticationFailed(
-                "Too many failed login attempts. Please try later."
-            )
+            raise AuthenticationFailed("Too many failed login attempts. Please try later.")
 
         if not user.check_password(password):
-            cache.set(
-                cache_key,
-                failed_attempts + 1,
-                timeout=300,
-            )
+            cache.set(cache_key, failed_attempts + 1, timeout=300)
 
             LoginHistory.objects.create(
                 user=user,
@@ -382,16 +254,11 @@ class AuthService:
             SecurityEvent.objects.create(
                 user=user,
                 event_type="login_failure",
-                description=(
-                    "Failed login with "
-                    "password verification."
-                ),
+                description="Failed login with password verification.",
                 ip_address=request_ip,
             )
 
-            raise AuthenticationFailed(
-                "Invalid credentials."
-            )
+            raise AuthenticationFailed("Invalid credentials.")
 
         cache.delete(cache_key)
 
@@ -407,9 +274,7 @@ class AuthService:
         SecurityEvent.objects.create(
             user=user,
             event_type="login_success",
-            description=(
-                "Successful login via OTP and password."
-            ),
+            description="Successful login via OTP and password.",
             ip_address=request_ip,
         )
 
@@ -420,54 +285,28 @@ class AuthService:
                 "id": user.id,
                 "phone_number": user.phone_number,
                 "full_name": user.full_name,
-                "avatar": (
-                    user.avatar.url
-                    if user.avatar
-                    else None
-                ),
-                "is_phone_verified":
-                    user.is_phone_verified,
+                "avatar": user.avatar.url if user.avatar else None,
+                "is_phone_verified": user.is_phone_verified,
                 "kyc_status": user.kyc_status,
                 "kyc_level": user.kyc_level,
-                "created_at": (
-                    user.created_at.isoformat()
-                    if user.created_at
-                    else None
-                ),
+                "created_at": user.created_at.isoformat() if user.created_at else None,
             },
         }
 
     @staticmethod
     @transaction.atomic
-    def register_with_password(
-            flow_token,
-            password,
-            confirm_password,
-            request_ip=None,
-            user_agent="",
-    ):
-        challenge, _ = AuthService.validate_flow_token(
-            flow_token,
-            expected_purpose="registration",
-        )
+    def register_with_password(flow_token, password, confirm_password, request_ip=None, user_agent=""):
+        challenge, _ = AuthService.validate_flow_token(flow_token, expected_purpose="registration")
 
         if password != confirm_password:
-            raise ValidationError(
-                "Passwords do not match."
-            )
+            raise ValidationError("Passwords do not match.")
 
-        from django.contrib.auth.password_validation import (
-            validate_password,
-        )
+        from django.contrib.auth.password_validation import validate_password
 
         validate_password(password)
 
-        if User.objects.filter(
-                phone_number=challenge.phone_number
-        ).exists():
-            raise ValidationError(
-                "This phone number is already registered."
-            )
+        if User.objects.filter(phone_number=challenge.phone_number).exists():
+            raise ValidationError("This phone number is already registered.")
 
         user = User.objects.create(
             phone_number=challenge.phone_number,
@@ -477,25 +316,14 @@ class AuthService:
         )
 
         user.set_password(password)
-
-        user.save(
-            update_fields=[
-                "password",
-                "is_phone_verified",
-                "phone_verified_at",
-                "updated_at",
-            ]
-        )
+        user.save(update_fields=["password", "is_phone_verified", "phone_verified_at", "updated_at"])
 
         refresh = RefreshToken.for_user(user)
 
         SecurityEvent.objects.create(
             user=user,
             event_type="registration_success",
-            description=(
-                "User registered successfully "
-                "via OTP and password."
-            ),
+            description="User registered successfully via OTP and password.",
             ip_address=request_ip,
         )
 
@@ -506,19 +334,47 @@ class AuthService:
                 "id": user.id,
                 "phone_number": user.phone_number,
                 "full_name": user.full_name,
-                "avatar": (
-                    user.avatar.url
-                    if user.avatar
-                    else None
-                ),
-                "is_phone_verified":
-                    user.is_phone_verified,
+                "avatar": user.avatar.url if user.avatar else None,
+                "is_phone_verified": user.is_phone_verified,
                 "kyc_status": user.kyc_status,
                 "kyc_level": user.kyc_level,
-                "created_at": (
-                    user.created_at.isoformat()
-                    if user.created_at
-                    else None
-                ),
+                "created_at": user.created_at.isoformat() if user.created_at else None,
             },
+        }
+
+    @staticmethod
+    @transaction.atomic
+    def reset_password(flow_token, password, confirm_password, request_ip=None, user_agent=""):
+        challenge, _ = AuthService.validate_flow_token(
+            flow_token,
+            expected_purpose="password_reset",
+        )
+
+        if password != confirm_password:
+            raise ValidationError("Passwords do not match.")
+
+        from django.contrib.auth.password_validation import validate_password
+
+        validate_password(password)
+
+        user = User.objects.filter(
+            phone_number=challenge.phone_number,
+            is_active=True,
+        ).first()
+
+        if not user:
+            raise ValidationError("User account not found.")
+
+        user.set_password(password)
+        user.save(update_fields=["password", "updated_at"])
+
+        SecurityEvent.objects.create(
+            user=user,
+            event_type="password_reset_success",
+            description="Password reset successfully via OTP.",
+            ip_address=request_ip,
+        )
+
+        return {
+            "message": "Password reset successfully.",
         }

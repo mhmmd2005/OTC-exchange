@@ -1,12 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import { useNotificationStore } from '../stores/notification'
-import { ArrowLeft, Eye, EyeOff, ShieldCheck } from 'lucide-vue-next'
+import {computed, onMounted, ref} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {useAuthStore} from '../stores/auth'
+import {useNotificationStore} from '../stores/notification'
+import {ArrowLeft, Eye, EyeOff, ShieldCheck} from 'lucide-vue-next'
 import OtpInput from '../components/OtpInput.vue'
-import { getPasswordRequirements, validatePassword } from '../utils/passwordValidation'
-import { isValidIranianMobile, normalizePhone } from '../utils/phone'
+import {getPasswordRequirements, validatePassword} from '../utils/passwordValidation'
+import {isValidIranianMobile, normalizePhone} from '../utils/phone'
 
 const router = useRouter()
 const route = useRoute()
@@ -50,16 +50,15 @@ function startResendTimer() {
   resendSeconds.value = 87
   resendTimer = setInterval(() => {
     resendSeconds.value -= 1
-    if (resendSeconds.value <= 0) {
-      clearResendTimer()
-    }
+    if (resendSeconds.value <= 0) clearResendTimer()
   }, 1000)
 }
 
 async function handlePhoneSubmit() {
   const normalized = normalizePhone(phone.value)
+
   if (!isValidIranianMobile(normalized)) {
-    notification.addToast({ title: 'خطا', text: 'شماره موبایل معتبر نیست.', type: 'error' })
+    notification.addToast({title: 'خطا', text: 'شماره موبایل معتبر نیست.', type: 'error'})
     return
   }
 
@@ -67,13 +66,18 @@ async function handlePhoneSubmit() {
   auth.phone = normalized
 
   const result = await auth.requestRegistrationOtp(normalized)
+
   if (!result.ok) {
-    notification.addToast({ title: 'خطا', text: result.message || 'درخواست کد ناموفق بود.', type: 'error' })
+    notification.addToast({title: 'خطا', text: result.message || 'ارسال کد تأیید انجام نشد.', type: 'error'})
     return
   }
 
   if (result.alreadyRegistered) {
-    notification.addToast({ title: 'توجه', text: result.message || 'این شماره قبلا ثبت شده است.', type: 'warning' })
+    notification.addToast({
+      title: 'حساب از قبل وجود دارد',
+      text: result.message || 'این شماره قبلاً ثبت شده است. وارد حساب خود شوید.',
+      type: 'warning',
+    })
     await router.push('/login')
     return
   }
@@ -83,13 +87,14 @@ async function handlePhoneSubmit() {
 
 async function handleOtpSubmit() {
   if (otp.value.length !== 6) {
-    notification.addToast({ title: 'خطا', text: 'کد تأیید باید ۶ رقمی باشد.', type: 'error' })
+    notification.addToast({title: 'خطا', text: 'کد تأیید باید ۶ رقمی باشد.', type: 'error'})
     return
   }
 
   const result = await auth.verifyOtp(otp.value)
+
   if (!result.ok) {
-    notification.addToast({ title: 'خطا', text: result.message || 'کد تایید صحیح نیست.', type: 'error' })
+    notification.addToast({title: 'خطا', text: result.message || 'کد تأیید صحیح نیست.', type: 'error'})
     return
   }
 
@@ -98,22 +103,23 @@ async function handleOtpSubmit() {
 
 async function handlePasswordSubmit() {
   if (!validatePassword(password.value)) {
-    notification.addToast({ title: 'خطا', text: 'رمز عبور شرایط لازم را ندارد.', type: 'error' })
+    notification.addToast({title: 'خطا', text: 'رمز عبور شرایط لازم را ندارد.', type: 'error'})
     return
   }
 
   if (password.value !== confirmPassword.value) {
-    notification.addToast({ title: 'خطا', text: 'رمزهای عبور یکسان نیستند.', type: 'error' })
+    notification.addToast({title: 'خطا', text: 'رمزهای عبور یکسان نیستند.', type: 'error'})
     return
   }
 
   const result = await auth.registerWithPassword(password.value, confirmPassword.value)
+
   if (!result.ok) {
-    notification.addToast({ title: 'خطا', text: result.message || 'ثبت‌نام ناموفق بود.', type: 'error' })
+    notification.addToast({title: 'خطا', text: result.message || 'ایجاد حساب انجام نشد.', type: 'error'})
     return
   }
 
-  notification.addToast({ title: 'ثبت‌نام', text: 'حساب شما با موفقیت ایجاد شد.', type: 'success' })
+  notification.addToast({title: 'ثبت‌نام موفق', text: 'حساب شما با موفقیت ایجاد شد.', type: 'success'})
   await router.push('/dashboard')
 }
 
@@ -121,8 +127,9 @@ async function resendOtp() {
   if (resendSeconds.value > 0 || !phone.value) return
 
   const result = await auth.requestRegistrationOtp(phone.value)
+
   if (!result.ok) {
-    notification.addToast({ title: 'خطا', text: result.message || 'ارسال مجدد کد ناموفق بود.', type: 'error' })
+    notification.addToast({title: 'خطا', text: result.message || 'ارسال مجدد کد انجام نشد.', type: 'error'})
     return
   }
 
@@ -139,7 +146,7 @@ function goBack() {
 
   if (step.value === 'otp') {
     otp.value = ''
-    auth.resetAuthFlow({ keepPhone: false })
+    auth.resetAuthFlow({keepPhone: false})
     phone.value = ''
     return
   }
@@ -149,6 +156,7 @@ function goBack() {
 
 onMounted(async () => {
   const prefilledPhone = route.query.phone ? String(route.query.phone) : ''
+
   if (prefilledPhone) {
     const normalized = normalizePhone(prefilledPhone)
     phone.value = normalized
@@ -168,19 +176,31 @@ onMounted(async () => {
           <div class="brand-mark"><span>OT</span></div>
           <div class="brand-copy small"><span class="brand-name">OTC</span><small>Exchange</small></div>
         </div>
-        <div class="visual-badge">Premium OTC</div>
-        <h1>ثبت‌نام در صرافی</h1>
-        <p>برای ورود به بازار رمزارز و معاملات OTC حرفه‌ای، حساب خود را ایجاد کنید.</p>
+
+        <div class="visual-badge">ایجاد حساب</div>
+        <h1>حساب خود را ایجاد کنید.</h1>
+        <p>برای استفاده از خدمات صرافی، حساب خود را ایجاد کنید.</p>
+
         <ul class="bullet-list">
-          <li><ShieldCheck :size="16" /> مسدودسازی پیشرفته</li>
-          <li><ShieldCheck :size="16" /> احراز هویت سطح ۲</li>
-          <li><ShieldCheck :size="16" /> تسویه سریع و امن</li>
+          <li>
+            <ShieldCheck :size="16"/>
+            امنیت حساب
+          </li>
+          <li>
+            <ShieldCheck :size="16"/>
+            مدیریت دارایی
+          </li>
+          <li>
+            <ShieldCheck :size="16"/>
+            خرید و فروش آسان
+          </li>
         </ul>
       </div>
 
       <div class="auth-form-panel">
         <button class="text-action" type="button" @click="goBack">
-          <ArrowLeft :size="16" /> بازگشت
+          <ArrowLeft :size="16"/>
+          بازگشت
         </button>
 
         <div class="auth-step-indicator" aria-label="مراحل ثبت‌نام">
@@ -195,33 +215,33 @@ onMounted(async () => {
           <h2 v-else>تنظیم رمز عبور</h2>
 
           <p v-if="step === 'phone'">شماره موبایل خود را وارد کنید.</p>
-          <p v-else-if="step === 'otp'">کد ۶ رقمی به شماره زیر ارسال شد.</p>
-          <p v-else>برای حساب خود یک رمز عبور امن انتخاب کنید.</p>
+          <p v-else-if="step === 'otp'">کد تأیید ارسال‌شده را وارد کنید.</p>
+          <p v-else>رمز عبور خود را انتخاب کنید.</p>
         </div>
 
         <form v-if="step === 'phone'" class="auth-form" @submit.prevent="handlePhoneSubmit">
           <div class="field">
             <label>شماره موبایل</label>
-            <input v-model="phone" type="tel" class="input" inputmode="numeric" placeholder="09123456789" />
+            <input v-model="phone" type="tel" class="input" inputmode="numeric" placeholder="09123456789"/>
           </div>
 
           <button class="primary-btn large" type="submit" :disabled="auth.loading">
-            {{ auth.loading ? 'در حال ارسال...' : 'ادامه' }}
+            {{ auth.loading ? 'در حال ارسال کد...' : 'ادامه' }}
           </button>
 
           <div class="auth-switch">
             <span>قبلاً حساب دارید؟</span>
-            <button type="button" class="text-link" @click="router.push('/login')">ورود</button>
+            <button type="button" class="text-link" @click="router.push('/login')">ورود به حساب</button>
           </div>
         </form>
 
         <form v-else-if="step === 'otp'" class="auth-form" @submit.prevent="handleOtpSubmit">
           <div class="otp-summary" aria-live="polite">
-            <span>شماره:</span>
+            <span>شماره موبایل:</span>
             <strong>{{ maskedPhone }}</strong>
           </div>
 
-          <OtpInput v-model="otp" :length="6" :disabled="auth.loading" />
+          <OtpInput v-model="otp" :length="6" :disabled="auth.loading"/>
 
           <div class="otp-actions">
             <button type="button" class="text-link" :disabled="resendSeconds > 0" @click="resendOtp">
@@ -239,10 +259,12 @@ onMounted(async () => {
           <div class="field">
             <label>رمز عبور</label>
             <div class="password-wrap">
-              <input v-model="password" :type="showPassword ? 'text' : 'password'" class="input" placeholder="رمز عبور" />
-              <button type="button" class="password-toggle" @click="showPassword = !showPassword" aria-label="نمایش یا مخفی کردن رمز عبور">
-                <Eye v-if="!showPassword" :size="16" />
-                <EyeOff v-else :size="16" />
+              <input v-model="password" :type="showPassword ? 'text' : 'password'" class="input"
+                     placeholder="رمز عبور"/>
+              <button type="button" class="password-toggle" @click="showPassword = !showPassword"
+                      aria-label="نمایش یا مخفی کردن رمز عبور">
+                <Eye v-if="!showPassword" :size="16"/>
+                <EyeOff v-else :size="16"/>
               </button>
             </div>
           </div>
@@ -250,16 +272,19 @@ onMounted(async () => {
           <div class="field">
             <label>تکرار رمز عبور</label>
             <div class="password-wrap">
-              <input v-model="confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" class="input" placeholder="تکرار رمز عبور" />
-              <button type="button" class="password-toggle" @click="showConfirmPassword = !showConfirmPassword" aria-label="نمایش یا مخفی کردن تکرار رمز عبور">
-                <Eye v-if="!showConfirmPassword" :size="16" />
-                <EyeOff v-else :size="16" />
+              <input v-model="confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" class="input"
+                     placeholder="تکرار رمز عبور"/>
+              <button type="button" class="password-toggle" @click="showConfirmPassword = !showConfirmPassword"
+                      aria-label="نمایش یا مخفی کردن تکرار رمز عبور">
+                <Eye v-if="!showConfirmPassword" :size="16"/>
+                <EyeOff v-else :size="16"/>
               </button>
             </div>
           </div>
 
           <div class="password-requirements" aria-live="polite">
-            <div v-for="item in passwordRequirements" :key="item.key" :class="['password-check', { valid: item.valid }]">
+            <div v-for="item in passwordRequirements" :key="item.key"
+                 :class="['password-check', { valid: item.valid }]">
               <span>{{ item.valid ? '✓' : '•' }}</span>
               <small>{{ item.label }}</small>
             </div>

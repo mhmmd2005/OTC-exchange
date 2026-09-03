@@ -1,7 +1,6 @@
+from apps.accounts.services.phone import normalize_phone_number
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-
-from apps.accounts.services.phone import normalize_phone_number
 
 
 class UserManager(BaseUserManager):
@@ -77,6 +76,7 @@ class OTPVerification(models.Model):
     class Purpose(models.TextChoices):
         LOGIN = "login", "Login"
         REGISTRATION = "registration", "Registration"
+        PASSWORD_RESET = "password_reset", "Password Reset"
 
     class DeliveryStatus(models.TextChoices):
         QUEUED = "queued", "Queued"

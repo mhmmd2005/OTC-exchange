@@ -1,6 +1,14 @@
 from apps.accounts.serializers import (
     LoginPasswordSerializer,
     OTPVerifySerializer,
+    PasswordResetSerializer,
+    PhoneRequestSerializer,
+    RegistrationPasswordSerializer,
+    UserSerializer,
+)
+from apps.accounts.serializers import (
+    LoginPasswordSerializer,
+    OTPVerifySerializer,
     PhoneRequestSerializer,
     RegistrationPasswordSerializer,
     UserSerializer,
@@ -225,3 +233,41 @@ class UserListAPIView(generics.ListAPIView):
 
 class AuthTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
+
+
+class RequestPasswordResetOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = PhoneRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        result = AuthService.request_otp(
+            serializer.validated_data["phone_number"],
+            purpose="password_reset",
+            request_ip=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ResetPasswordAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = PasswordResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = AuthService.reset_password(
+                flow_token=serializer.validated_data["flow_token"],
+                password=serializer.validated_data["password"],
+                confirm_password=serializer.validated_data["confirm_password"],
+                request_ip=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result, status=status.HTTP_200_OK)
