@@ -5,6 +5,7 @@ import {useAuthStore} from '../stores/auth'
 import {useNotificationStore} from '../stores/notification'
 import {ArrowLeft, Eye, EyeOff, ShieldCheck} from 'lucide-vue-next'
 import OtpInput from '../components/OtpInput.vue'
+import ApiModeSwitch from '../components/ApiModeSwitch.vue'
 import {isValidIranianMobile, normalizePhone} from '../utils/phone'
 
 const router = useRouter()
@@ -269,6 +270,8 @@ onMounted(() => {
             {{ auth.loading ? 'در حال ورود...' : 'ورود به حساب' }}
           </button>
         </form>
+
+        <ApiModeSwitch/>
       </div>
     </div>
   </div>

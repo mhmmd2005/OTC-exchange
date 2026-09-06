@@ -1,10 +1,13 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import {authService} from '../services/auth'
+import {isMockMode} from '../services/mode'
 
 const STORAGE_KEY = 'otc-user'
 const ACCESS_TOKEN_KEY = 'otc-access-token'
 const REFRESH_TOKEN_KEY = 'otc-refresh-token'
+const MOCK_USER_KEY = 'otc-mock-user'
+const MOCK_AUTH_KEY = 'otc-mock-auth'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref(null)
@@ -21,6 +24,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     function initialize() {
         try {
+            if (isMockMode()) {
+                const mockAuth = JSON.parse(localStorage.getItem(MOCK_AUTH_KEY) || 'null')
+                const mockUser = JSON.parse(localStorage.getItem(MOCK_USER_KEY) || 'null')
+                user.value = mockAuth?.authenticated && mockUser ? mockUser : null
+                return
+            }
+
             const savedUser = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
             const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY)
             user.value = savedUser && accessToken ? savedUser : null
@@ -32,6 +42,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     function persistAuth(data) {
         user.value = data.user
+
+        if (isMockMode()) {
+            localStorage.setItem(MOCK_USER_KEY, JSON.stringify(data.user))
+            localStorage.setItem(MOCK_AUTH_KEY, JSON.stringify({authenticated: true}))
+            return
+        }
+
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user))
         localStorage.setItem(ACCESS_TOKEN_KEY, data.access)
         localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh)
@@ -39,6 +56,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     function clearAuth() {
         user.value = null
+
+        if (isMockMode()) {
+            localStorage.removeItem(MOCK_USER_KEY)
+            localStorage.removeItem(MOCK_AUTH_KEY)
+            return
+        }
+
         localStorage.removeItem(STORAGE_KEY)
         localStorage.removeItem(ACCESS_TOKEN_KEY)
         localStorage.removeItem(REFRESH_TOKEN_KEY)
@@ -216,11 +240,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         try {
             const token = sessionStorage.getItem('otc-reset-flow-token') || flowToken.value
-            const result = await authService.resetPassword(
-                token,
-                passwordValue,
-                confirmPasswordValue,
-            )
+            const result = await authService.resetPassword(token, passwordValue, confirmPasswordValue)
 
             if (!result.ok) {
                 error.value = result.message || 'تغییر رمز عبور انجام نشد.'
@@ -237,6 +257,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function loadCurrentUser() {
+        if (isMockMode()) {
+            initialize()
+            return Boolean(user.value)
+        }
+
         const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY)
 
         if (!accessToken) {
@@ -256,6 +281,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function logout() {
+        if (isMockMode()) {
+            clearAuth()
+            resetAuthFlow()
+            return
+        }
+
         const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
 
         try {

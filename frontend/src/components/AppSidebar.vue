@@ -19,6 +19,7 @@ import {
   Sparkles,
   Wallet,
 } from 'lucide-vue-next'
+import ApiModeSwitch from './ApiModeSwitch.vue'
 
 const props = defineProps({ open: { type: Boolean, default: false }, collapsed: { type: Boolean, default: false } })
 const emit = defineEmits(['close', 'toggle-collapse'])
@@ -32,8 +33,8 @@ const sections = [
   {
     title: 'معاملات',
     items: [
-      { label: 'میز OTC', icon: BarChart3, to: '/otc' },
-      { label: 'سفارش‌ها', icon: ReceiptText, to: '/orders' },
+     { label: 'میز OTC', icon: BarChart3, to: '/otc' },
+     { label: 'سفارش‌ها', icon: ReceiptText, to: '/orders' },
      {
   label: 'معاملات',
   icon: ArrowRightLeft,
@@ -44,18 +45,18 @@ const sections = [
   {
     title: 'دارایی‌ها',
     items: [
-      { label: 'کیف پول', icon: Wallet, to: '/wallet' },
-      { label: 'واریز', icon: ArrowDownLeft, to: '/deposit' },
-      { label: 'برداشت', icon: ArrowUpRight, to: '/withdraw' },
-      { label: 'تراکنش‌ها', icon: CreditCard, to: '/transactions' },
+     { label: 'کیف پول', icon: Wallet, to: '/wallet' },
+     { label: 'واریز', icon: ArrowDownLeft, to: '/deposit' },
+     { label: 'برداشت', icon: ArrowUpRight, to: '/withdraw' },
+     { label: 'تراکنش‌ها', icon: CreditCard, to: '/transactions' },
     ],
   },
   {
     title: 'حساب کاربری',
     items: [
-      { label: 'احراز هویت', icon: ShieldCheck, to: '/kyc' },
-      { label: 'امنیت', icon: Shield, to: '/security' },
-      { label: 'تنظیمات', icon: Settings, to: '/settings' },
+     { label: 'احراز هویت', icon: ShieldCheck, to: '/kyc' },
+     { label: 'امنیت', icon: Shield, to: '/security' },
+     { label: 'تنظیمات', icon: Settings, to: '/settings' },
     ],
   },
   {
@@ -71,13 +72,13 @@ const accountState = computed(() => (route.path === '/kyc' ? 'احراز هوی�
 <template>
   <aside :class="['sidebar', { open: props.open, collapsed: props.collapsed }]">
     <div class="sidebar-header">
-      <div class="brand-wrap">
-        <div class="brand-mark">
-          <Sparkles :size="16" />
-        </div>
-        <div v-if="!props.collapsed" class="brand-copy">
-          <span class="brand-name">OTC</span>
-          <small>Institutional Desk</small>
+     <div class="brand-wrap">
+       <div class="brand-mark">
+         <Sparkles :size="16" />
+       </div>
+       <div v-if="!props.collapsed" class="brand-copy">
+         <span class="brand-name">OTC</span>
+         <small>Institutional Desk</small>
         </div>
       </div>
 
@@ -139,6 +140,7 @@ const accountState = computed(() => (route.path === '/kyc' ? 'احراز هوی�
     </div>
 
     <div class="sidebar-footer">
+      <ApiModeSwitch />
       <button type="button" class="sidebar-footer-btn secondary" @click="$router.push('/settings')">
         <Settings :size="15" />
         <span>تنظیمات</span>
