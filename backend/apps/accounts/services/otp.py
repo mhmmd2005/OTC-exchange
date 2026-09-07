@@ -52,13 +52,10 @@ def invalidate_previous_challenges(phone_number, purpose):
     )
 
 
-def can_resend(phone_number, purpose):
+def can_resend(phone_number, purpose=None):
     last_request = (
         OTPVerification.objects
-        .filter(
-            phone_number=phone_number,
-            purpose=purpose,
-        )
+        .filter(phone_number=phone_number)
         .order_by("-created_at")
         .first()
     )
@@ -68,27 +65,22 @@ def can_resend(phone_number, purpose):
 
     cooldown_until = (
             last_request.created_at
-            + timedelta(
-        seconds=settings.OTP_RESEND_COOLDOWN_SECONDS
-    )
+            + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
     )
 
     return cooldown_until <= timezone.now()
 
 
-def challenge_send_count(phone_number, purpose):
+def challenge_send_count(phone_number, purpose=None):
     window_start = (
             timezone.now()
-            - timedelta(
-        seconds=settings.OTP_SEND_WINDOW_SECONDS
-    )
+            - timedelta(seconds=settings.OTP_SEND_WINDOW_SECONDS)
     )
 
     return (
         OTPVerification.objects
         .filter(
             phone_number=phone_number,
-            purpose=purpose,
             created_at__gte=window_start,
         )
         .count()
@@ -105,11 +97,6 @@ def check_and_increment_ip_rate_limit(ip_address, action):
     window_seconds = settings.OTP_IP_WINDOW_SECONDS
 
     current_count = client.incr(key)
-
-    print(
-        f"IP RATE LIMIT | ACTION={action} | "
-        f"IP={ip_address} | COUNT={current_count}"
-    )
 
     if current_count == 1:
         client.expire(key, window_seconds)
@@ -150,7 +137,7 @@ class OTPService:
         return is_expired(challenge)
 
     @staticmethod
-    def can_resend(phone_number, purpose):
+    def can_resend(phone_number, purpose=None):
         return can_resend(phone_number, purpose)
 
     @staticmethod
@@ -158,12 +145,9 @@ class OTPService:
         invalidate_previous_challenges(phone_number, purpose)
 
     @staticmethod
-    def challenge_send_count(phone_number, purpose):
+    def challenge_send_count(phone_number, purpose=None):
         return challenge_send_count(phone_number, purpose)
 
     @staticmethod
     def check_and_increment_ip_rate_limit(ip_address, action):
-        return check_and_increment_ip_rate_limit(
-            ip_address,
-            action,
-        )
+        return check_and_increment_ip_rate_limit(ip_address, action)

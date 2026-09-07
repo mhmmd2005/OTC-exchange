@@ -1,0 +1,48 @@
+// src/constants/countries.ts
+export type CountryOption = { code: string; name: string };
+
+const COUNTRIES: CountryOption[] = [
+  { code: 'US', name: 'United States' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'CZ', name: 'Czechia' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'TR', name: 'Türkiye' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'CN', name: 'China' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'IN', name: 'India' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'ZA', name: 'South Africa' },
+  // ...add the rest as needed
+];
+
+export default COUNTRIES;

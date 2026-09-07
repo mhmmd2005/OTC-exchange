@@ -1,0 +1,3 @@
+<script setup lang="ts">withDefaults(defineProps<{ height?: string; width?: string; radius?: string }>(), { height: '1rem', width: '100%', radius: 'var(--radius-sm)' })</script>
+<template><span class="skeleton" :style="{ height, width, borderRadius: radius }" aria-hidden="true" /></template>
+<style scoped>.skeleton { display: block; max-width: 100%; background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-surface-3) 50%, var(--color-surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; } @keyframes shimmer { to { background-position: -200% 0; } }</style>

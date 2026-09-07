@@ -1,0 +1,231 @@
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('/fonts/IRANYekanX-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('/fonts/IRANYekanX-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('/fonts/IRANYekanX-DemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('/fonts/IRANYekanX-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Core palette: cool navy surfaces, a calm royal blue and restrained gold. */
+  --color-bg-app: #050e1a;
+  --color-bg-sidebar: #071421;
+  --color-bg-header: rgba(5, 14, 26, 0.84);
+  --color-surface-1: #0b1928;
+  --color-surface-2: #0f2032;
+  --color-surface-3: #14273b;
+  --color-surface-raised: #172b42;
+  --color-surface-elevated: #1a3049;
+  --color-surface-soft: rgba(76, 141, 255, 0.085);
+  --color-surface-glass: rgba(11, 25, 40, 0.84);
+
+  --color-border: #20354b;
+  --color-border-soft: rgba(151, 177, 207, 0.115);
+  --color-border-strong: #314b67;
+  --color-border-hover: #3a5572;
+  --color-border-control: #4f708e;
+  --color-border-focus: #70a7ff;
+  --color-focus-ring: rgba(112, 167, 255, 0.34);
+
+  --color-text-primary: #f3f7fc;
+  --color-text-secondary: #b9c6d5;
+  --color-text-muted: #8798ad;
+  --color-text-subtle: #66798f;
+  --color-text-inverse: #06101c;
+
+  --color-primary: #4c8dff;
+  --color-primary-hover: #69a0ff;
+  --color-primary-active: #3777e7;
+  --color-primary-soft: rgba(76, 141, 255, 0.14);
+  --color-primary-border: rgba(105, 160, 255, 0.28);
+  --color-primary-shadow: rgba(36, 101, 218, 0.26);
+  /* Filled actions use a deeper blue so their white label stays above 4.5:1. */
+  --color-action-primary: #2b6dcc;
+  --color-action-primary-hover: #3270cc;
+  --color-action-primary-active: #245fbd;
+  --color-on-primary: #ffffff;
+  --color-on-danger: #06101c;
+  --color-on-success: #06101c;
+  --color-on-gold: #06101c;
+  --color-gold: #dfb866;
+  --color-gold-hover: #ebc97e;
+  --color-gold-soft: rgba(223, 184, 102, 0.12);
+  --color-gold-border: rgba(223, 184, 102, 0.24);
+  --color-success: #38c998;
+  --color-success-hover: #4bd7a8;
+  --color-success-soft: rgba(56, 201, 152, 0.12);
+  --color-warning: #efb64b;
+  --color-warning-soft: rgba(239, 182, 75, 0.12);
+  --color-danger: #ef747d;
+  --color-danger-soft: rgba(239, 116, 125, 0.12);
+  --color-info: #68b6ec;
+  --color-info-soft: rgba(104, 182, 236, 0.12);
+
+  /* Semantic product aliases. Existing --color-* names stay API-compatible. */
+  --app-bg: var(--color-bg-app);
+  --sidebar-bg: var(--color-bg-sidebar);
+  --header-bg: var(--color-bg-header);
+  --surface-primary: var(--color-surface-1);
+  --surface-secondary: var(--color-surface-2);
+  --surface-tertiary: var(--color-surface-3);
+  --surface-hover: var(--color-surface-raised);
+  --surface-overlay: var(--color-surface-elevated);
+  --border-subtle: var(--color-border-soft);
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --control-border: var(--color-border-control);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --brand-primary: var(--color-primary);
+  --brand-primary-hover: var(--color-primary-hover);
+  --action-primary: var(--color-action-primary);
+  --action-primary-hover: var(--color-action-primary-hover);
+  --action-primary-active: var(--color-action-primary-active);
+  --on-primary: var(--color-on-primary);
+  --on-danger: var(--color-on-danger);
+  --on-success: var(--color-on-success);
+  --on-gold: var(--color-on-gold);
+  --accent-gold: var(--color-gold);
+  --status-success: var(--color-success);
+  --status-warning: var(--color-warning);
+  --status-danger: var(--color-danger);
+  --status-info: var(--color-info);
+
+  --font-family: 'IRANYekanX', Tahoma, Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.9375rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.375rem;
+  --radius-2xl: 1.75rem;
+  --radius-pill: 999px;
+
+  --shadow-xs: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 5px 16px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 12px 32px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 1px 0 rgba(255, 255, 255, 0.035) inset, 0 24px 68px rgba(0, 0, 0, 0.34);
+  --shadow-focus: 0 0 0 3px var(--color-focus-ring);
+
+  --control-height-sm: 2.5rem;
+  --control-height: 3rem;
+  --control-height-lg: 3.5rem;
+  --sidebar-width: 15.75rem;
+  --sidebar-collapsed: 5rem;
+  --header-height: 4.25rem;
+  --mobile-nav-height: 4.5rem;
+  --content-max: 94rem;
+
+  --transition-fast: 150ms ease;
+  --transition-base: 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-spring: 320ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  --z-header: 30;
+  --z-nav: 40;
+  --z-overlay: 70;
+  --z-modal: 80;
+  --z-toast: 90;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --color-bg-app: #f2f6fb;
+  --color-bg-sidebar: #fbfdff;
+  --color-bg-header: rgba(246, 249, 252, 0.88);
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f7f9fc;
+  --color-surface-3: #edf2f8;
+  --color-surface-raised: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-glass: rgba(255, 255, 255, 0.9);
+  --color-border: #d8e2ed;
+  --color-border-soft: rgba(19, 46, 74, 0.085);
+  --color-border-strong: #c3d1df;
+  --color-border-hover: #aebfd2;
+  --color-border-control: #7890a8;
+  --color-border-focus: #286bd7;
+  --color-focus-ring: rgba(40, 107, 215, 0.26);
+  --color-text-primary: #102033;
+  --color-text-secondary: #435970;
+  --color-text-muted: #586d84;
+  --color-text-subtle: #71849a;
+  --color-text-inverse: #ffffff;
+  --color-primary: #1e63cf;
+  --color-primary-hover: #174fab;
+  --color-primary-active: #123e88;
+  --color-primary-soft: rgba(30, 99, 207, 0.1);
+  --color-primary-border: rgba(30, 99, 207, 0.22);
+  --color-primary-shadow: rgba(30, 99, 207, 0.18);
+  --color-action-primary: #1e63cf;
+  --color-action-primary-hover: #174fab;
+  --color-action-primary-active: #123e88;
+  --color-on-primary: #ffffff;
+  --color-on-danger: #ffffff;
+  --color-on-success: #ffffff;
+  --color-on-gold: #ffffff;
+  --color-gold: #765313;
+  --color-gold-hover: #61420d;
+  --color-gold-soft: rgba(118, 83, 19, 0.09);
+  --color-gold-border: rgba(118, 83, 19, 0.2);
+  --color-success: #167a58;
+  --color-success-hover: #126649;
+  --color-success-soft: rgba(22, 122, 88, 0.1);
+  --color-warning: #805500;
+  --color-warning-soft: rgba(128, 85, 0, 0.1);
+  --color-danger: #b42331;
+  --color-danger-soft: rgba(180, 35, 49, 0.09);
+  --color-info: #216a9a;
+  --color-info-soft: rgba(33, 106, 154, 0.1);
+  --shadow-xs: 0 1px 2px rgba(22, 46, 75, 0.045);
+  --shadow-sm: 0 10px 30px rgba(23, 47, 75, 0.075);
+  --shadow-md: 0 24px 68px rgba(23, 47, 75, 0.15);
+}

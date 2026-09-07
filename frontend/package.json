@@ -1,25 +1,26 @@
 {
-  "name": "otc-exchange-app",
+  "name": "rosha-otc-customer",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "node --test --test-isolation=none --test-reporter=spec tests/*.test.mjs",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
-    "@fontsource/vazirmatn": "^5.3.0",
-    "axios": "^1.20.0",
-    "chart.js": "^4.5.1",
-    "lucide-vue-next": "^1.0.0",
-    "pinia": "^4.0.3",
-    "vue": "^3.5.12",
-    "vue-chartjs": "^5.3.4",
-    "vue-router": "^4.6.4"
+    "pinia": "3.0.1",
+    "vue": "^3.5.42",
+    "vue-router": "4.2.5"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.1.4",
-    "vite": "^5.4.10"
+    "@types/node": "^26.4.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "typescript": "^5.9.2",
+    "vite": "^8.2.2",
+    "vue-tsc": "^3.3.11"
   }
 }

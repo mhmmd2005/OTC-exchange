@@ -8,15 +8,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     USE_SQLITE_FOR_DEV=(bool, False),
-    JWT_ACCESS_MINUTES=(int, 10),
+    JWT_ACCESS_MINUTES=(int, 15),
     JWT_REFRESH_DAYS=(int, 7),
+    JWT_IDLE_TIMEOUT_SECONDS=(int, 1800),
     OTP_TTL_SECONDS=(int, 180),
     OTP_RESEND_COOLDOWN_SECONDS=(int, 120),
     OTP_MAX_ATTEMPTS=(int, 5),
     OTP_MAX_SENDS=(int, 3),
     OTP_SEND_WINDOW_SECONDS=(int, 3600),
-    OTP_IP_MAX_REQUESTS=(int, 20),
-    OTP_IP_WINDOW_SECONDS=(int, 3600),
+    OTP_IP_MAX_REQUESTS=(int, 10),
+    OTP_IP_WINDOW_SECONDS=(int, 60),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -157,9 +158,23 @@ CSRF_TRUSTED_ORIGINS = list(
     )
 )
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env(
+            "REDIS_CACHE_URL",
+            default="redis://127.0.0.1:6379/1",
+        ),
+    }
+}
+
+CACHE_MIDDLEWARE_KEY_PREFIX = ""
+CACHE_MIDDLEWARE_SECONDS = 600
+CACHE_MIDDLEWARE_ALIAS = "default"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.accounts.authentication.IdleTimeoutJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -192,6 +207,11 @@ REDIS_URL = env(
     default="redis://127.0.0.1:6379/0",
 )
 
+REDIS_CACHE_URL = env(
+    "REDIS_CACHE_URL",
+    default="redis://127.0.0.1:6379/1",
+)
+
 CELERY_BROKER_URL = env(
     "CELERY_BROKER_URL",
     default=REDIS_URL,
@@ -206,6 +226,10 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+JWT_ACCESS_MINUTES = env("JWT_ACCESS_MINUTES")
+JWT_REFRESH_DAYS = env("JWT_REFRESH_DAYS")
+JWT_IDLE_TIMEOUT_SECONDS = env("JWT_IDLE_TIMEOUT_SECONDS")
 
 OTP_TTL_SECONDS = env("OTP_TTL_SECONDS")
 OTP_RESEND_COOLDOWN_SECONDS = env("OTP_RESEND_COOLDOWN_SECONDS")
