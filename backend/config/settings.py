@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.kyc",
     "apps.security",
     "apps.support",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [

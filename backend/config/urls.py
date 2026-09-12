@@ -24,6 +24,7 @@ def api_v1_root(request):
                 "transactions": "/api/v1/transactions/",
                 "kyc": "/api/v1/kyc/",
                 "security": "/api/v1/security/",
+                "notifications": "/api/v1/notifications/",
                 "support": "/api/v1/support/",
             },
         }
@@ -42,6 +43,7 @@ urlpatterns = [
     path("api/v1/transactions/", include("apps.transactions.urls")),
     path("api/v1/kyc/", include("apps.kyc.urls")),
     path("api/v1/security/", include("apps.security.urls")),
+    path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/support/", include("apps.support.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
