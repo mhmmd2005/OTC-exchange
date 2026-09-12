@@ -19,4 +19,5 @@ urlpatterns = [
     path("admin/<int:pk>/", AdminKycDetailAPIView.as_view(), name="kyc-admin-detail"),
     path("admin/<int:pk>/approve/", AdminKycApproveAPIView.as_view(), name="kyc-admin-approve"),
     path("admin/<int:pk>/reject/", AdminKycRejectAPIView.as_view(), name="kyc-admin-reject"),
+
 ]

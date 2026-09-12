@@ -29,7 +29,7 @@ export const transactionService: TransactionService = {
           && Boolean(matchesSearch)
       })
       return paginate(filtered, filters)
-    }, () => api.get<PaginatedResult<Transaction>>('/transactions', {
+    }, () => api.get<PaginatedResult<Transaction>>('/transactions/', {
       query: {
         page: filters.page,
         pageSize: filters.pageSize,

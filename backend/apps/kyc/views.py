@@ -177,3 +177,72 @@ class AdminKycRejectAPIView(APIView):
             KycApplicationSerializer(kyc).data,
             status=status.HTTP_200_OK,
         )
+
+
+class VerificationSummaryAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "status": "not_started",
+            "currentLevel": "level_0",
+            "progressPercent": 0,
+            "message": "برای تکمیل احراز هویت، مراحل باقی‌مانده را انجام دهید.",
+            "steps": [
+                {
+                    "id": "mobile",
+                    "title": "تأیید شماره موبایل",
+                    "description": "مالکیت شماره موبایل خود را تأیید کنید.",
+                    "status": "not_started",
+                    "required": True,
+                    "actionLabel": "دریافت کد تأیید"
+                },
+                {
+                    "id": "basic_info",
+                    "title": "اطلاعات هویتی",
+                    "description": "نام، نام خانوادگی، کد ملی و تاریخ تولد را وارد کنید.",
+                    "status": "not_started",
+                    "required": True,
+                    "actionLabel": "ثبت اطلاعات"
+                },
+                {
+                    "id": "identity",
+                    "title": "مدرک شناسایی",
+                    "description": "مدرک شناسایی خود را برای بررسی ارسال کنید.",
+                    "status": "not_started",
+                    "required": True,
+                    "actionLabel": "ارسال مدرک"
+                },
+                {
+                    "id": "bank",
+                    "title": "حساب بانکی",
+                    "description": "یک حساب بانکی به نام خودتان اضافه کنید.",
+                    "status": "not_started",
+                    "required": True,
+                    "actionLabel": "افزودن حساب بانکی",
+                    "actionRoute": "/app/bank-accounts"
+                },
+                {
+                    "id": "selfie",
+                    "title": "تصویر چهره",
+                    "description": "تصویر چهره خود را برای بررسی ارسال کنید.",
+                    "status": "not_started",
+                    "required": False,
+                    "actionLabel": "ارسال تصویر"
+                }
+            ],
+            "levels": [],
+            "limits": {
+                "accountLevel": "level_0",
+                "dailyBuy": "0",
+                "dailySell": "0",
+                "dailyTomanDeposit": "0",
+                "dailyTomanWithdrawal": "0",
+                "dailyCryptoWithdrawalTomanEquivalent": "0",
+                "usedBuy": "0",
+                "usedSell": "0",
+                "usedTomanDeposit": "0",
+                "usedTomanWithdrawal": "0",
+                "usedCryptoWithdrawalTomanEquivalent": "0"
+            }
+        })

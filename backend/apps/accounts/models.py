@@ -110,3 +110,50 @@ class OTPVerification(models.Model):
 
     def __str__(self):
         return f"{self.phone_number} ({self.purpose})"
+
+
+class IranianBank(models.Model):
+    name_fa = models.CharField(max_length=255)
+    name_en = models.CharField(max_length=255)
+    card_prefixes = models.JSONField(default=list)
+    color = models.CharField(max_length=7, default="#6366f1")
+    logo_url = models.URLField(blank=True, default="")
+
+    class Meta:
+        ordering = ["name_fa"]
+
+    def __str__(self):
+        return self.name_fa
+
+
+class BankAccount(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("verified", "Verified"),
+        ("needs_correction", "Needs Correction"),
+        ("rejected", "Rejected"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bank_accounts")
+    bank = models.ForeignKey(IranianBank, on_delete=models.PROTECT, related_name="accounts")
+    owner_name = models.CharField(max_length=255)
+    card_number = models.CharField(max_length=16)
+    iban = models.CharField(max_length=26)
+    account_number = models.CharField(max_length=20, blank=True, default="")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    preferred = models.BooleanField(default=False)
+    rejection_reason = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "preferred"]),
+            models.Index(fields=["card_number"]),
+            models.Index(fields=["iban"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.phone_number} - {self.card_number}"

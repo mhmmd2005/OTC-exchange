@@ -6,7 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-
+from apps.kyc.views import VerificationSummaryAPIView
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -34,14 +34,17 @@ def api_v1_root(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
+    path("api/v1/", include("apps.accounts.api_urls")),
     path("api/v1/", api_v1_root, name="api-v1-root"),
     path("api/v1/assets/", include("apps.assets.urls")),
     path("api/v1/wallets/", include("apps.wallets.urls")),
     path("api/v1/otc/", include("apps.otc.urls")),
+    path("api/v1/trade/", include("apps.otc.urls")),
     path("api/v1/orders/", include("apps.orders.urls")),
     path("api/v1/trades/", include("apps.trades.urls")),
     path("api/v1/transactions/", include("apps.transactions.urls")),
     path("api/v1/kyc/", include("apps.kyc.urls")),
+    path("api/v1/verification", VerificationSummaryAPIView.as_view(), name="verification-summary"),
     path("api/v1/security/", include("apps.security.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/support/", include("apps.support.urls")),
