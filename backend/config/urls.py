@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.kyc.views import VerificationSummaryAPIView
+from apps.markets.views import MarketListAPIView
 from apps.wallets.views import WalletSummaryAPIView
 
 
@@ -45,6 +46,7 @@ urlpatterns = [
     path("api/v1/otc/", include("apps.otc.urls")),
     path("api/v1/trade/", include("apps.otc.urls")),
     path("api/v1/orders/", include("apps.orders.urls")),
+    path("api/v1/markets", MarketListAPIView.as_view(), name="market-list"),
     path("api/v1/trades/", include("apps.trades.urls")),
     path("api/v1/transactions/", include("apps.transactions.urls")),
     path("api/v1/kyc/", include("apps.kyc.urls")),

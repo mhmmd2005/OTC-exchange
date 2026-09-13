@@ -5,7 +5,7 @@ from .models import OTCDeal, OTCQuote
 
 @admin.register(OTCQuote)
 class OTCQuoteAdmin(admin.ModelAdmin):
-    list_display = ("user", "asset", "side", "requested_amount", "quoted_total", "status", "expires_at")
+    list_display = ("user", "asset", "side", "requested_amount", "toman_amount", "status", "expires_at")
     list_filter = ("status", "side", "asset")
     search_fields = ("user__email", "asset__symbol")
 

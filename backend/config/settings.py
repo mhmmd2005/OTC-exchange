@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "apps.security",
     "apps.support",
     "apps.notifications",
+    "apps.markets",
 ]
 
 MIDDLEWARE = [
@@ -144,7 +145,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 
-
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=[
@@ -177,7 +177,6 @@ CSRF_TRUSTED_ORIGINS = list(
         ]
     )
 )
-
 
 CACHES = {
     "default": {
