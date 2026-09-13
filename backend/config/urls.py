@@ -6,7 +6,10 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
 from apps.kyc.views import VerificationSummaryAPIView
+from apps.wallets.views import WalletSummaryAPIView
+
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -38,6 +41,7 @@ urlpatterns = [
     path("api/v1/", api_v1_root, name="api-v1-root"),
     path("api/v1/assets/", include("apps.assets.urls")),
     path("api/v1/wallets/", include("apps.wallets.urls")),
+    path("api/v1/wallet", WalletSummaryAPIView.as_view(), name="wallet-summary"),
     path("api/v1/otc/", include("apps.otc.urls")),
     path("api/v1/trade/", include("apps.otc.urls")),
     path("api/v1/orders/", include("apps.orders.urls")),

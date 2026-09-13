@@ -30,7 +30,7 @@ export const orderService: OrderService = {
         return matchesSide && matchesAsset && matchesStatus && matchesSearch
       })
       return paginate(filtered, filters)
-    }, () => api.get<PaginatedResult<OtcOrder>>('/orders', {
+    }, () => api.get<PaginatedResult<OtcOrder>>('/orders/', {
       query: {
         page: filters.page,
         pageSize: filters.pageSize,
