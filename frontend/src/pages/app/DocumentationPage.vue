@@ -549,7 +549,6 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">01</span>
 
             <div>
-              <span class="section-heading__eyebrow">شروع</span>
               <h2>معرفی پروژه</h2>
             </div>
           </div>
@@ -619,7 +618,6 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">02</span>
 
             <div>
-              <span class="section-heading__eyebrow">Stack</span>
               <h2>فناوری‌های استفاده‌شده</h2>
             </div>
           </div>
@@ -651,7 +649,6 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">03</span>
 
             <div>
-              <span class="section-heading__eyebrow">Backend</span>
               <h2>معماری Backend</h2>
             </div>
           </div>
@@ -705,7 +702,7 @@ onBeforeUnmount(() => {
           <div class="subsection">
             <div class="subsection-heading">
               <div>
-                <span class="section-heading__eyebrow">API</span>
+                <span class="      ">API</span>
                 <h3>مرجع Endpointها</h3>
               </div>
 
@@ -777,7 +774,7 @@ onBeforeUnmount(() => {
           <div class="subsection">
             <div class="subsection-heading">
               <div>
-                <span class="section-heading__eyebrow">Security</span>
+                <span class="      ">Security</span>
                 <h3>احراز هویت</h3>
               </div>
             </div>
@@ -876,7 +873,6 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">04</span>
 
             <div>
-              <span class="section-heading__eyebrow">Frontend</span>
               <h2>معماری Frontend</h2>
             </div>
           </div>
@@ -885,7 +881,7 @@ onBeforeUnmount(() => {
             <div>
               <div class="subsection-heading">
                 <div>
-                  <span class="section-heading__eyebrow">Structure</span>
+                  <span class="      ">Structure</span>
                   <h3>ساختار پروژه</h3>
                 </div>
               </div>
@@ -931,7 +927,7 @@ onBeforeUnmount(() => {
             <div class="frontend-features">
               <div class="subsection-heading">
                 <div>
-                  <span class="section-heading__eyebrow">Experience</span>
+                  <span class="      ">Experience</span>
                   <h3>ویژگی‌های کلیدی</h3>
                 </div>
               </div>
@@ -950,7 +946,7 @@ onBeforeUnmount(() => {
           <div class="build-panel">
             <div class="subsection-heading">
               <div>
-                <span class="section-heading__eyebrow">Build</span>
+                <span class="      ">Build</span>
                 <h3>Build Configuration</h3>
               </div>
             </div>
@@ -979,7 +975,6 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">05</span>
 
             <div>
-              <span class="section-heading__eyebrow">Status</span>
               <h2>وضعیت یکپارچه‌سازی</h2>
             </div>
           </div>
@@ -1056,7 +1051,7 @@ onBeforeUnmount(() => {
             <span class="section-heading__index">06</span>
 
             <div>
-              <span class="section-heading__eyebrow">Workflow</span>
+
               <h2>گردش کار توسعه</h2>
             </div>
           </div>
@@ -1129,7 +1124,7 @@ npm run dev</code></pre>
           <div class="environment-panel">
             <div class="subsection-heading">
               <div>
-                <span class="section-heading__eyebrow">Environment</span>
+                <span class="      ">Environment</span>
                 <h3>متغیرهای محیطی</h3>
               </div>
             </div>
@@ -1169,7 +1164,6 @@ npm run dev</code></pre>
             <span class="section-heading__index">07</span>
 
             <div>
-              <span class="section-heading__eyebrow">Notice</span>
               <h2>نکات مهم</h2>
             </div>
           </div>
@@ -1275,25 +1269,30 @@ npm run dev</code></pre>
   </div>
 </template>
 
+
 <style scoped>
 .docs-page {
-  width: min(100%, calc(var(--content-max) + 4rem));
+  width: min(100%, 1380px);
   margin-inline: auto;
-  padding-block: var(--space-5) var(--space-12);
+  padding: 2rem var(--page-gutter) 5rem;
   direction: rtl;
 }
+
+/* =========================================================
+   HERO
+   ========================================================= */
 
 .docs-hero {
   position: relative;
   overflow: hidden;
-  margin-bottom: var(--space-9);
+  margin-bottom: 3rem;
   padding: clamp(1.5rem, 3vw, 2.5rem);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: linear-gradient(
       145deg,
       color-mix(in srgb, var(--color-primary-soft) 78%, transparent),
-      transparent 58%
+      transparent 62%
   ),
   var(--surface-primary);
   box-shadow: var(--shadow-sm);
@@ -1306,8 +1305,8 @@ npm run dev</code></pre>
   width: 20rem;
   height: 20rem;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-primary) 11%, transparent);
-  filter: blur(20px);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  filter: blur(24px);
   pointer-events: none;
 }
 
@@ -1321,14 +1320,14 @@ npm run dev</code></pre>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
+  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
 .docs-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0.5rem;
   color: var(--color-primary);
   font-size: var(--font-size-sm);
   font-weight: 700;
@@ -1337,25 +1336,25 @@ npm run dev</code></pre>
 .docs-eyebrow__dot {
   width: 0.5rem;
   height: 0.5rem;
+  flex: 0 0 auto;
   border-radius: 50%;
   background: var(--color-success);
   box-shadow: 0 0 0 0.3rem var(--color-success-soft);
 }
 
-.docs-hero__actions,
-.docs-cta__actions {
+.docs-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 0.6rem;
 }
 
 .docs-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height);
-  padding-inline: var(--space-4);
+  gap: 0.5rem;
+  min-height: 2.65rem;
+  padding-inline: 1rem;
   border: 1px solid var(--control-border);
   border-radius: var(--radius-md);
   background: var(--surface-secondary);
@@ -1369,6 +1368,15 @@ npm run dev</code></pre>
   box-shadow var(--transition-fast);
 }
 
+.docs-action:hover {
+  border-color: var(--color-border-hover);
+  background: var(--surface-tertiary);
+}
+
+.docs-action:active {
+  transform: translateY(1px);
+}
+
 .docs-action--primary {
   border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
   background: var(--action-primary);
@@ -1376,47 +1384,42 @@ npm run dev</code></pre>
   box-shadow: 0 8px 22px var(--color-primary-shadow);
 }
 
-.docs-action:hover {
-  border-color: var(--color-border-hover);
-  background: var(--surface-tertiary);
-}
-
 .docs-action--primary:hover {
   background: var(--action-primary-hover);
 }
 
-.docs-action:active {
-  transform: translateY(1px);
-}
-
 .docs-hero__body {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(17rem, 0.8fr);
-  gap: var(--space-8);
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.75fr);
+  gap: 3rem;
   align-items: end;
 }
 
+.docs-hero__copy {
+  min-width: 0;
+}
+
 .docs-hero__copy h1 {
-  max-width: 48rem;
-  margin: 0 0 var(--space-3);
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  max-width: 50rem;
+  margin: 0 0 0.85rem;
+  font-size: clamp(2rem, 4vw, 3.35rem);
   font-weight: 800;
   letter-spacing: -0.035em;
-  line-height: 1.16;
+  line-height: 1.18;
 }
 
 .docs-hero__copy p {
-  max-width: 44rem;
-  margin: 0 0 var(--space-5);
+  max-width: 46rem;
+  margin: 0 0 1.25rem;
   color: var(--text-secondary);
-  font-size: clamp(1rem, 1.5vw, 1.12rem);
-  line-height: 1.9;
+  font-size: clamp(1rem, 1.45vw, 1.1rem);
+  line-height: 1.95;
 }
 
 .docs-status-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 0.5rem;
 }
 
 .docs-status {
@@ -1441,14 +1444,15 @@ npm run dev</code></pre>
 
 .docs-hero__facts {
   display: grid;
-  gap: var(--space-2);
+  gap: 0.6rem;
 }
 
 .hero-fact {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: 1rem;
+  min-width: 0;
   padding: 0.8rem 0.95rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -1463,25 +1467,30 @@ npm run dev</code></pre>
 .hero-fact strong {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  text-align: end;
 }
+
+/* =========================================================
+   PAGE LAYOUT
+   ========================================================= */
 
 .docs-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;
-  gap: clamp(1.25rem, 3vw, 3rem);
+  gap: clamp(1.5rem, 3vw, 3.5rem);
   align-items: start;
 }
 
 .docs-main {
-  grid-column: 1;
   min-width: 0;
+  grid-column: 1;
 }
 
 .docs-sidebar {
+  min-width: 0;
   grid-column: 2;
   position: sticky;
-  top: calc(var(--header-height) + var(--space-5));
-  min-width: 0;
+  top: calc(var(--header-height) + 1.25rem);
 }
 
 .sidebar-mobile-toggle {
@@ -1489,16 +1498,16 @@ npm run dev</code></pre>
 }
 
 .sidebar-nav {
-  padding: 0.7rem;
+  margin: 0;
+  padding: 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--surface-primary);
   box-shadow: var(--shadow-xs);
-  margin-top: 15px;
 }
 
 .sidebar-nav__label {
-  margin: 0.35rem 0.55rem 0.7rem;
+  margin: 0.4rem 0.55rem 0.65rem;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -1507,11 +1516,11 @@ npm run dev</code></pre>
 .sidebar-link {
   position: relative;
   display: grid;
-  grid-template-columns: 1.9rem 1fr;
+  grid-template-columns: 1.9rem minmax(0, 1fr);
   align-items: center;
   width: 100%;
-  gap: var(--space-2);
-  padding: 0.65rem 0.7rem;
+  gap: 0.55rem;
+  padding: 0.7rem;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1530,8 +1539,10 @@ npm run dev</code></pre>
 }
 
 .sidebar-link strong {
+  min-width: 0;
   font-size: var(--font-size-sm);
   font-weight: 600;
+  line-height: 1.6;
 }
 
 .sidebar-link:hover {
@@ -1558,22 +1569,40 @@ npm run dev</code></pre>
   content: '';
 }
 
+/* =========================================================
+   SECTIONS
+   ========================================================= */
+
 .docs-section {
-  scroll-margin-top: calc(var(--header-height) + var(--space-7));
-  margin-bottom: clamp(4rem, 7vw, 7rem);
+  scroll-margin-top: calc(var(--header-height) + 2rem);
+  margin-bottom: clamp(4rem, 6vw, 5.5rem);
+}
+
+.docs-section:last-child {
+  margin-bottom: 0;
 }
 
 .section-heading {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  justify-content: flex-start;
+  width: 100%;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.section-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .section-heading__index {
   display: grid;
-  width: 2.65rem;
-  height: 2.65rem;
+  width: 2.6rem;
+  height: 2.6rem;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid var(--color-primary-border);
@@ -1586,81 +1615,102 @@ npm run dev</code></pre>
   direction: ltr;
 }
 
-.section-heading__eyebrow {
-  display: block;
-  margin-bottom: 0.2rem;
+.       {
+  order: 2;
+  display: inline-block;
+  margin: 0;
+  flex: 0 0 auto;
   color: var(--color-primary);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   direction: ltr;
 }
 
-.section-heading h2,
-.subsection-heading h3 {
+.section-heading h2 {
+  order: 1;
   margin: 0;
   color: var(--text-primary);
+  font-size: clamp(1.45rem, 2vw, 1.95rem);
   font-weight: 750;
   letter-spacing: -0.018em;
+  line-height: 1.35;
 }
 
-.section-heading h2 {
-  font-size: clamp(1.5rem, 2vw, 2rem);
+/* =========================================================
+   COMMON SUBSECTION
+   ========================================================= */
+
+.subsection {
+  margin-top: 3rem;
 }
 
 .subsection-heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .subsection-heading h3 {
-  font-size: 1.25rem;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 750;
+  line-height: 1.45;
 }
 
 .subsection-heading > code {
+  flex: 0 0 auto;
   padding: 0.4rem 0.65rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-secondary);
   color: var(--color-primary);
+  font-size: 0.7rem;
   direction: ltr;
 }
 
+/* =========================================================
+   OVERVIEW
+   ========================================================= */
+
 .overview-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(19rem, 0.8fr);
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 0.85fr);
+  gap: 1.5rem;
 }
 
 .overview-copy {
-  padding-block: var(--space-2);
+  min-width: 0;
+  padding-block: 0.25rem;
 }
 
 .overview-copy > p {
-  margin: 0 0 var(--space-5);
+  margin: 0 0 1.25rem;
   color: var(--text-secondary);
   line-height: 2;
 }
 
 .overview-points {
   display: grid;
-  gap: var(--space-2);
+  gap: 0.55rem;
 }
 
 .overview-point {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 0.75rem;
+  min-width: 0;
   padding: 0.75rem 0.8rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-secondary);
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
+  line-height: 1.7;
 }
 
 .point-icon {
@@ -1675,14 +1725,15 @@ npm run dev</code></pre>
 }
 
 .architecture {
-  padding: var(--space-5);
+  min-width: 0;
+  padding: 1.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
 }
 
 .architecture__label {
-  margin-bottom: var(--space-4);
+  margin-bottom: 1rem;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -1690,12 +1741,11 @@ npm run dev</code></pre>
 
 .architecture__flow {
   display: grid;
-  justify-items: stretch;
-  gap: var(--space-2);
+  gap: 0.5rem;
 }
 
 .architecture__node {
-  padding: 0.85rem 1rem;
+  padding: 0.8rem 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-primary);
@@ -1729,19 +1779,24 @@ npm run dev</code></pre>
 
 .architecture__arrow {
   color: var(--color-primary);
-  font-size: 1.05rem;
+  font-size: 1rem;
+  line-height: 1;
   text-align: center;
 }
+
+/* =========================================================
+   TECH STACK
+   ========================================================= */
 
 .tech-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: 0.75rem;
 }
 
 .tech-card {
   min-width: 0;
-  padding: var(--space-4);
+  padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-primary);
@@ -1763,14 +1818,15 @@ npm run dev</code></pre>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
 }
 
 .tech-card__icon {
   display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
   place-items: center;
   border-radius: var(--radius-sm);
   background: var(--color-primary-soft);
@@ -1778,9 +1834,13 @@ npm run dev</code></pre>
 }
 
 .tech-card__version {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   direction: ltr;
 }
 
@@ -1798,14 +1858,19 @@ npm run dev</code></pre>
   margin-top: 0.25rem;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
+  line-height: 1.55;
 }
+
+/* =========================================================
+   BACKEND APPS
+   ========================================================= */
 
 .module-header {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .module-header h3,
@@ -1815,7 +1880,7 @@ npm run dev</code></pre>
 
 .module-header h3 {
   color: var(--text-primary);
-  font-size: 1.18rem;
+  font-size: 1.15rem;
 }
 
 .module-header p {
@@ -1825,6 +1890,7 @@ npm run dev</code></pre>
 }
 
 .module-count {
+  flex: 0 0 auto;
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
@@ -1837,12 +1903,14 @@ npm run dev</code></pre>
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: 0.75rem;
 }
 
 .app-card {
+  display: flex;
   min-width: 0;
-  padding: var(--space-4);
+  flex-direction: column;
+  padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
@@ -1859,8 +1927,8 @@ npm run dev</code></pre>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .app-card__header code {
@@ -1876,17 +1944,18 @@ npm run dev</code></pre>
 }
 
 .app-card p {
-  min-height: 2.8rem;
-  margin: 0 0 var(--space-3);
+  min-height: 3rem;
+  margin: 0 0 0.85rem;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
 .app-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  margin-top: auto;
 }
 
 .app-card__tags span {
@@ -1895,7 +1964,7 @@ npm run dev</code></pre>
   border-radius: var(--radius-sm);
   background: var(--surface-tertiary);
   color: var(--text-muted);
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   direction: ltr;
 }
 
@@ -1903,8 +1972,7 @@ npm run dev</code></pre>
 .api-note {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+  gap: 0.55rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--color-primary-border);
   border-radius: var(--radius-md);
@@ -1914,17 +1982,27 @@ npm run dev</code></pre>
   line-height: 1.8;
 }
 
-.subsection {
-  margin-top: clamp(2.75rem, 5vw, 4rem);
+.info-strip {
+  margin-top: 1rem;
 }
+
+.info-strip :deep(svg),
+.api-note :deep(svg) {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
+/* =========================================================
+   API
+   ========================================================= */
 
 .api-groups {
   display: grid;
-  gap: 1px;
+  gap: 0;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--border-subtle);
+  background: var(--surface-primary);
 }
 
 .api-group {
@@ -1936,18 +2014,22 @@ npm run dev</code></pre>
 }
 
 .api-group__header {
-  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.9rem 1rem;
   background: linear-gradient(
       90deg,
-      color-mix(in srgb, var(--color-primary-soft) 45%, transparent),
-      transparent
+      color-mix(in srgb, var(--color-primary-soft) 42%, transparent),
+      transparent 75%
   ),
   var(--surface-secondary);
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .api-group__header h4 {
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.2rem;
   color: var(--text-primary);
   font-size: var(--font-size-sm);
 }
@@ -1956,7 +2038,7 @@ npm run dev</code></pre>
   padding: 0;
   background: transparent;
   color: var(--color-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   direction: ltr;
 }
 
@@ -1966,11 +2048,11 @@ npm run dev</code></pre>
 
 .api-row {
   display: grid;
-  grid-template-columns: 4.5rem minmax(11rem, 1fr) minmax(12rem, 1.5fr) auto;
-  gap: var(--space-3);
+  grid-template-columns: 4.4rem minmax(14rem, 1.1fr) minmax(12rem, 1fr) auto;
+  gap: 0.8rem;
   align-items: center;
   min-width: 0;
-  padding: 0.8rem 1rem;
+  padding: 0.75rem 1rem;
   background: var(--surface-primary);
   transition: background var(--transition-fast);
 }
@@ -1987,11 +2069,11 @@ npm run dev</code></pre>
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.8rem;
-  padding-inline: 0.5rem;
+  min-height: 1.75rem;
+  padding-inline: 0.45rem;
   border-radius: var(--radius-sm);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.66rem;
+  font-size: 0.63rem;
   font-weight: 800;
   direction: ltr;
 }
@@ -2022,7 +2104,8 @@ npm run dev</code></pre>
   padding: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  line-height: 1.7;
   direction: ltr;
   text-align: left;
 }
@@ -2031,7 +2114,7 @@ npm run dev</code></pre>
   min-width: 0;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .copy-button {
@@ -2045,7 +2128,8 @@ npm run dev</code></pre>
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: 0.63rem;
+  white-space: nowrap;
 }
 
 .copy-button:hover {
@@ -2055,10 +2139,14 @@ npm run dev</code></pre>
 }
 
 .api-note {
-  margin: 0.75rem 1rem 1rem;
+  margin: 0.7rem 0.85rem 0.85rem;
   background: var(--surface-secondary);
   color: var(--text-muted);
 }
+
+/* =========================================================
+   DATA LISTS
+   ========================================================= */
 
 .data-list {
   display: grid;
@@ -2071,8 +2159,9 @@ npm run dev</code></pre>
 .data-row {
   display: grid;
   grid-template-columns: minmax(9rem, 0.7fr) minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: 1rem;
   align-items: center;
+  min-width: 0;
   padding: 0.8rem 1rem;
 }
 
@@ -2087,36 +2176,42 @@ npm run dev</code></pre>
 
 .data-row strong,
 .data-row code {
+  min-width: 0;
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  line-height: 1.7;
 }
 
 .data-row code {
   justify-self: start;
+  overflow-wrap: anywhere;
   direction: ltr;
 }
 
 .backend-meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  margin-top: var(--space-4);
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
 .meta-panel,
 .build-panel,
 .environment-panel {
-  padding: var(--space-5);
+  min-width: 0;
+  padding: 1.2rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
+  margin-top: 10px;
 }
 
 .meta-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .meta-panel__header h3 {
@@ -2132,21 +2227,25 @@ npm run dev</code></pre>
   direction: ltr;
 }
 
+/* =========================================================
+   FRONTEND
+   ========================================================= */
+
 .structure-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.8fr);
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.8fr);
+  gap: 1.5rem;
 }
 
 .structure-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: 0.75rem;
 }
 
 .structure-item {
   min-width: 0;
-  padding: 0.9rem;
+  padding: 0.85rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-secondary);
@@ -2154,17 +2253,19 @@ npm run dev</code></pre>
 
 .structure-item code {
   display: block;
+  overflow-wrap: anywhere;
   padding: 0;
   margin-bottom: 0.3rem;
   background: transparent;
   color: var(--color-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   direction: ltr;
 }
 
 .structure-item span {
   color: var(--text-muted);
   font-size: var(--font-size-xs);
+  line-height: 1.7;
 }
 
 .frontend-features {
@@ -2178,7 +2279,7 @@ npm run dev</code></pre>
 }
 
 .feature-pills span {
-  padding: 0.4rem 0.6rem;
+  padding: 0.38rem 0.6rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   background: var(--surface-secondary);
@@ -2186,23 +2287,23 @@ npm run dev</code></pre>
   font-size: var(--font-size-xs);
 }
 
-.build-panel {
-  margin-top: var(--space-4);
-}
+/* =========================================================
+   INTEGRATION
+   ========================================================= */
 
 .integration-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .integration-summary__item {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: 0.75rem;
   min-width: 0;
-  padding: var(--space-4);
+  padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
@@ -2240,26 +2341,28 @@ npm run dev</code></pre>
 .integration-summary__item strong {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 .integration-summary__item > div > span {
   margin-top: 0.25rem;
   color: var(--text-muted);
   font-size: 0.7rem;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .integration-list {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .integration-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  gap: 0.75rem;
   align-items: center;
-  padding: 0.85rem 1rem;
+  min-width: 0;
+  padding: 0.8rem 0.95rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-primary);
@@ -2269,6 +2372,7 @@ npm run dev</code></pre>
   display: grid;
   width: 2rem;
   height: 2rem;
+  flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
 }
@@ -2288,6 +2392,10 @@ npm run dev</code></pre>
   color: var(--text-muted);
 }
 
+.integration-row__content {
+  min-width: 0;
+}
+
 .integration-row__content strong,
 .integration-row__content span {
   display: block;
@@ -2296,15 +2404,18 @@ npm run dev</code></pre>
 .integration-row__content strong {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  line-height: 1.55;
 }
 
 .integration-row__content span {
   margin-top: 0.15rem;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
+  line-height: 1.65;
 }
 
 .integration-row__status {
+  flex: 0 0 auto;
   padding: 0.3rem 0.55rem;
   border-radius: var(--radius-pill);
   background: var(--surface-secondary);
@@ -2323,10 +2434,13 @@ npm run dev</code></pre>
   color: var(--color-warning);
 }
 
+/* =========================================================
+   WORKFLOW
+   ========================================================= */
+
 .workflow {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -2334,7 +2448,6 @@ npm run dev</code></pre>
 }
 
 .workflow-step {
-  position: relative;
   min-width: 0;
   padding: 1rem;
   background: var(--surface-primary);
@@ -2350,12 +2463,12 @@ npm run dev</code></pre>
   height: 2rem;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0.7rem;
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 800;
   direction: ltr;
 }
@@ -2368,24 +2481,21 @@ npm run dev</code></pre>
 .workflow-step strong {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 .workflow-step > div span {
   margin-top: 0.25rem;
   color: var(--text-muted);
   font-size: 0.68rem;
-  line-height: 1.6;
-}
-
-.workflow-step__arrow {
-  display: none;
+  line-height: 1.7;
 }
 
 .command-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  margin-top: var(--space-5);
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
 .command-panel {
@@ -2401,7 +2511,7 @@ npm run dev</code></pre>
 }
 
 .command-panel__header {
-  padding: 0.85rem 1rem;
+  padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -2414,13 +2524,14 @@ npm run dev</code></pre>
   margin-bottom: 0.2rem;
   color: var(--color-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.64rem;
+  font-size: 0.63rem;
   direction: ltr;
 }
 
 .command-panel__header strong {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 .command-panel pre {
@@ -2431,11 +2542,13 @@ npm run dev</code></pre>
 
 .command-panel code {
   display: block;
+  width: max-content;
+  min-width: 100%;
   padding: 0;
   background: transparent;
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1.8;
   direction: ltr;
   text-align: left;
@@ -2443,18 +2556,18 @@ npm run dev</code></pre>
 }
 
 .environment-panel {
-  margin-top: var(--space-5);
+  margin-top: 1.5rem;
 }
 
 .environment-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-5);
+  gap: 1.5rem;
 }
 
 .environment-title {
   display: block;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0.7rem;
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   font-weight: 700;
@@ -2472,14 +2585,18 @@ npm run dev</code></pre>
   border-radius: var(--radius-sm);
   background: var(--surface-primary);
   color: var(--color-primary);
-  font-size: 0.62rem;
+  font-size: 0.61rem;
   direction: ltr;
 }
+
+/* =========================================================
+   NOTICE + CTA
+   ========================================================= */
 
 .notice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: 1rem;
   padding: clamp(1rem, 2vw, 1.4rem);
   border: 1px solid color-mix(in srgb, var(--color-warning) 26%, transparent);
   border-radius: var(--radius-lg);
@@ -2501,6 +2618,10 @@ npm run dev</code></pre>
   color: var(--color-bg-app);
 }
 
+.notice__content {
+  min-width: 0;
+}
+
 .notice__label {
   display: block;
   margin-bottom: 0.25rem;
@@ -2510,7 +2631,7 @@ npm run dev</code></pre>
 }
 
 .notice__content h3 {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 1rem;
   color: var(--text-primary);
   font-size: 1rem;
   font-weight: 700;
@@ -2527,14 +2648,15 @@ npm run dev</code></pre>
   padding-inline-start: 1rem;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
+  line-height: 1.7;
 }
 
 .notice__list div::before {
   position: absolute;
   inset-inline-start: 0;
   inset-block-start: 0.68em;
-  width: 0.32rem;
-  height: 0.32rem;
+  width: 0.3rem;
+  height: 0.3rem;
   border-radius: 50%;
   background: var(--color-warning);
   content: '';
@@ -2544,9 +2666,9 @@ npm run dev</code></pre>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-5);
-  margin-top: var(--space-5);
-  padding: clamp(1.1rem, 2.4vw, 1.5rem);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding: clamp(1rem, 2.4vw, 1.4rem);
   border: 1px solid var(--color-primary-border);
   border-radius: var(--radius-lg);
   background: linear-gradient(
@@ -2555,6 +2677,10 @@ npm run dev</code></pre>
       transparent 72%
   ),
   var(--surface-primary);
+}
+
+.docs-cta > div:first-child {
+  min-width: 0;
 }
 
 .docs-cta > div:first-child > span {
@@ -2569,21 +2695,28 @@ npm run dev</code></pre>
   margin: 0.3rem 0;
   color: var(--text-primary);
   font-size: 1rem;
+  line-height: 1.5;
 }
 
 .docs-cta p {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--font-size-sm);
+  line-height: 1.7;
 }
 
-/* Mobile */
+.docs-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  flex: 0 0 auto;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
 
 @media (max-width: 1199px) {
-  .docs-page {
-    padding-inline: var(--page-gutter);
-  }
-
   .tech-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -2596,9 +2729,7 @@ npm run dev</code></pre>
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .workflow-step:nth-child(4),
-  .workflow-step:nth-child(5),
-  .workflow-step:nth-child(6) {
+  .workflow-step:nth-child(n + 4) {
     border-top: 1px solid var(--border-subtle);
   }
 
@@ -2609,7 +2740,7 @@ npm run dev</code></pre>
 
 @media (max-width: 1023px) {
   .docs-layout {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
 
   .docs-main {
@@ -2620,7 +2751,7 @@ npm run dev</code></pre>
     grid-column: 1;
     grid-row: 1;
     position: static;
-    margin-bottom: var(--space-4);
+    margin-bottom: 0.5rem;
   }
 
   .sidebar-mobile-toggle {
@@ -2641,12 +2772,12 @@ npm run dev</code></pre>
   .sidebar-mobile-toggle > span {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 0.5rem;
   }
 
   .sidebar-nav {
     display: none;
-    margin-top: var(--space-2);
+    margin-top: 0.5rem;
   }
 
   .sidebar-nav--open {
@@ -2655,28 +2786,23 @@ npm run dev</code></pre>
 
   .docs-hero__body {
     grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 
-  .integration-summary {
+  .docs-hero__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .overview-grid,
+  .structure-layout {
     grid-template-columns: 1fr;
   }
 
-  .workflow {
+  .backend-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .workflow-step:nth-child(3),
-  .workflow-step:nth-child(5) {
-    border-inline-start: 0;
-  }
-
-  .workflow-step:nth-child(n + 3) {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .structure-layout,
-  .overview-grid,
-  .backend-meta-grid {
+  .integration-summary {
     grid-template-columns: 1fr;
   }
 
@@ -2691,20 +2817,20 @@ npm run dev</code></pre>
 
 @media (max-width: 767px) {
   .docs-page {
-    padding-block: var(--space-4) calc(var(--mobile-nav-height) + var(--safe-bottom) + var(--space-8));
-    padding-inline: var(--space-4);
+    padding-block: 1rem calc(var(--mobile-nav-height) + var(--safe-bottom) + 2rem);
+    padding-inline: 1rem;
   }
 
   .docs-hero {
-    margin-bottom: var(--space-7);
+    margin-bottom: 2rem;
     padding: 1rem;
     border-radius: var(--radius-lg);
   }
 
   .docs-hero__top {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
-    margin-bottom: var(--space-6);
+    margin-bottom: 1.5rem;
   }
 
   .docs-hero__actions {
@@ -2712,8 +2838,8 @@ npm run dev</code></pre>
   }
 
   .docs-action {
-    flex: 1 1 auto;
-    min-height: 2.75rem;
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .docs-hero__copy h1 {
@@ -2725,6 +2851,7 @@ npm run dev</code></pre>
   }
 
   .docs-hero__facts {
+    grid-template-columns: 1fr;
     gap: 0.45rem;
   }
 
@@ -2732,8 +2859,12 @@ npm run dev</code></pre>
     padding: 0.7rem 0.8rem;
   }
 
+  .docs-section {
+    margin-bottom: 3.75rem;
+  }
+
   .section-heading {
-    margin-bottom: var(--space-4);
+    margin-bottom: 1.25rem;
   }
 
   .section-heading__index {
@@ -2745,23 +2876,24 @@ npm run dev</code></pre>
     font-size: 1.35rem;
   }
 
+  .subsection {
+    margin-top: 2.25rem;
+  }
+
+  .subsection-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
   .tech-grid,
   .apps-grid,
   .structure-grid,
   .command-grid,
   .environment-columns,
-  .workflow {
+  .workflow,
+  .backend-meta-grid {
     grid-template-columns: 1fr;
-  }
-
-  .workflow-step,
-  .workflow-step:nth-child(n + 1) {
-    border-inline-start: 0;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .workflow-step:first-child {
-    border-top: 0;
   }
 
   .api-row {
@@ -2772,6 +2904,11 @@ npm run dev</code></pre>
 
   .api-description {
     grid-column: 2 / 4;
+  }
+
+  .copy-button {
+    min-width: 2rem;
+    padding-inline: 0.45rem;
   }
 
   .copy-button span {
@@ -2827,3 +2964,4 @@ npm run dev</code></pre>
   overflow: hidden;
 }
 </style>
+
