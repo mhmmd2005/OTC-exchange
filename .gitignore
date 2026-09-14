@@ -47,4 +47,5 @@ backend/.env.*
 *.sw?
 
 # Local project / generated files
-summary.xml
+summary.xmlreview.txt
+review.txt

@@ -46,6 +46,7 @@ const appChildren: RouteRecordRaw[] = [
   { path: 'profile', name: 'profile', component: () => import('@/pages/app/ProfilePage.vue'), meta: { title: 'حساب کاربری', mobileNav: 'more' } },
   { path: 'security', name: 'security', component: () => import('@/pages/app/SecurityPage.vue'), meta: { title: 'امنیت', mobileNav: 'more' } },
   { path: 'settings', name: 'settings', component: () => import('@/pages/app/SettingsPage.vue'), meta: { title: 'تنظیمات', mobileNav: 'more' } },
+  { path: 'documentation', name: 'documentation', component: () => import('@/pages/app/DocumentationPage.vue'), meta: { title: 'مستندات', mobileNav: 'more' } },
 ]
 
 const router = createRouter({
