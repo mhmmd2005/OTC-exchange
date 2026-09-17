@@ -15,24 +15,22 @@ from apps.wallets.views import WalletSummaryAPIView
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def api_v1_root(request):
-    return Response(
-        {
-            "message": "OTC Exchange API v1",
-            "endpoints": {
-                "auth": "/api/v1/auth/",
-                "assets": "/api/v1/assets/",
-                "wallets": "/api/v1/wallets/",
-                "otc": "/api/v1/otc/",
-                "orders": "/api/v1/orders/",
-                "trades": "/api/v1/trades/",
-                "transactions": "/api/v1/transactions/",
-                "kyc": "/api/v1/kyc/",
-                "security": "/api/v1/security/",
-                "notifications": "/api/v1/notifications/",
-                "support": "/api/v1/support/",
-            },
-        }
-    )
+    return Response({
+        "message": "OTC Exchange API v1",
+        "endpoints": {
+            "auth": "/api/v1/auth/",
+            "assets": "/api/v1/assets/",
+            "wallets": "/api/v1/wallets/",
+            "otc": "/api/v1/otc/",
+            "orders": "/api/v1/orders/",
+            "trades": "/api/v1/trades/",
+            "transactions": "/api/v1/transactions/",
+            "verification": "/api/v1/verification",
+            "security": "/api/v1/security/",
+            "notifications": "/api/v1/notifications/",
+            "support": "/api/v1/support/",
+        },
+    })
 
 
 urlpatterns = [
@@ -49,8 +47,8 @@ urlpatterns = [
     path("api/v1/markets", MarketListAPIView.as_view(), name="market-list"),
     path("api/v1/trades/", include("apps.trades.urls")),
     path("api/v1/transactions/", include("apps.transactions.urls")),
-    path("api/v1/kyc/", include("apps.kyc.urls")),
     path("api/v1/verification", VerificationSummaryAPIView.as_view(), name="verification-summary"),
+    path("api/v1/verification/", include("apps.kyc.urls")),
     path("api/v1/security/", include("apps.security.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/support/", include("apps.support.urls")),
@@ -59,5 +57,11 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )
+    urlpatterns += static(
+        settings.STATIC_URL,
+        document_root=settings.STATIC_ROOT,
+    )

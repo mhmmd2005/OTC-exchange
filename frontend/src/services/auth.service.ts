@@ -57,7 +57,7 @@ interface BackendOtpResponse {
 
 interface BackendFlowResponse {
     flow_token: string
-    next_step: 'password'
+    next_step: 'password' | 'completed'
     expires_in: number
 }
 
@@ -83,7 +83,11 @@ interface MockOtpChallenge extends OtpChallenge {
 }
 
 interface MockFlow {
-    purpose: 'login' | 'register' | 'reset_password'
+    purpose:
+        | 'login'
+        | 'register'
+        | 'reset_password'
+        | 'phone_verification'
     mobile: string
     expiresAt: number
 }
@@ -344,7 +348,9 @@ async function requestBackendOtp(
                 ? 'registration'
                 : input.purpose === 'reset_password'
                     ? 'password_reset'
-                    : null
+                    : input.purpose === 'phone_verification'
+                        ? 'phone_verification'
+                        : null
 
     if (!backendPurpose) {
         throw new ApiError(
@@ -359,7 +365,9 @@ async function requestBackendOtp(
             ? '/auth/request-login-otp/'
             : backendPurpose === 'registration'
                 ? '/auth/request-registration-otp/'
-                : '/auth/request-password-reset-otp/'
+                : backendPurpose === 'password_reset'
+                    ? '/auth/request-password-reset-otp/'
+                    : '/auth/request-phone-verification-otp/'
 
     const response =
         await api.post<BackendOtpResponse>(
@@ -383,6 +391,22 @@ async function verifyBackendOtp(
     const response =
         await api.post<BackendFlowResponse>(
             '/auth/verify-otp/',
+            {
+                challenge_id: input.challengeId,
+                otp: normalizeDigits(input.code)
+                    .replace(/\D/g, ''),
+            },
+        )
+
+    return createFlowFromBackend(response)
+}
+
+async function verifyBackendPhoneVerificationOtp(
+    input: VerifyOtpInput,
+): Promise<AuthFlowResult> {
+    const response =
+        await api.post<BackendFlowResponse>(
+            '/auth/verify-phone-otp/',
             {
                 challenge_id: input.challengeId,
                 otp: normalizeDigits(input.code)
@@ -432,7 +456,8 @@ function createMockFlow(
                 challenge.purpose as
                     | 'login'
                     | 'register'
-                    | 'reset_password',
+                    | 'reset_password'
+                    | 'phone_verification',
             mobile: challenge.mobile,
             expiresAt,
         },
@@ -607,7 +632,12 @@ export const authService: AuthService = {
                     challenge,
                 )
             },
-            () => verifyBackendOtp(input),
+            () =>
+                input.purpose === 'phone_verification'
+                    ? verifyBackendPhoneVerificationOtp(
+                        input,
+                    )
+                    : verifyBackendOtp(input),
         )
     },
 

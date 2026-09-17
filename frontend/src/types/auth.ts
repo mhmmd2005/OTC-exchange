@@ -18,7 +18,12 @@ export interface RegisterInput {
     acceptedAt: ISODateString
 }
 
-export type OtpPurpose = 'register' | 'login' | 'reset_password' | 'withdrawal'
+export type OtpPurpose =
+    | 'register'
+    | 'login'
+    | 'reset_password'
+    | 'withdrawal'
+    | 'phone_verification'
 
 export interface RequestOtpInput {
     mobile: string

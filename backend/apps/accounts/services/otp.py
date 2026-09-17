@@ -3,9 +3,10 @@ import secrets
 from datetime import timedelta
 
 import redis
-from apps.accounts.models import OTPVerification
 from django.conf import settings
 from django.utils import timezone
+
+from apps.accounts.models import OTPVerification
 
 
 def get_redis_client():
@@ -16,31 +17,51 @@ def get_redis_client():
 
 
 def generate_otp():
-    return str(secrets.randbelow(1_000_000)).zfill(6)
+    return str(
+        secrets.randbelow(1_000_000)
+    ).zfill(6)
 
 
 def hash_otp(code):
-    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        code.encode("utf-8")
+    ).hexdigest()
 
 
-def store_otp_code(challenge_id, code, ttl_seconds):
+def store_otp_code(
+        challenge_id,
+        code,
+        ttl_seconds,
+):
     client = get_redis_client()
-    client.setex(f"otp:{challenge_id}", ttl_seconds, code)
+
+    client.setex(
+        f"otp:{challenge_id}",
+        ttl_seconds,
+        code,
+    )
 
 
 def get_otp_code(challenge_id):
-    return get_redis_client().get(f"otp:{challenge_id}")
+    return get_redis_client().get(
+        f"otp:{challenge_id}"
+    )
 
 
 def delete_otp_code(challenge_id):
-    get_redis_client().delete(f"otp:{challenge_id}")
+    get_redis_client().delete(
+        f"otp:{challenge_id}"
+    )
 
 
 def is_expired(challenge):
     return challenge.expires_at <= timezone.now()
 
 
-def invalidate_previous_challenges(phone_number, purpose):
+def invalidate_previous_challenges(
+        phone_number,
+        purpose,
+):
     OTPVerification.objects.filter(
         phone_number=phone_number,
         purpose=purpose,
@@ -52,10 +73,21 @@ def invalidate_previous_challenges(phone_number, purpose):
     )
 
 
-def can_resend(phone_number, purpose=None):
+def can_resend(
+        phone_number,
+        purpose=None,
+):
+    queryset = OTPVerification.objects.filter(
+        phone_number=phone_number,
+    )
+
+    if purpose:
+        queryset = queryset.filter(
+            purpose=purpose,
+        )
+
     last_request = (
-        OTPVerification.objects
-        .filter(phone_number=phone_number)
+        queryset
         .order_by("-created_at")
         .first()
     )
@@ -65,50 +97,82 @@ def can_resend(phone_number, purpose=None):
 
     cooldown_until = (
             last_request.created_at
-            + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
+            + timedelta(
+        seconds=settings.OTP_RESEND_COOLDOWN_SECONDS
+    )
     )
 
     return cooldown_until <= timezone.now()
 
 
-def challenge_send_count(phone_number, purpose=None):
+def challenge_send_count(
+        phone_number,
+        purpose=None,
+):
     window_start = (
             timezone.now()
-            - timedelta(seconds=settings.OTP_SEND_WINDOW_SECONDS)
+            - timedelta(
+        seconds=settings.OTP_SEND_WINDOW_SECONDS
+    )
     )
 
-    return (
-        OTPVerification.objects
-        .filter(
-            phone_number=phone_number,
-            created_at__gte=window_start,
+    queryset = OTPVerification.objects.filter(
+        phone_number=phone_number,
+        created_at__gte=window_start,
+    )
+
+    if purpose:
+        queryset = queryset.filter(
+            purpose=purpose,
         )
-        .count()
-    )
+
+    return queryset.count()
 
 
-def check_and_increment_ip_rate_limit(ip_address, action):
+def check_and_increment_ip_rate_limit(
+        ip_address,
+        action,
+):
     ip_address = ip_address or "unknown"
 
     client = get_redis_client()
-    key = f"otp:ip-rate:{action}:{ip_address}"
 
-    max_requests = settings.OTP_IP_MAX_REQUESTS
-    window_seconds = settings.OTP_IP_WINDOW_SECONDS
+    key = (
+        f"otp:ip-rate:"
+        f"{action}:"
+        f"{ip_address}"
+    )
+
+    max_requests = (
+        settings.OTP_IP_MAX_REQUESTS
+    )
+
+    window_seconds = (
+        settings.OTP_IP_WINDOW_SECONDS
+    )
 
     current_count = client.incr(key)
 
     if current_count == 1:
-        client.expire(key, window_seconds)
+        client.expire(
+            key,
+            window_seconds,
+        )
 
-    remaining = max(max_requests - current_count, 0)
+    remaining = max(
+        max_requests - current_count,
+        0,
+    )
+
     ttl = client.ttl(key)
 
     if ttl is None or ttl < 0:
         ttl = window_seconds
 
     return {
-        "allowed": current_count <= max_requests,
+        "allowed": (
+                current_count <= max_requests
+        ),
         "count": current_count,
         "remaining": remaining,
         "retry_after": ttl,
@@ -137,17 +201,41 @@ class OTPService:
         return is_expired(challenge)
 
     @staticmethod
-    def can_resend(phone_number, purpose=None):
-        return can_resend(phone_number, purpose)
+    def can_resend(
+            phone_number,
+            purpose=None,
+    ):
+        return can_resend(
+            phone_number,
+            purpose,
+        )
 
     @staticmethod
-    def invalidate_previous_challenges(phone_number, purpose):
-        invalidate_previous_challenges(phone_number, purpose)
+    def invalidate_previous_challenges(
+            phone_number,
+            purpose,
+    ):
+        invalidate_previous_challenges(
+            phone_number,
+            purpose,
+        )
 
     @staticmethod
-    def challenge_send_count(phone_number, purpose=None):
-        return challenge_send_count(phone_number, purpose)
+    def challenge_send_count(
+            phone_number,
+            purpose=None,
+    ):
+        return challenge_send_count(
+            phone_number,
+            purpose,
+        )
 
     @staticmethod
-    def check_and_increment_ip_rate_limit(ip_address, action):
-        return check_and_increment_ip_rate_limit(ip_address, action)
+    def check_and_increment_ip_rate_limit(
+            ip_address,
+            action,
+    ):
+        return check_and_increment_ip_rate_limit(
+            ip_address,
+            action,
+        )

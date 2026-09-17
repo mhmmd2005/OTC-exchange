@@ -1,6 +1,3 @@
-import time
-
-from django.conf import settings
 from django.core.exceptions import (
     ValidationError as DjangoValidationError,
 )
@@ -16,6 +13,7 @@ from apps.accounts.services.session import (
     delete_session,
     get_session,
     get_user_session_version,
+    update_session,
 )
 
 
@@ -146,15 +144,37 @@ class IranianBankSerializer(serializers.ModelSerializer):
 class BankAccountSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     bank = IranianBankSerializer(read_only=True)
-    ownerName = serializers.CharField(source="owner_name")
-    cardNumber = serializers.CharField(source="card_number")
-    iban = serializers.CharField()
-    accountNumber = serializers.CharField(source="account_number", required=False, allow_blank=True)
-    status = serializers.CharField()
-    preferred = serializers.BooleanField()
-    rejectionReason = serializers.CharField(source="rejection_reason", required=False, allow_blank=True)
-    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
-    verifiedAt = serializers.DateTimeField(source="verified_at", read_only=True)
+    ownerName = serializers.CharField(
+        source="owner_name",
+        read_only=True,
+    )
+    cardNumber = serializers.CharField(
+        source="card_number",
+        read_only=True,
+    )
+    iban = serializers.CharField(read_only=True)
+    accountNumber = serializers.CharField(
+        source="account_number",
+        read_only=True,
+    )
+    status = serializers.CharField(read_only=True)
+    preferred = serializers.BooleanField(read_only=True)
+    rejectionReason = serializers.CharField(
+        source="rejection_reason",
+        read_only=True,
+    )
+    createdAt = serializers.DateTimeField(
+        source="created_at",
+        read_only=True,
+    )
+    verifiedAt = serializers.DateTimeField(
+        source="verified_at",
+        read_only=True,
+    )
+    isUsable = serializers.BooleanField(
+        source="is_usable",
+        read_only=True,
+    )
 
     class Meta:
         model = BankAccount
@@ -170,6 +190,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "rejectionReason",
             "createdAt",
             "verifiedAt",
+            "isUsable",
         ]
 
 
@@ -270,10 +291,8 @@ class IdleTimeoutTokenRefreshSerializer(
             session.get("session_version", 1)
         )
 
-        current_version = (
-            get_user_session_version(
-                user_id
-            )
+        current_version = get_user_session_version(
+            user_id
         )
 
         if session_version != current_version:
@@ -282,16 +301,10 @@ class IdleTimeoutTokenRefreshSerializer(
                 "Session has been revoked."
             )
 
-        current_time = int(time.time())
-        last_activity = int(
-            session.get("last_activity", 0)
-        )
-
-        if (
-                current_time - last_activity
-                >= settings.JWT_IDLE_TIMEOUT_SECONDS
+        if not update_session(
+                session_id,
+                user_id,
         ):
-            delete_session(session_id)
             raise AuthenticationFailed(
                 "Session has expired due to inactivity."
             )

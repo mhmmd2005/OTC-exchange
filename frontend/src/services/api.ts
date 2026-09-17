@@ -403,7 +403,17 @@ async function refreshAccessToken(): Promise<boolean> {
 }
 
 function shouldRefreshOn401(path: string): boolean {
-    return path === '/auth/me/' || !path.startsWith('/auth/')
+    const publicAuthPaths = [
+        '/auth/request-login-otp/',
+        '/auth/request-registration-otp/',
+        '/auth/request-password-reset-otp/',
+        '/auth/verify-otp/',
+        '/auth/login/verify-password/',
+        '/auth/register/set-password/',
+        '/auth/refresh/',
+    ]
+
+    return !publicAuthPaths.includes(path)
 }
 
 export async function request<T>(

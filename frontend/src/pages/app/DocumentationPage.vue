@@ -881,7 +881,7 @@ onBeforeUnmount(() => {
             <div>
               <div class="subsection-heading">
                 <div>
-                  <span class="      ">Structure</span>
+                  <span class="subsection-heading__eyebrow">Structure</span>
                   <h3>ساختار پروژه</h3>
                 </div>
               </div>
@@ -927,7 +927,7 @@ onBeforeUnmount(() => {
             <div class="frontend-features">
               <div class="subsection-heading">
                 <div>
-                  <span class="      ">Experience</span>
+                  <span class="subsection-heading__eyebrow">Experience</span>
                   <h3>ویژگی‌های کلیدی</h3>
                 </div>
               </div>
@@ -946,7 +946,7 @@ onBeforeUnmount(() => {
           <div class="build-panel">
             <div class="subsection-heading">
               <div>
-                <span class="      ">Build</span>
+                <span class="subsection-heading__eyebrow">Build</span>
                 <h3>Build Configuration</h3>
               </div>
             </div>
@@ -1124,7 +1124,7 @@ npm run dev</code></pre>
           <div class="environment-panel">
             <div class="subsection-heading">
               <div>
-                <span class="      ">Environment</span>
+                <span class="subsection-heading__eyebrow">Environment</span>
                 <h3>متغیرهای محیطی</h3>
               </div>
             </div>
@@ -1615,7 +1615,7 @@ npm run dev</code></pre>
   direction: ltr;
 }
 
-.       {
+.subsection-heading__eyebrow {
   order: 2;
   display: inline-block;
   margin: 0;

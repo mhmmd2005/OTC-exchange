@@ -1,13 +1,15 @@
 import time
 
+from django.conf import settings
+from rest_framework import exceptions
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from apps.accounts.services.session import (
     delete_session,
     get_session,
     get_user_session_version,
+    update_session,
 )
-from django.conf import settings
-from rest_framework import exceptions
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 class IdleTimeoutJWTAuthentication(JWTAuthentication):
@@ -42,9 +44,7 @@ class IdleTimeoutJWTAuthentication(JWTAuthentication):
             session.get("session_version", 1)
         )
 
-        current_version = get_user_session_version(
-            user.id
-        )
+        current_version = get_user_session_version(user.id)
 
         if session_version != current_version:
             delete_session(session_id)
@@ -64,6 +64,11 @@ class IdleTimeoutJWTAuthentication(JWTAuthentication):
             delete_session(session_id)
             raise exceptions.AuthenticationFailed(
                 "Session has expired due to inactivity."
+            )
+
+        if not update_session(session_id, user.id):
+            raise exceptions.AuthenticationFailed(
+                "Session has expired or is no longer valid."
             )
 
         return user, token

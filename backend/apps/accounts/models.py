@@ -1,7 +1,7 @@
 from apps.accounts.services.phone import normalize_phone_number
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-
+from django.utils import timezone
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -77,6 +77,7 @@ class OTPVerification(models.Model):
         LOGIN = "login", "Login"
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password Reset"
+        PHONE_VERIFICATION = "phone_verification", "Phone Verification"
 
     class DeliveryStatus(models.TextChoices):
         QUEUED = "queued", "Queued"
@@ -157,3 +158,41 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return f"{self.user.phone_number} - {self.card_number}"
+
+    @property
+    def is_usable(self):
+        return self.status == "verified"
+
+    def approve(self):
+        if self.status != "pending":
+            raise ValidationError(
+                "حساب بانکی در وضعیت قابل تأیید نیست."
+            )
+
+        self.status = "verified"
+        self.rejection_reason = ""
+        self.verified_at = timezone.now()
+
+        self.save(update_fields=[
+            "status",
+            "rejection_reason",
+            "verified_at",
+        ])
+
+    def reject(self, reason):
+        if self.status != "pending":
+            raise ValidationError(
+                "حساب بانکی در وضعیت قابل رد نیست."
+            )
+
+        self.status = "rejected"
+        self.rejection_reason = reason
+        self.verified_at = None
+        self.preferred = False
+
+        self.save(update_fields=[
+            "status",
+            "rejection_reason",
+            "verified_at",
+            "preferred",
+        ])

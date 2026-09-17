@@ -11,6 +11,8 @@ from .views import (
     RequestRegistrationOTPAPIView,
     ResetPasswordAPIView,
     VerifyOTPAPIView,
+    VerifyPhoneVerificationOTPAPIView,
+    RequestPhoneVerificationOTPAPIView
 )
 
 urlpatterns = [
@@ -63,5 +65,15 @@ urlpatterns = [
         "reset-password/",
         ResetPasswordAPIView.as_view(),
         name="reset-password",
+    ),
+    path(
+        "request-phone-verification-otp/",
+        RequestPhoneVerificationOTPAPIView.as_view(),
+        name="request-phone-verification-otp",
+    ),
+    path(
+        "verify-phone-otp/",
+        VerifyPhoneVerificationOTPAPIView.as_view(),
+        name="verify-phone-otp",
     ),
 ]

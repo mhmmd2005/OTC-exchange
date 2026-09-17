@@ -1,7 +1,18 @@
 import type { DecimalString, ISODateString } from './common'
 import type { AccountLevel, KycStatus, UserLimits } from './user'
 
-export type VerificationStepId = 'mobile' | 'basic_info' | 'identity' | 'bank' | 'selfie'
+export type VerificationStepId =
+  | 'mobile'
+  | 'basic_info'
+  | 'identity'
+  | 'bank'
+
+export interface BasicIdentityInput {
+  firstName: string
+  lastName: string
+  nationalId: string
+  birthDate: string
+}
 
 export interface VerificationStep {
   id: VerificationStepId
@@ -9,6 +20,7 @@ export interface VerificationStep {
   description: string
   status: KycStatus
   required: boolean
+  locked?: boolean
   rejectionReason?: string
   completedAt?: ISODateString
   actionLabel?: string
@@ -34,16 +46,12 @@ export interface VerificationSummary {
   currentLevel: AccountLevel
   progressPercent: number
   message: string
+  currentStepId: VerificationStepId | null
+  reviewPending: boolean
+  basicInfo: BasicIdentityInput
   steps: VerificationStep[]
   levels: AccountLevelInfo[]
   limits: UserLimits
-}
-
-export interface BasicIdentityInput {
-  firstName: string
-  lastName: string
-  nationalId: string
-  birthDate: string
 }
 
 export interface VerificationSubmission {
@@ -51,4 +59,7 @@ export interface VerificationSubmission {
   stepId: VerificationStepId
   status: KycStatus
   submittedAt: ISODateString
+  nextStep?: VerificationStepId | null
+  reviewPending?: boolean
+  message?: string
 }

@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-
+from apps.kyc.serializers import AdminKycApplicationSerializer
 from apps.accounts.models import BankAccount, IranianBank
 from apps.accounts.serializers import (
     BankAccountSerializer,
@@ -29,6 +29,7 @@ from apps.accounts.services.session import (
     delete_session,
     update_session,
 )
+from apps.kyc.models import KycApplication
 
 User = get_user_model()
 
@@ -530,8 +531,8 @@ class BankAccountListCreateAPIView(APIView):
 
     def get(self, request):
         accounts = BankAccount.objects.filter(
-            user=request.user
-        )
+            user=request.user,
+        ).select_related("bank")
 
         serializer = BankAccountSerializer(
             accounts,
@@ -545,29 +546,90 @@ class BankAccountListCreateAPIView(APIView):
 
     def post(self, request):
         card_number = str(
-            request.data.get("cardNumber", "")
+            request.data.get("cardNumber", ""),
         )
 
         iban = str(
-            request.data.get("iban", "")
+            request.data.get("iban", ""),
         )
 
         account_number = str(
-            request.data.get("accountNumber", "")
+            request.data.get("accountNumber", ""),
         )
 
-        owner_name = request.user.full_name or ""
+        try:
+            kyc = KycApplication.objects.get(
+                user=request.user,
+            )
+        except KycApplication.DoesNotExist:
+            return Response(
+                {
+                    "detail": (
+                        "ابتدا باید احراز هویت خود را تکمیل کنید."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if not kyc.both_identity_steps_approved:
+            return Response(
+                {
+                    "detail": (
+                        "ابتدا باید اطلاعات هویتی و مدرک شناسایی "
+                        "توسط ادمین تأیید شوند."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        owner_name = (
+            f"{kyc.first_name} {kyc.last_name}"
+        ).strip()
+
+        if not owner_name:
+            return Response(
+                {
+                    "detail": (
+                        "نام و نام خانوادگی تأییدشده احراز هویت "
+                        "در دسترس نیست."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         card_digits = "".join(
-            char for char in card_number
+            char
+            for char in card_number
             if char.isdigit()
+        )
+
+        iban_value = (
+            iban
+            .replace(" ", "")
+            .replace("-", "")
+            .upper()
         )
 
         if len(card_digits) != 16:
             return Response(
                 {
                     "fields": {
-                        "cardNumber": "شماره کارت باید ۱۶ رقم باشد."
+                        "cardNumber": (
+                            "شماره کارت باید ۱۶ رقم باشد."
+                        )
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        if not iban_value.startswith("IR") or len(iban_value) != 26:
+            return Response(
+                {
+                    "fields": {
+                        "iban": (
+                            "شماره شبا باید با IR شروع شود و "
+                            "۲۴ رقم بعد از آن داشته باشد."
+                        )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -588,7 +650,37 @@ class BankAccountListCreateAPIView(APIView):
                 return Response(
                     {
                         "fields": {
-                            "cardNumber": "بانک صادرکننده این کارت شناسایی نشد."
+                            "cardNumber": (
+                                "بانک صادرکننده این کارت شناسایی نشد."
+                            )
+                        }
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+            if BankAccount.objects.filter(
+                    card_number=card_digits,
+            ).exists():
+                return Response(
+                    {
+                        "fields": {
+                            "cardNumber": (
+                                "این شماره کارت قبلاً ثبت شده است."
+                            )
+                        }
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+            if BankAccount.objects.filter(
+                    iban=iban_value,
+            ).exists():
+                return Response(
+                    {
+                        "fields": {
+                            "iban": (
+                                "این شماره شبا قبلاً ثبت شده است."
+                            )
                         }
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -599,7 +691,7 @@ class BankAccountListCreateAPIView(APIView):
                 bank=bank,
                 owner_name=owner_name,
                 card_number=card_digits,
-                iban=iban,
+                iban=iban_value,
                 account_number=account_number,
                 status="pending",
                 preferred=False,
@@ -607,7 +699,9 @@ class BankAccountListCreateAPIView(APIView):
 
         except Exception:
             return Response(
-                {"detail": "ثبت حساب بانکی انجام نشد."},
+                {
+                    "detail": "ثبت حساب بانکی انجام نشد."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -617,7 +711,6 @@ class BankAccountListCreateAPIView(APIView):
             serializer.data,
             status=status.HTTP_201_CREATED,
         )
-
 
 
 class BankAccountDetailAPIView(APIView):
@@ -714,3 +807,80 @@ class BankAccountPreferredAPIView(APIView):
                 {"detail": "Bank account not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class RequestPhoneVerificationOTPAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response(
+                {
+                    "detail": (
+                        "Authentication is required."
+                    )
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        phone_number = request.user.phone_number
+
+        result = AuthService.request_otp(
+            phone_number,
+            purpose="phone_verification",
+            request_ip=request.META.get(
+                "REMOTE_ADDR"
+            ),
+            user_agent=request.META.get(
+                "HTTP_USER_AGENT",
+                "",
+            ),
+        )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerifyPhoneVerificationOTPAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = OTPVerifySerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        try:
+            result = AuthService.verify_otp(
+                challenge_id=str(
+                    serializer.validated_data[
+                        "challenge_id"
+                    ]
+                ),
+                otp=serializer.validated_data[
+                    "otp"
+                ],
+                request_ip=request.META.get(
+                    "REMOTE_ADDR"
+                ),
+                user_agent=request.META.get(
+                    "HTTP_USER_AGENT",
+                    "",
+                ),
+                user=request.user,
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )

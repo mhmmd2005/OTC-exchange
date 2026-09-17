@@ -26,9 +26,17 @@ const resendMessage = ref('')
 const purpose = computed<OtpPurpose>(() => {
   const requested = queryValue(route.query.purpose)
 
-  return requested === 'reset_password' || requested === 'login'
-      ? requested
-      : 'register'
+  if (
+      requested === 'login'
+      || requested === 'register'
+      || requested === 'reset_password'
+      || requested === 'phone_verification'
+      || requested === 'withdrawal'
+  ) {
+    return requested
+  }
+
+  return 'register'
 })
 
 const activeChallenge = computed(() => {

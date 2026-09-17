@@ -272,16 +272,10 @@ export const useAuthStore = defineStore(
 
             try {
                 const flow =
-                    await authService.verifyOtp(
-                        input,
-                    )
+                    await authService.verifyOtp(input)
 
-                if (
-                    input.purpose === 'login'
-                ) {
-                    if (
-                        !pendingLoginPassword.value
-                    ) {
+                if (input.purpose === 'login') {
+                    if (!pendingLoginPassword.value) {
                         throw new ApiError(
                             'اطلاعات ورود در این مرورگر در دسترس نیست؛ دوباره وارد شوید.',
                             'BAD_REQUEST',
@@ -307,9 +301,7 @@ export const useAuthStore = defineStore(
                     return result.user
                 }
 
-                if (
-                    input.purpose === 'register'
-                ) {
+                if (input.purpose === 'register') {
                     if (
                         !pendingRegistrationPassword.value
                         || !pendingRegistrationConfirmation.value
@@ -322,12 +314,11 @@ export const useAuthStore = defineStore(
                     }
 
                     const result =
-                        await authService
-                            .completeRegistration(
-                                flow.flowToken,
-                                pendingRegistrationPassword.value,
-                                pendingRegistrationConfirmation.value,
-                            )
+                        await authService.completeRegistration(
+                            flow.flowToken,
+                            pendingRegistrationPassword.value,
+                            pendingRegistrationConfirmation.value,
+                        )
 
                     applyAuth(
                         result,
@@ -339,6 +330,20 @@ export const useAuthStore = defineStore(
                     initialized.value = true
 
                     return result.user
+                }
+
+                if (
+                    input.purpose === 'phone_verification'
+                ) {
+                    otpChallenge.value = null
+
+                    const refreshedUser =
+                        await authService.getCurrentUser()
+
+                    user.value = refreshedUser
+                    initialized.value = true
+
+                    return refreshedUser
                 }
 
                 throw new ApiError(

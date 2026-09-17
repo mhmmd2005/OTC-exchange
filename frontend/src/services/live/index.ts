@@ -48,7 +48,6 @@ import type {
     UpdateProfileInput,
     UserPreferences,
     UserProfile,
-    VerificationStepId,
     VerificationSubmission,
     VerificationSummary,
     VerifyOtpInput,
@@ -148,8 +147,12 @@ export const bankService: BankService = {
         return api.post<IranianBank | null>('/banks/detect', {bin})
     },
     addAccount: (input: AddBankAccountInput) => api.post<BankAccount>('/bank-accounts', input),
-    setPreferred: (id: string) => api.post<BankAccount>(`/bank-accounts/${id}/preferred`),
-    removeAccount: (id: string) => api.delete<void>(`/bank-accounts/${id}`),
+    setPreferred: (id: string) => api.post<BankAccount>(` / bank - accounts / $
+{
+    id
+}
+/preferred`),
+removeAccount: (id: string) => api.delete<void>(`/bank-accounts/${id}`),
 }
 
 export const marketService: MarketService = {
@@ -282,12 +285,13 @@ export const userService: UserService = {
         api.patch<UserPreferences>('/users/me/preferences', input),
 }
 
-export const verificationService: VerificationService = {
+export const verificationService: {
+    getSummary: () => Promise<VerificationSummary>;
+    submitBasicInfo: (input: BasicIdentityInput) => Promise<VerificationSubmission>
+} = {
     getSummary: () => api.get<VerificationSummary>('/verification'),
     submitBasicInfo: (input: BasicIdentityInput) =>
         api.post<VerificationSubmission>('/verification/basic-info', input),
-    submitStep: (stepId: VerificationStepId, payload: FormData | Record<string, unknown>) =>
-        api.post<VerificationSubmission>(`/verification/${stepId}`, payload),
 }
 
 export const walletService: WalletService = {

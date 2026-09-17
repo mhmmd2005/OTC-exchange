@@ -1,5 +1,14 @@
 from datetime import timedelta
 
+from django.conf import settings
+from django.core import signing
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
+from rest_framework.exceptions import AuthenticationFailed, Throttled
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from apps.accounts.models import OTPVerification, User
 from apps.accounts.services.otp import (
     challenge_send_count,
@@ -18,14 +27,6 @@ from apps.accounts.services.session import (
 )
 from apps.accounts.tasks import send_otp_sms_task
 from apps.security.models import LoginHistory, SecurityEvent
-from django.conf import settings
-from django.core import signing
-from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.utils import timezone
-from rest_framework.exceptions import AuthenticationFailed, Throttled
-from rest_framework_simplejwt.tokens import RefreshToken
 
 
 class AuthService:
@@ -88,14 +89,17 @@ class AuthService:
                 "phone_number": normalized_phone,
             }
 
-        if not can_resend(normalized_phone):
+        if not can_resend(normalized_phone, purpose):
             raise Throttled(
                 detail="Please wait before requesting a new OTP.",
                 wait=settings.OTP_RESEND_COOLDOWN_SECONDS,
             )
 
         if (
-                challenge_send_count(normalized_phone)
+                challenge_send_count(
+                    normalized_phone,
+                    purpose,
+                )
                 >= settings.OTP_MAX_SENDS
         ):
             raise Throttled(
@@ -162,6 +166,7 @@ class AuthService:
             otp,
             request_ip=None,
             user_agent="",
+            user=None,
     ):
         try:
             challenge_id = int(challenge_id)
@@ -178,7 +183,9 @@ class AuthService:
         otp = str(otp or "").strip()
 
         if not otp.isdigit() or len(otp) != 6:
-            raise ValidationError("Invalid OTP.")
+            raise ValidationError(
+                "Invalid OTP."
+            )
 
         rate_limit = check_and_increment_ip_rate_limit(
             request_ip,
@@ -187,7 +194,10 @@ class AuthService:
 
         if not rate_limit["allowed"]:
             raise Throttled(
-                detail="Too many OTP requests from this IP. Please try again later.",
+                detail=(
+                    "Too many OTP requests from this IP. "
+                    "Please try again later."
+                ),
                 wait=rate_limit["retry_after"],
             )
 
@@ -200,6 +210,24 @@ class AuthService:
                 "Invalid verification challenge."
             ) from exc
 
+        if challenge.purpose == "phone_verification":
+            if not user or not user.is_authenticated:
+                raise AuthenticationFailed(
+                    "Authentication is required for phone verification."
+                )
+
+            challenge_phone = normalize_phone_number(
+                challenge.phone_number
+            )
+            user_phone = normalize_phone_number(
+                user.phone_number
+            )
+
+            if challenge_phone != user_phone:
+                raise AuthenticationFailed(
+                    "Phone verification does not belong to this account."
+                )
+
         if challenge.is_used:
             raise ValidationError(
                 "This OTP challenge has already been used."
@@ -207,39 +235,47 @@ class AuthService:
 
         if is_expired(challenge):
             challenge.is_used = True
+
             challenge.save(
                 update_fields=["is_used"]
             )
+
             raise ValidationError(
                 "OTP has expired. Please request a new one."
             )
 
-        if (
-                challenge.attempts
-                >= challenge.max_attempts
-        ):
+        if challenge.attempts >= challenge.max_attempts:
             challenge.is_used = True
+
             challenge.save(
                 update_fields=["is_used"]
             )
+
             raise ValidationError(
-                "OTP verification limit reached. Please request a new one."
+                "OTP verification limit reached. "
+                "Please request a new one."
             )
 
         submitted_hash = hash_otp(otp)
 
         if challenge.code_hash != submitted_hash:
             challenge.attempts += 1
+
             challenge.save(
                 update_fields=["attempts"]
             )
 
             SecurityEvent.objects.create(
-                user=None,
+                user=(
+                    user
+                    if user and user.is_authenticated
+                    else None
+                ),
                 event_type="otp_failed",
                 description=(
                     f"OTP failed for "
-                    f"{challenge.phone_number}"
+                    f"{challenge.phone_number} "
+                    f"({challenge.purpose})"
                 ),
                 ip_address=request_ip,
             )
@@ -250,6 +286,7 @@ class AuthService:
 
         challenge.is_used = True
         challenge.verified_at = timezone.now()
+
         challenge.save(
             update_fields=[
                 "is_used",
@@ -257,24 +294,38 @@ class AuthService:
             ]
         )
 
+        if challenge.purpose == "phone_verification":
+            user.is_phone_verified = True
+            user.phone_verified_at = timezone.now()
+
+            user.save(
+                update_fields=[
+                    "is_phone_verified",
+                    "phone_verified_at",
+                    "updated_at",
+                ]
+            )
+
         SecurityEvent.objects.create(
-            user=None,
+            user=(
+                user
+                if user and user.is_authenticated
+                else None
+            ),
             event_type="otp_verified",
             description=(
                 f"OTP verified for "
-                f"{challenge.phone_number}"
+                f"{challenge.phone_number} "
+                f"({challenge.purpose})"
             ),
             ip_address=request_ip,
         )
-
         flow_token = signing.dumps(
             {
                 "challenge_id": str(
                     challenge.id
                 ),
-                "phone_number": (
-                    challenge.phone_number
-                ),
+                "phone_number": challenge.phone_number,
                 "purpose": challenge.purpose,
                 "exp": int(
                     (
@@ -289,7 +340,11 @@ class AuthService:
 
         return {
             "flow_token": flow_token,
-            "next_step": "password",
+            "next_step": (
+                "completed"
+                if challenge.purpose == "phone_verification"
+                else "password"
+            ),
             "expires_in": 600,
         }
 
