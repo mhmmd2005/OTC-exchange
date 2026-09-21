@@ -36,40 +36,44 @@ const error = ref('')
 const feedback = ref('')
 const activeStep = ref<VerificationStep | null>(null)
 
-const currentLevel = computed(
-    () => summary.value?.levels.find(
-        (level) => level.active,
-    ),
-)
+const currentLevel = computed(() => {
+  if (!summary.value) return undefined
+
+  return summary.value.levels.find(
+      (level) => level.level === summary.value?.currentLevel,
+  )
+})
 
 const nextLevel = computed(() => {
   if (!summary.value) return undefined
 
-  const activeIndex = summary.value.levels.findIndex(
-      (level) => level.active,
+  const currentIndex = summary.value.levels.findIndex(
+      (level) => level.level === summary.value?.currentLevel,
   )
 
-  return summary.value.levels[activeIndex + 1]
+  if (currentIndex < 0) return undefined
+
+  return summary.value.levels[currentIndex + 1]
 })
 
 const requiredSteps = computed(
-    () => summary.value?.steps.filter(
-        (step) => step.required,
-    ) ?? [],
+    () =>
+        summary.value?.steps.filter(
+            (step) => step.required,
+        ) ?? [],
 )
 
 const verifiedRequiredSteps = computed(
-    () => requiredSteps.value.filter(
-        (step) => step.status === 'verified',
-    ).length,
+    () =>
+        requiredSteps.value.filter(
+            (step) => step.status === 'verified',
+        ).length,
 )
 
 const requiredProgress = computed(() =>
     requiredSteps.value.length
         ? Math.round(
-            verifiedRequiredSteps.value
-            / requiredSteps.value.length
-            * 100,
+            (verifiedRequiredSteps.value / requiredSteps.value.length) * 100,
         )
         : 100,
 )
@@ -100,11 +104,11 @@ const wizardStepIndex = computed(() =>
 const wizardProgress = computed(() =>
     requiredSteps.value.length
         ? Math.round(
-            requiredSteps.value.filter(
-                (step) => step.status === 'verified',
-            ).length
-            / requiredSteps.value.length
-            * 100,
+            (requiredSteps.value.filter(
+                    (step) => step.status === 'verified',
+                ).length /
+                requiredSteps.value.length) *
+            100,
         )
         : 0,
 )
@@ -115,6 +119,7 @@ const basicInfo = computed(
 
 const limitRows = computed<LimitRow[]>(() => {
   const limits = summary.value?.limits
+
   if (!limits) return []
 
   return [
@@ -156,12 +161,18 @@ const limitRows = computed<LimitRow[]>(() => {
   ]
 })
 
-function readableError(caught: unknown, fallback: string): string {
-  return caught instanceof Error ? caught.message : fallback
+function readableError(
+    caught: unknown,
+    fallback: string,
+): string {
+  return caught instanceof Error
+      ? caught.message
+      : fallback
 }
 
 function levelLabel(level?: string): string {
   const labels: Record<string, string> = {
+    basic: 'سطح پایه',
     level_0: 'سطح صفر',
     level_1: 'سطح یک',
     level_2: 'سطح دو',
@@ -173,23 +184,61 @@ function levelLabel(level?: string): string {
       : '—'
 }
 
-function remaining(limit: string, used: string): string {
+function levelTitle(
+    level?: { title?: string } | string,
+): string {
+  const value =
+      typeof level === 'string'
+          ? level
+          : level?.title
+
+  const labels: Record<string, string> = {
+    basic: 'سطح پایه',
+    level_0: 'سطح صفر',
+    level_1: 'سطح یک',
+    level_2: 'سطح دو',
+    level_3: 'سطح سه',
+  }
+
+  return value
+      ? labels[value] ?? value
+      : '—'
+}
+
+function remaining(
+    limit: string,
+    used: string,
+): string {
   try {
-    const result = BigInt(limit) - BigInt(used)
-    return (result < 0n ? 0n : result).toString()
+    const result =
+        BigInt(limit) - BigInt(used)
+
+    return (
+        result < 0n
+            ? 0n
+            : result
+    ).toString()
   } catch {
     return '0'
   }
 }
 
-function usagePercent(limit: string, used: string): number {
+function usagePercent(
+    limit: string,
+    used: string,
+): number {
   try {
     const total = BigInt(limit)
 
     if (total <= 0n) return 0
 
-    const ratio = BigInt(used) * 100n / total
-    return Math.min(100, Math.max(0, Number(ratio)))
+    const ratio =
+        (BigInt(used) * 100n) / total
+
+    return Math.min(
+        100,
+        Math.max(0, Number(ratio)),
+    )
   } catch {
     return 0
   }
@@ -217,6 +266,7 @@ async function load(): Promise<void> {
     summary.value = verificationResult.value
   } else {
     summary.value = null
+
     error.value = readableError(
         verificationResult.reason,
         'اطلاعات احراز هویت بارگیری نشد.',
@@ -228,7 +278,10 @@ async function load(): Promise<void> {
   } else {
     profile.value = null
 
-    if (verificationResult.status === 'fulfilled') {
+    if (
+        verificationResult.status ===
+        'fulfilled'
+    ) {
       error.value = readableError(
           profileResult.reason,
           'اطلاعات پروفایل بارگیری نشد.',
@@ -239,7 +292,9 @@ async function load(): Promise<void> {
   loading.value = false
 }
 
-async function openStep(step: VerificationStep): Promise<void> {
+async function openStep(
+    step: VerificationStep,
+): Promise<void> {
   feedback.value = ''
 
   if (step.locked) return
@@ -256,8 +311,10 @@ async function openStep(step: VerificationStep): Promise<void> {
 
   if (step.id === 'bank') {
     void router.push(
-        step.actionRoute || '/app/bank-accounts',
+        step.actionRoute ||
+        '/app/bank-accounts',
     )
+
     return
   }
 
@@ -278,7 +335,9 @@ async function handleStepSubmitted(
   ])
 }
 
-function maskedNationalId(value: string): string {
+function maskedNationalId(
+    value: string,
+): string {
   const digits = value.replace(/\D/g, '')
 
   if (!digits) return '—'
@@ -290,7 +349,9 @@ function maskedNationalId(value: string): string {
   }
 
   return toPersianDigits(
-      `${digits.slice(0, 2)}${'•'.repeat(Math.max(1, digits.length - 5))}${digits.slice(-3)}`,
+      `${digits.slice(0, 2)}${'•'.repeat(
+          Math.max(1, digits.length - 5),
+      )}${digits.slice(-3)}`,
   )
 }
 
@@ -302,14 +363,30 @@ onMounted(load)
     <PageHeader
         title="احراز هویت"
         description="وضعیت حساب، مراحل باقی‌مانده و سقف‌های روزانه را یک‌جا ببینید."
-    />
+    >
+      <template #actions>
+        <AppButton
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            :loading="loading"
+            @click="load"
+        >
+          به‌روزرسانی
+        </AppButton>
+      </template>
+    </PageHeader>
 
     <div
         v-if="feedback"
         class="page-notice success"
         role="status"
     >
-      <AppIcon name="check" :size="20"/>
+      <AppIcon
+          name="check"
+          :size="20"
+      />
+
       <span>{{ feedback }}</span>
 
       <button
@@ -317,7 +394,10 @@ onMounted(load)
           aria-label="بستن"
           @click="feedback = ''"
       >
-        <AppIcon name="close" :size="17"/>
+        <AppIcon
+            name="close"
+            :size="17"
+        />
       </button>
     </div>
 
@@ -326,9 +406,17 @@ onMounted(load)
         class="page-notice danger"
         role="alert"
     >
-      <AppIcon name="warning" :size="20"/>
+      <AppIcon
+          name="warning"
+          :size="20"
+      />
+
       <span>{{ error }}</span>
-      <button type="button" @click="load">
+
+      <button
+          type="button"
+          @click="load"
+      >
         تلاش دوباره
       </button>
     </div>
@@ -341,11 +429,13 @@ onMounted(load)
               width="5rem"
               radius="1.4rem"
           />
+
           <div>
             <AppSkeleton
                 height="1.7rem"
                 width="11rem"
             />
+
             <AppSkeleton
                 height="1rem"
                 width="18rem"
@@ -360,7 +450,9 @@ onMounted(load)
               v-for="i in 4"
               :key="i"
               height="4.5rem"
-              :style="{ marginBottom: '1rem' }"
+              :style="{
+              marginBottom: '1rem',
+            }"
           />
         </AppCard>
 
@@ -369,7 +461,9 @@ onMounted(load)
               v-for="i in 4"
               :key="i"
               height="3.5rem"
-              :style="{ marginBottom: '1rem' }"
+              :style="{
+              marginBottom: '1rem',
+            }"
           />
         </AppCard>
       </div>
@@ -381,16 +475,26 @@ onMounted(load)
           class="page-notice pending"
           role="status"
       >
-        <AppIcon name="clock" :size="20"/>
+        <AppIcon
+            name="clock"
+            :size="20"
+        />
+
         <span>
-          <strong>اطلاعات شما در حال بررسی است.</strong>
+          <strong>
+            اطلاعات شما در حال بررسی است.
+          </strong>
+
           اطلاعات هویتی و مدرک شناسایی شما برای بررسی ادمین ارسال شده است.
           نتیجه پس از بررسی در حساب شما اعلام می‌شود.
         </span>
       </div>
 
       <section
-          v-if="isWizardMode && wizardCurrentStep"
+          v-if="
+          isWizardMode &&
+          wizardCurrentStep
+        "
           class="verification-wizard"
       >
         <AppCard
@@ -400,12 +504,22 @@ onMounted(load)
           <div class="wizard-progress__copy">
             <span>
               مرحله
-              {{ toPersianDigits(wizardStepIndex + 1) }}
+              {{
+                toPersianDigits(
+                    wizardStepIndex + 1,
+                )
+              }}
               از
-              {{ toPersianDigits(requiredSteps.length) }}
+              {{
+                toPersianDigits(
+                    requiredSteps.length,
+                )
+              }}
             </span>
 
-            <h2>تکمیل احراز هویت</h2>
+            <h2>
+              تکمیل احراز هویت
+            </h2>
 
             <p>
               هر مرحله را به ترتیب تکمیل کنید.
@@ -420,35 +534,63 @@ onMounted(load)
               :aria-valuenow="wizardProgress"
           >
             <strong>
-              {{ toPersianDigits(wizardProgress) }}٪
+              {{
+                toPersianDigits(
+                    wizardProgress,
+                )
+              }}٪
             </strong>
-            <span>تکمیل‌شده</span>
+
+            <span>
+              تکمیل‌شده
+            </span>
           </div>
 
           <ol
               class="wizard-steps"
-              :style="{ '--wizard-count': requiredSteps.length }"
+              :style="{
+              '--wizard-count':
+                requiredSteps.length,
+            }"
           >
             <li
-                v-for="(step, index) in requiredSteps"
+                v-for="(
+                step,
+                index
+              ) in requiredSteps"
                 :key="step.id"
                 :class="{
-                complete: step.status === 'verified',
-                current: step.id === wizardCurrentStep.id,
+                complete:
+                  step.status ===
+                  'verified',
+
+                current:
+                  step.id ===
+                  wizardCurrentStep.id,
               }"
             >
               <span>
                 <AppIcon
-                    v-if="step.status === 'verified'"
+                    v-if="
+                    step.status ===
+                    'verified'
+                  "
                     name="check"
                     :size="16"
                 />
+
                 <template v-else>
-                  {{ toPersianDigits(index + 1) }}
+                  {{
+                    toPersianDigits(
+                        index + 1,
+                    )
+                  }}
                 </template>
               </span>
 
-              <b>{{ step.title }}</b>
+              <b>
+                {{ step.title }}
+              </b>
             </li>
           </ol>
         </AppCard>
@@ -458,13 +600,19 @@ onMounted(load)
               class="wizard-form-card"
               padding="lg"
           >
-            <header class="wizard-form-heading">
-              <span class="heading-icon">
+            <header
+                class="wizard-form-heading"
+            >
+              <span
+                  class="heading-icon"
+              >
                 <AppIcon
                     :name="
-                    wizardCurrentStep.id === 'bank'
+                    wizardCurrentStep.id ===
+                    'bank'
                       ? 'bank'
-                      : wizardCurrentStep.id === 'mobile'
+                      : wizardCurrentStep.id ===
+                        'mobile'
                         ? 'phone'
                         : 'verify'
                   "
@@ -473,14 +621,28 @@ onMounted(load)
               </span>
 
               <div>
-                <span>مرحله جاری</span>
-                <h2>{{ wizardCurrentStep.title }}</h2>
-                <p>{{ wizardCurrentStep.description }}</p>
+                <span>
+                  مرحله جاری
+                </span>
+
+                <h2>
+                  {{
+                    wizardCurrentStep.title
+                  }}
+                </h2>
+
+                <p>
+                  {{
+                    wizardCurrentStep.description
+                  }}
+                </p>
               </div>
 
               <StatusBadge
                   domain="kyc"
-                  :status="wizardCurrentStep.status"
+                  :status="
+                  wizardCurrentStep.status
+                "
               />
             </header>
 
@@ -488,21 +650,33 @@ onMounted(load)
                 :step="wizardCurrentStep"
                 :profile="profile"
                 :basic-info="basicInfo"
-                @submitted="handleStepSubmitted"
+                @submitted="
+                handleStepSubmitted
+              "
             />
           </AppCard>
 
-          <aside class="wizard-aside">
+          <aside
+              class="wizard-aside"
+          >
             <AppCard
                 padding="lg"
                 class="wizard-trust-card"
             >
-              <span class="wizard-trust-icon">
-                <AppIcon name="shield" :size="28"/>
+              <span
+                  class="wizard-trust-icon"
+              >
+                <AppIcon
+                    name="shield"
+                    :size="28"
+                />
               </span>
 
               <div>
-                <h2>اطلاعات شما امن است</h2>
+                <h2>
+                  اطلاعات شما امن است
+                </h2>
+
                 <p>
                   اطلاعات هویتی فقط برای احراز هویت و بررسی حساب استفاده می‌شود.
                 </p>
@@ -510,15 +684,26 @@ onMounted(load)
 
               <ul>
                 <li>
-                  <AppIcon name="check" :size="16"/>
+                  <AppIcon
+                      name="check"
+                      :size="16"
+                  />
                   ارتباط رمزنگاری‌شده
                 </li>
+
                 <li>
-                  <AppIcon name="check" :size="16"/>
+                  <AppIcon
+                      name="check"
+                      :size="16"
+                  />
                   بررسی توسط سامانه احراز هویت
                 </li>
+
                 <li>
-                  <AppIcon name="check" :size="16"/>
+                  <AppIcon
+                      name="check"
+                      :size="16"
+                  />
                   اعلام نتیجه در حساب
                 </li>
               </ul>
@@ -528,11 +713,23 @@ onMounted(load)
                 padding="lg"
                 class="wizard-help-card"
             >
-              <AppIcon name="help" :size="22"/>
+              <AppIcon
+                  name="help"
+                  :size="22"
+              />
+
               <div>
-                <strong>در این مرحله مشکلی دارید؟</strong>
-                <p>پشتیبانی برای تکمیل احراز هویت همراه شماست.</p>
-                <RouterLink to="/app/support">
+                <strong>
+                  در این مرحله مشکلی دارید؟
+                </strong>
+
+                <p>
+                  پشتیبانی برای تکمیل احراز هویت همراه شماست.
+                </p>
+
+                <RouterLink
+                    to="/app/support"
+                >
                   ارتباط با پشتیبانی
                 </RouterLink>
               </div>
@@ -549,26 +746,44 @@ onMounted(load)
           <div
               class="level-orbit"
               :style="{
-              '--progress': `${requiredProgress * 3.6}deg`,
+              '--progress':
+                `${requiredProgress * 3.6}deg`,
             }"
               role="progressbar"
               aria-valuemin="0"
               aria-valuemax="100"
-              :aria-valuenow="requiredProgress"
+              :aria-valuenow="
+              requiredProgress
+            "
           >
             <span>
               <strong>
-                {{ toPersianDigits(requiredProgress) }}٪
+                {{
+                  toPersianDigits(
+                      requiredProgress,
+                  )
+                }}٪
               </strong>
-              <small>ضروری</small>
+
+              <small>
+                مراحل ضروری
+              </small>
             </span>
           </div>
 
           <div class="hero-copy">
             <div class="hero-title">
-              <span class="eyebrow">سطح فعلی حساب</span>
+              <span class="eyebrow">
+                سطح فعلی حساب
+              </span>
+
               <h2>
-                {{ currentLevel?.title || levelLabel(summary.currentLevel) }}
+                {{
+                  currentLevel?.title ||
+                  levelLabel(
+                      summary.currentLevel,
+                  )
+                }}
               </h2>
 
               <StatusBadge
@@ -577,22 +792,38 @@ onMounted(load)
               />
             </div>
 
-            <p>{{ summary.message }}</p>
+            <p>
+              {{ summary.message }}
+            </p>
 
             <div
                 v-if="nextLevel"
                 class="next-level"
             >
-              <AppIcon name="sparkle" :size="19"/>
+              <AppIcon
+                  name="sparkle"
+                  :size="19"
+              />
+
               <span>
                 گام بعدی:
-                <strong>{{ nextLevel.title }}</strong>
+                <strong>
+                  {{
+                    levelTitle(
+                        nextLevel,
+                    )
+                  }}
+                </strong>
               </span>
             </div>
           </div>
 
           <div class="trust-mark">
-            <AppIcon name="shield" :size="30"/>
+            <AppIcon
+                name="shield"
+                :size="30"
+            />
+
             <span>
               اطلاعات شما<br/>
               رمزنگاری می‌شود
@@ -607,12 +838,20 @@ onMounted(load)
           >
             <div class="card-heading">
               <div>
-                <span class="heading-icon">
-                  <AppIcon name="verify" :size="21"/>
+                <span
+                    class="heading-icon"
+                >
+                  <AppIcon
+                      name="verify"
+                      :size="21"
+                  />
                 </span>
 
                 <div>
-                  <h2>مراحل احراز هویت</h2>
+                  <h2>
+                    مراحل احراز هویت
+                  </h2>
+
                   <p>
                     وضعیت و اقدام بعدی هر مرحله را ببینید.
                   </p>
@@ -620,54 +859,97 @@ onMounted(load)
               </div>
 
               <span>
-                {{ toPersianDigits(verifiedRequiredSteps) }}
+                {{
+                  toPersianDigits(
+                      verifiedRequiredSteps,
+                  )
+                }}
                 از
-                {{ toPersianDigits(requiredSteps.length) }}
+                {{
+                  toPersianDigits(
+                      requiredSteps.length,
+                  )
+                }}
                 ضروری
               </span>
             </div>
 
             <ol class="steps-list">
               <li
-                  v-for="(step, index) in summary.steps"
+                  v-for="(
+                  step,
+                  index
+                ) in summary.steps"
                   :key="step.id"
                   :class="[
                   `status-${step.status}`,
-                  { optional: !step.required },
+                  {
+                    optional:
+                      !step.required,
+                  },
                 ]"
               >
                 <span class="step-index">
                   <AppIcon
-                      v-if="step.status === 'verified'"
+                      v-if="
+                      step.status ===
+                      'verified'
+                    "
                       name="check"
                       :size="17"
                   />
+
                   <span v-else>
-                    {{ toPersianDigits(index + 1) }}
+                    {{
+                      toPersianDigits(
+                          index + 1,
+                      )
+                    }}
                   </span>
                 </span>
 
                 <div class="step-copy">
                   <div class="step-title">
-                    <h3>{{ step.title }}</h3>
+                    <h3>
+                      {{ step.title }}
+                    </h3>
                   </div>
 
-                  <p>{{ step.description }}</p>
+                  <p>
+                    {{ step.description }}
+                  </p>
 
                   <div
-                      v-if="step.rejectionReason"
+                      v-if="
+                      step.rejectionReason
+                    "
                       class="rejection-reason"
                   >
-                    <AppIcon name="warning" :size="17"/>
+                    <AppIcon
+                        name="warning"
+                        :size="17"
+                    />
+
                     <span>
-                      <strong>علت نیاز به اصلاح:</strong>
-                      {{ step.rejectionReason }}
+                      <strong>
+                        علت نیاز به اصلاح:
+                      </strong>
+
+                      {{
+                        step.rejectionReason
+                      }}
                     </span>
                   </div>
 
-                  <small v-if="step.completedAt">
+                  <small
+                      v-if="step.completedAt"
+                  >
                     تکمیل در
-                    {{ formatPersianDate(step.completedAt) }}
+                    {{
+                      formatPersianDate(
+                          step.completedAt,
+                      )
+                    }}
                   </small>
                 </div>
 
@@ -679,12 +961,14 @@ onMounted(load)
 
                   <AppButton
                       v-if="
-                      !step.locked
-                      && [
+                      !step.locked &&
+                      [
                         'not_started',
                         'needs_correction',
                         'rejected',
-                      ].includes(step.status)
+                      ].includes(
+                        step.status,
+                      )
                     "
                       variant="secondary"
                       size="sm"
@@ -692,19 +976,26 @@ onMounted(load)
                       [
                         'needs_correction',
                         'rejected',
-                      ].includes(step.status)
+                      ].includes(
+                        step.status,
+                      )
                         ? 'refresh'
                         : 'chevronLeft'
                     "
-                      @click="openStep(step)"
+                      @click="
+                      openStep(step)
+                    "
                   >
                     {{
                       [
                         'needs_correction',
                         'rejected',
-                      ].includes(step.status)
+                      ].includes(
+                          step.status,
+                      )
                           ? 'ارسال مجدد'
-                          : step.actionLabel || 'شروع مرحله'
+                          : step.actionLabel ||
+                          'شروع مرحله'
                     }}
                   </AppButton>
                 </div>
@@ -717,16 +1008,31 @@ onMounted(load)
                 padding="lg"
                 class="limits-card"
             >
-              <div class="card-heading compact">
+              <div
+                  class="card-heading compact"
+              >
                 <div>
-                  <span class="heading-icon">
-                    <AppIcon name="wallet" :size="20"/>
+                  <span
+                      class="heading-icon"
+                  >
+                    <AppIcon
+                        name="wallet"
+                        :size="20"
+                    />
                   </span>
 
                   <div>
-                    <h2>سقف‌های امروز</h2>
+                    <h2>
+                      سقف‌های امروز
+                    </h2>
+
                     <p>
-                      {{ levelLabel(summary.limits.accountLevel) }}
+                      {{
+                        levelLabel(
+                            summary.limits
+                                .accountLevel,
+                        )
+                      }}
                     </p>
                   </div>
                 </div>
@@ -738,12 +1044,15 @@ onMounted(load)
                     :key="row.key"
                     class="limit-row"
                 >
-                  <div class="limit-title">
+                  <div
+                      class="limit-title"
+                  >
                     <span>
                       <AppIcon
                           :name="row.icon"
                           :size="17"
                       />
+
                       {{ row.label }}
                     </span>
 
@@ -754,9 +1063,13 @@ onMounted(load)
                                 row.limit,
                                 row.used,
                             ),
-                            {maximumFractionDigits: 0},
+                            {
+                              maximumFractionDigits:
+                                  0,
+                            },
                         )
                       }}
+
                       مصرف
                     </strong>
                   </div>
@@ -767,24 +1080,45 @@ onMounted(load)
                       aria-valuemin="0"
                       aria-valuemax="100"
                       :aria-valuenow="
-                      usagePercent(row.limit, row.used)
+                      usagePercent(
+                        row.limit,
+                        row.used,
+                      )
                     "
                   >
                     <i
                         :style="{
-                        width: `${usagePercent(row.limit, row.used)}%`,
+                        width:
+                          `${usagePercent(
+                            row.limit,
+                            row.used,
+                          )}%`,
                       }"
                     />
                   </div>
 
-                  <div class="limit-values">
+                  <div
+                      class="limit-values"
+                  >
                     <span>
                       باقی‌مانده
-                      {{ formatToman(remaining(row.limit, row.used)) }}
+                      {{
+                        formatToman(
+                            remaining(
+                                row.limit,
+                                row.used,
+                            ),
+                        )
+                      }}
                     </span>
 
                     <small>
-                      از {{ formatToman(row.limit) }}
+                      از
+                      {{
+                        formatToman(
+                            row.limit,
+                        )
+                      }}
                     </small>
                   </div>
                 </div>
@@ -797,28 +1131,50 @@ onMounted(load)
                 class="identity-card"
             >
               <div class="identity-avatar">
-                {{ basicInfo.firstName.charAt(0) }}
-                {{ basicInfo.lastName.charAt(0) }}
+                {{
+                  basicInfo.firstName.charAt(
+                      0,
+                  )
+                }}
+
+                {{
+                  basicInfo.lastName.charAt(
+                      0,
+                  )
+                }}
               </div>
 
-              <div>
-                <strong>
+              <div class="identity-info">
+                <div class="identity-name">
                   {{
                     `${basicInfo.firstName} ${basicInfo.lastName}`.trim()
                     || '—'
                   }}
-                </strong>
+                </div>
 
-                <bdi dir="ltr">
-                  {{ maskedNationalId(basicInfo.nationalId) }}
-                </bdi>
+                <div
+                    class="identity-national-id"
+                >
+                  {{
+                    maskedNationalId(
+                        basicInfo.nationalId,
+                    )
+                  }}
+                </div>
               </div>
 
               <span
-                  v-if="summary.status === 'verified'"
+                  v-if="
+                  summary.status ===
+                  'verified'
+                "
                   class="verified-seal"
               >
-                <AppIcon name="check" :size="15"/>
+                <AppIcon
+                    name="check"
+                    :size="15"
+                />
+
                 هویت تأییدشده
               </span>
             </AppCard>
@@ -828,7 +1184,10 @@ onMounted(load)
         <section class="levels-section">
           <div class="section-heading">
             <div>
-              <h2>سطوح کاربری</h2>
+              <h2>
+                سطوح کاربری
+              </h2>
+
               <p>
                 با تکمیل مراحل بعدی، سقف‌ها و خدمات بیشتری در دسترس قرار می‌گیرد.
               </p>
@@ -841,51 +1200,89 @@ onMounted(load)
                 :key="level.level"
                 padding="lg"
                 class="level-card"
-                :class="{ active: level.active }"
+                :class="{
+                active: level.active,
+              }"
             >
               <header>
-                <span class="level-badge">
+                <span
+                    class="level-badge"
+                >
                   <AppIcon
-                      :name="level.active ? 'star' : 'shield'"
+                      :name="
+                      level.active
+                        ? 'star'
+                        : 'shield'
+                    "
                       :size="20"
                   />
                 </span>
 
                 <div>
-                  <h3>{{ level.title }}</h3>
-                  <p>{{ level.description }}</p>
+                  <h3>
+                    {{
+                      levelTitle(
+                          level,
+                      )
+                    }}
+                  </h3>
+
+                  <p>
+                    {{ level.description }}
+                  </p>
                 </div>
 
                 <span
-                    v-if="level.active"
+                    v-if="level.level === summary.currentLevel"
                     class="active-label"
                 >
                   سطح شما
                 </span>
               </header>
 
-              <div class="level-section">
-                <span>نیازمندی‌ها</span>
+              <div
+                  class="level-section"
+              >
+                <span>
+                  نیازمندی‌ها
+                </span>
 
                 <ul>
                   <li
                       v-for="item in level.requirements"
                       :key="item"
                   >
-                    <AppIcon name="check" :size="15"/>
+                    <AppIcon
+                        name="check"
+                        :size="15"
+                    />
+
                     {{ item }}
                   </li>
                 </ul>
               </div>
 
-              <div class="benefit-list">
+              <div
+                  class="benefit-list"
+              >
                 <div
-                    v-for="benefit in level.benefits"
+                    v-for="
+                    benefit in level.benefits
+                  "
                     :key="benefit.label"
                 >
-                  <span>{{ benefit.label }}</span>
+                  <span>
+                    {{ benefit.label }}
+                  </span>
+
                   <strong>
-                    {{ benefitValue(String(benefit.value)) }}
+                    {{
+                      benefitValue(
+                          String(
+                              benefit.value,
+                          ),
+                      )
+                    }}
                   </strong>
                 </div>
               </div>
@@ -897,10 +1294,13 @@ onMounted(load)
 
     <AppModal
         v-if="!isWizardMode"
-        :model-value="Boolean(activeStep)"
+        :model-value="
+        Boolean(activeStep)
+      "
         :title="activeStep?.title"
         :description="
-        activeStep?.status === 'rejected'
+        activeStep?.status ===
+        'rejected'
           ? 'اطلاعات اصلاح‌شده را دوباره ارسال کنید.'
           : 'اطلاعات این مرحله پس از ارسال بررسی می‌شود.'
       "
@@ -917,8 +1317,12 @@ onMounted(load)
           :profile="profile"
           :basic-info="basicInfo"
           allow-cancel
-          @submitted="handleStepSubmitted"
-          @cancel="activeStep = null"
+          @submitted="
+          handleStepSubmitted
+        "
+          @cancel="
+          activeStep = null
+        "
       />
     </AppModal>
   </div>
@@ -928,11 +1332,11 @@ onMounted(load)
 .verification-page {
   display: grid;
   align-content: start;
-  gap: var(--space-5)
+  gap: var(--space-5);
 }
 
 .verification-page:deep(.page-header) {
-  margin-bottom: 0
+  margin-bottom: 0;
 }
 
 .page-notice {
@@ -942,90 +1346,95 @@ onMounted(load)
   padding: var(--space-3) var(--space-4);
   border: 1px solid;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .page-notice span {
-  flex: 1
+  flex: 1;
 }
 
 .page-notice button {
   border: 0;
   background: transparent;
   color: inherit;
-  font-weight: 600
+  font-weight: 600;
 }
 
 .page-notice.success {
   border-color: rgba(53, 201, 149, .24);
   background: var(--color-success-soft);
-  color: var(--color-success)
+  color: var(--color-success);
 }
 
 .page-notice.danger {
   border-color: rgba(240, 108, 117, .24);
   background: var(--color-danger-soft);
-  color: var(--color-danger)
+  color: var(--color-danger);
 }
 
 .page-notice.pending {
   border-color: rgba(234, 179, 8, .24);
   background: var(--color-warning-soft);
-  color: var(--color-warning)
+  color: var(--color-warning);
 }
 
 .page-notice.pending strong {
   display: block;
-  margin-bottom: .2rem
+  margin-bottom: .2rem;
 }
 
 .hero-skeleton {
   display: flex;
   align-items: center;
-  gap: var(--space-5)
+  gap: var(--space-5);
 }
 
 .hero-skeleton > div {
   display: grid;
-  grid-template-columns:minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   flex: 1;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .hero-skeleton:deep(.skeleton) {
-  max-width: 100%
+  max-width: 100%;
 }
 
 .verification-wizard {
   display: grid;
-  gap: var(--space-5)
+  gap: var(--space-5);
 }
 
 .wizard-progress {
   display: grid;
-  grid-template-columns:minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-5);
   overflow: hidden;
-  background: linear-gradient(120deg, var(--color-surface-1) 45%, var(--color-primary-soft))
+  background: linear-gradient(
+      120deg,
+      var(--color-surface-1) 45%,
+      var(--color-primary-soft)
+  );
 }
 
-.wizard-progress__copy > span, .wizard-form-heading > div > span {
+.wizard-progress__copy > span,
+.wizard-form-heading > div > span {
   color: var(--color-primary);
   font-size: var(--font-size-xs);
-  font-weight: 700
+  font-weight: 700;
 }
 
 .wizard-progress__copy h2 {
   margin: var(--space-1) 0;
-  font-size: var(--font-size-2xl)
+  font-size: var(--font-size-2xl);
 }
 
 .wizard-progress__copy p {
   max-width: 42rem;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .wizard-progress__value {
@@ -1034,27 +1443,30 @@ onMounted(load)
   align-content: center;
   padding-inline: var(--space-5);
   border-inline-start: 1px solid var(--color-border-soft);
-  text-align: center
+  text-align: center;
 }
 
 .wizard-progress__value strong {
   color: var(--color-primary);
-  font-size: var(--font-size-2xl)
+  font-size: var(--font-size-2xl);
 }
 
 .wizard-progress__value span {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .wizard-steps {
-  grid-column: 1/-1;
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns:repeat(var(--wizard-count, 4), minmax(0, 1fr));
+  grid-template-columns: repeat(
+    var(--wizard-count, 4),
+    minmax(0, 1fr)
+  );
   margin: 0;
   padding: var(--space-4) 0 0;
   border-top: 1px solid var(--color-border-soft);
-  list-style: none
+  list-style: none;
 }
 
 .wizard-steps li {
@@ -1064,21 +1476,21 @@ onMounted(load)
   gap: var(--space-2);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  text-align: center
+  text-align: center;
 }
 
-.wizard-steps li:before {
+.wizard-steps li::before {
   position: absolute;
   z-index: 0;
   inset-block-start: 1.05rem;
   inset-inline: calc(50% + 1.1rem) calc(-50% + 1.1rem);
   height: 1px;
   background: var(--color-border-hover);
-  content: ''
+  content: '';
 }
 
-.wizard-steps li:first-child:before {
-  display: none
+.wizard-steps li:first-child::before {
+  display: none;
 }
 
 .wizard-steps li > span {
@@ -1089,34 +1501,34 @@ onMounted(load)
   border: 2px solid var(--color-border-hover);
   border-radius: 50%;
   background: var(--color-surface-1);
-  place-items: center
+  place-items: center;
 }
 
 .wizard-steps li.complete > span {
   border-color: var(--color-success);
   background: var(--color-success);
-  color: var(--on-success)
+  color: var(--on-success);
 }
 
-.wizard-steps li.complete:before {
-  background: var(--color-success)
+.wizard-steps li.complete::before {
+  background: var(--color-success);
 }
 
 .wizard-steps li.current {
-  color: var(--color-text-primary)
+  color: var(--color-text-primary);
 }
 
 .wizard-steps li.current > span {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px var(--color-primary-soft);
-  color: var(--color-primary)
+  color: var(--color-primary);
 }
 
 .wizard-layout {
   display: grid;
-  grid-template-columns:minmax(0, 1.4fr) minmax(18rem, .6fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, .6fr);
   align-items: start;
-  gap: var(--space-5)
+  gap: var(--space-5);
 }
 
 .wizard-form-heading {
@@ -1125,34 +1537,38 @@ onMounted(load)
   gap: var(--space-3);
   margin-bottom: var(--space-5);
   padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border-soft)
+  border-bottom: 1px solid var(--color-border-soft);
 }
 
 .wizard-form-heading > div {
   min-width: 0;
-  flex: 1
+  flex: 1;
 }
 
 .wizard-form-heading h2 {
   margin: .15rem 0;
-  font-size: var(--font-size-xl)
+  font-size: var(--font-size-xl);
 }
 
 .wizard-form-heading p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .wizard-aside {
   display: grid;
-  gap: var(--space-4)
+  gap: var(--space-4);
 }
 
 .wizard-trust-card {
   display: grid;
   gap: var(--space-4);
-  background: linear-gradient(145deg, var(--color-surface-1), var(--color-success-soft))
+  background: linear-gradient(
+      145deg,
+      var(--color-surface-1),
+      var(--color-success-soft)
+  );
 }
 
 .wizard-trust-icon {
@@ -1162,18 +1578,19 @@ onMounted(load)
   border-radius: 1rem;
   background: var(--color-success-soft);
   color: var(--color-success);
-  place-items: center
+  place-items: center;
 }
 
 .wizard-trust-card h2 {
   margin: 0;
-  font-size: var(--font-size-lg)
+  font-size: var(--font-size-lg);
 }
 
-.wizard-trust-card p, .wizard-help-card p {
+.wizard-trust-card p,
+.wizard-help-card p {
   margin: .25rem 0 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .wizard-trust-card ul {
@@ -1182,7 +1599,7 @@ onMounted(load)
   margin: 0;
   padding: var(--space-4) 0 0;
   border-top: 1px solid var(--color-border-soft);
-  list-style: none
+  list-style: none;
 }
 
 .wizard-trust-card li {
@@ -1190,22 +1607,22 @@ onMounted(load)
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .wizard-trust-card li svg {
-  color: var(--color-success)
+  color: var(--color-success);
 }
 
 .wizard-help-card {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .wizard-help-card > svg {
   flex: 0 0 auto;
-  color: var(--color-primary)
+  color: var(--color-primary);
 }
 
 .wizard-help-card a {
@@ -1213,7 +1630,7 @@ onMounted(load)
   margin-top: var(--space-2);
   color: var(--color-primary);
   font-size: var(--font-size-xs);
-  font-weight: 700
+  font-weight: 700;
 }
 
 .verification-hero {
@@ -1222,10 +1639,14 @@ onMounted(load)
   align-items: center;
   gap: var(--space-6);
   overflow: hidden;
-  background: linear-gradient(120deg, var(--color-surface-1) 45%, var(--color-primary-soft))
+  background: linear-gradient(
+      120deg,
+      var(--color-surface-1) 45%,
+      var(--color-primary-soft)
+  );
 }
 
-.verification-hero:after {
+.verification-hero::after {
   position: absolute;
   width: 18rem;
   height: 18rem;
@@ -1233,7 +1654,7 @@ onMounted(load)
   inset-inline-end: -6rem;
   border: 1px solid rgba(67, 139, 255, .12);
   border-radius: 50%;
-  content: ''
+  content: '';
 }
 
 .level-orbit {
@@ -1243,60 +1664,63 @@ onMounted(load)
   height: 7rem;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: conic-gradient(var(--color-primary) var(--progress), var(--color-surface-3) 0);
-  place-items: center
+  background: conic-gradient(
+      var(--color-primary) var(--progress),
+      var(--color-surface-3) 0
+  );
+  place-items: center;
 }
 
-.level-orbit:before {
+.level-orbit::before {
   position: absolute;
   inset: .45rem;
   border-radius: 50%;
   background: var(--color-surface-1);
-  content: ''
+  content: '';
 }
 
 .level-orbit span {
   position: relative;
   display: grid;
-  text-align: center
+  text-align: center;
 }
 
 .level-orbit strong {
-  font-size: var(--font-size-xl)
+  font-size: var(--font-size-xl);
 }
 
 .level-orbit small {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .hero-copy {
   min-width: 0;
-  flex: 1
+  flex: 1;
 }
 
 .hero-title {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .eyebrow {
   width: 100%;
   color: var(--color-primary);
   font-size: var(--font-size-xs);
-  font-weight: 600
+  font-weight: 600;
 }
 
 .hero-title h2 {
   margin: 0;
-  font-size: var(--font-size-2xl)
+  font-size: var(--font-size-2xl);
 }
 
 .hero-copy > p {
   margin: var(--space-2) 0;
-  color: var(--color-text-secondary)
+  color: var(--color-text-secondary);
 }
 
 .next-level {
@@ -1308,15 +1732,15 @@ onMounted(load)
   border-radius: var(--radius-md);
   background: var(--color-gold-soft);
   color: var(--color-gold);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .next-level span {
-  color: var(--color-text-secondary)
+  color: var(--color-text-secondary);
 }
 
 .next-level strong {
-  color: var(--color-gold)
+  color: var(--color-gold);
 }
 
 .trust-mark {
@@ -1329,25 +1753,26 @@ onMounted(load)
   border: 1px solid rgba(67, 139, 255, .16);
   border-radius: var(--radius-lg);
   background: rgba(7, 17, 30, .32);
-  color: var(--color-primary)
+  color: var(--color-primary);
 }
 
 .trust-mark span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  line-height: 1.7
+  line-height: 1.7;
 }
 
 .verification-layout {
   display: grid;
-  grid-template-columns:minmax(0, 1.55fr) minmax(20rem, .75fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(20rem, .75fr);
   align-items: start;
-  gap: var(--space-5)
+  gap: var(--space-5);
 }
 
 .side-stack {
   display: grid;
-  gap: var(--space-5)
+  width: 100%;
+  gap: var(--space-5);
 }
 
 .card-heading {
@@ -1355,13 +1780,13 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-5)
+  margin-bottom: var(--space-5);
 }
 
 .card-heading > div {
   display: flex;
   align-items: center;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .heading-icon {
@@ -1372,46 +1797,46 @@ onMounted(load)
   border-radius: .85rem;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  place-items: center
+  place-items: center;
 }
 
 .card-heading h2 {
   margin: 0;
-  font-size: var(--font-size-lg)
+  font-size: var(--font-size-lg);
 }
 
 .card-heading p {
   margin: .15rem 0 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .card-heading > span {
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .card-heading.compact {
-  margin-bottom: var(--space-4)
+  margin-bottom: var(--space-4);
 }
 
 .steps-list {
   display: grid;
   margin: 0;
   padding: 0;
-  list-style: none
+  list-style: none;
 }
 
 .steps-list li {
   position: relative;
   display: grid;
-  grid-template-columns:auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
-  padding-block: var(--space-4)
+  padding-block: var(--space-4);
 }
 
 .steps-list li + li {
-  border-top: 1px solid var(--color-border-soft)
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .step-index {
@@ -1424,47 +1849,47 @@ onMounted(load)
   background: var(--color-surface-2);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  place-items: center
+  place-items: center;
 }
 
 .status-verified .step-index {
   border-color: var(--color-success);
   background: var(--color-success);
-  color: white
+  color: white;
 }
 
 .status-rejected .step-index {
   border-color: var(--color-warning);
   background: var(--color-warning-soft);
-  color: var(--color-warning)
+  color: var(--color-warning);
 }
 
 .status-pending .step-index {
   border-color: var(--color-warning);
-  color: var(--color-warning)
+  color: var(--color-warning);
 }
 
 .step-copy h3 {
   margin: 0;
-  font-size: var(--font-size-md)
+  font-size: var(--font-size-md);
 }
 
 .step-copy p {
   margin: .25rem 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .step-copy small {
   color: var(--color-success);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .step-action {
   display: grid;
   justify-items: end;
   align-content: start;
-  gap: var(--space-2)
+  gap: var(--space-2);
 }
 
 .rejection-reason {
@@ -1476,24 +1901,25 @@ onMounted(load)
   border-radius: var(--radius-sm);
   background: var(--color-warning-soft);
   color: var(--color-warning);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .limit-list {
   display: grid;
-  gap: var(--space-4)
+  gap: var(--space-4);
 }
 
 .limit-row {
   display: grid;
-  gap: var(--space-2)
+  gap: var(--space-2);
 }
 
-.limit-title, .limit-values {
+.limit-title,
+.limit-values {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .limit-title > span {
@@ -1501,112 +1927,151 @@ onMounted(load)
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .limit-title svg {
-  color: var(--color-primary)
+  color: var(--color-primary);
 }
 
 .limit-title strong {
   color: var(--color-text-muted);
-  font-size: .68rem
+  font-size: .68rem;
 }
 
 .progress-track {
   height: .4rem;
   overflow: hidden;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-3)
+  background: var(--color-surface-3);
 }
 
 .progress-track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-info))
+  background: linear-gradient(
+      90deg,
+      var(--color-primary),
+      var(--color-info)
+  );
 }
 
 .limit-values span {
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .limit-values small {
   color: var(--color-text-muted);
-  font-size: .68rem
+  font-size: .68rem;
 }
 
 .identity-card {
+  position: relative;
   display: flex;
+  width: 100%;
+  min-height: 5rem;
+  box-sizing: border-box;
   align-items: center;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .identity-avatar {
   display: grid;
   width: 3rem;
   height: 3rem;
-  flex: 0 0 auto;
+  flex: 0 0 3rem;
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   font-weight: 700;
-  place-items: center
+  place-items: center;
 }
 
-.identity-card > div:nth-child(2) {
-  display: grid;
-  flex: 1
+.identity-info {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  height: 3rem;
 }
 
-.identity-card > div bdi {
+.identity-name {
+  position: absolute;
+  inset-inline-start: 0;
+  top: .45rem;
+  color: var(--color-text-primary);
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.identity-national-id {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 2rem;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  direction: ltr;
+  white-space: nowrap;
 }
 
 .verified-seal {
   display: inline-flex;
   align-items: center;
   gap: .2rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
   color: var(--color-success);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .levels-section {
   display: grid;
-  gap: var(--space-4)
+  gap: var(--space-4);
+  margin-top: 0;
+}
+
+.section-heading {
+  position: relative;
+  top: calc(var(--space-3) * -1);
+  margin: 0;
 }
 
 .section-heading h2 {
   margin: 0;
-  font-size: var(--font-size-xl)
+  font-size: var(--font-size-xl);
 }
 
 .section-heading p {
   margin: .15rem 0 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .levels-grid {
   display: grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
-  gap: var(--space-5)
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
 }
 
 .level-card {
-  position: relative
+  position: relative;
 }
 
 .level-card.active {
   border-color: rgba(221, 183, 110, .4);
-  background: linear-gradient(145deg, var(--color-surface-1), var(--color-gold-soft))
+  background: linear-gradient(
+      145deg,
+      var(--color-surface-1),
+      var(--color-gold-soft)
+  );
 }
 
 .level-card header {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3)
+  gap: var(--space-3);
 }
 
 .level-badge {
@@ -1617,22 +2082,22 @@ onMounted(load)
   border-radius: .85rem;
   background: var(--color-surface-3);
   color: var(--color-text-muted);
-  place-items: center
+  place-items: center;
 }
 
 .active .level-badge {
   background: var(--color-gold-soft);
-  color: var(--color-gold)
+  color: var(--color-gold);
 }
 
 .level-card h3 {
-  margin: 0
+  margin: 0;
 }
 
 .level-card header p {
   margin: .15rem 0 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .active-label {
@@ -1641,16 +2106,16 @@ onMounted(load)
   border-radius: var(--radius-pill);
   background: var(--color-gold-soft);
   color: var(--color-gold);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .level-section {
-  margin-block: var(--space-5)
+  margin-block: var(--space-5);
 }
 
 .level-section > span {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .level-section ul {
@@ -1658,7 +2123,7 @@ onMounted(load)
   gap: var(--space-2);
   margin: var(--space-2) 0 0;
   padding: 0;
-  list-style: none
+  list-style: none;
 }
 
 .level-section li {
@@ -1666,34 +2131,34 @@ onMounted(load)
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .level-section li svg {
-  color: var(--color-success)
+  color: var(--color-success);
 }
 
 .benefit-list {
   display: grid;
   gap: var(--space-2);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border-soft)
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .benefit-list > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2)
+  gap: var(--space-2);
 }
 
 .benefit-list span {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs)
+  font-size: var(--font-size-xs);
 }
 
 .benefit-list strong {
-  font-size: var(--font-size-sm)
+  font-size: var(--font-size-sm);
 }
 
 .page-notice button {
@@ -1702,32 +2167,36 @@ onMounted(load)
   min-height: 2.75rem;
   padding-inline: var(--space-2);
   border-radius: var(--radius-sm);
-  place-items: center
+  place-items: center;
 }
 
 .level-card {
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast)
+  transition: border-color var(--transition-fast),
+  box-shadow var(--transition-fast),
+  transform var(--transition-fast);
 }
 
 @media (hover: hover) {
   .level-card:hover {
     border-color: var(--color-border-hover);
     box-shadow: var(--shadow-sm);
-    transform: translateY(-2px)
+    transform: translateY(-2px);
   }
 }
 
 @media (max-width: 1100px) {
-  .verification-layout, .wizard-layout {
-    grid-template-columns:1fr
+  .verification-layout,
+  .wizard-layout {
+    grid-template-columns: 1fr;
   }
 
-  .side-stack, .wizard-aside {
-    grid-template-columns:1fr 1fr
+  .side-stack,
+  .wizard-aside {
+    grid-template-columns: 1fr 1fr;
   }
 
   .levels-grid {
-    grid-template-columns:1fr 1fr
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1735,181 +2204,196 @@ onMounted(load)
   .wizard-form-card:deep(.form-actions) {
     position: sticky;
     z-index: 2;
-    bottom: calc(var(--mobile-nav-height) + var(--safe-bottom) + var(--space-2));
+    bottom: calc(
+        var(--mobile-nav-height) +
+        var(--safe-bottom) +
+        var(--space-2)
+    );
     margin: var(--space-2) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
     padding: var(--space-3) var(--space-4) var(--space-4);
     border-top: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-surface-1) 94%, transparent);
-    backdrop-filter: blur(14px)
+    background: color-mix(
+        in srgb,
+        var(--color-surface-1) 94%,
+        transparent
+    );
+    backdrop-filter: blur(14px);
   }
 }
 
 @media (max-width: 767px) {
   .wizard-progress {
-    grid-template-columns:minmax(0, 1fr) auto;
-    gap: var(--space-4)
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-4);
   }
 
   .wizard-progress__copy h2 {
-    font-size: var(--font-size-xl)
+    font-size: var(--font-size-xl);
   }
 
   .wizard-progress__value {
     min-width: 4.5rem;
-    padding-inline: var(--space-3)
+    padding-inline: var(--space-3);
   }
 
   .wizard-progress__value strong {
-    font-size: var(--font-size-xl)
+    font-size: var(--font-size-xl);
   }
 
   .wizard-steps {
-    display: none
+    display: none;
   }
 
-  .wizard-aside, .side-stack, .levels-grid {
-    grid-template-columns:1fr
+  .wizard-aside,
+  .side-stack,
+  .levels-grid {
+    grid-template-columns: 1fr;
   }
 
   .verification-hero {
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: var(--space-4)
+    gap: var(--space-4);
   }
 
   .level-orbit {
     width: 5.5rem;
-    height: 5.5rem
+    height: 5.5rem;
   }
 
   .hero-copy {
-    width: calc(100% - 7rem)
+    width: calc(100% - 7rem);
   }
 
   .hero-title h2 {
-    font-size: var(--font-size-xl)
+    font-size: var(--font-size-xl);
   }
 
   .trust-mark {
     width: 100%;
-    justify-content: center
+    justify-content: center;
   }
 
   .steps-list li {
-    grid-template-columns:auto minmax(0, 1fr)
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .step-action {
     grid-column: 2;
-    grid-template-columns:auto auto;
+    grid-template-columns: auto auto;
     align-items: center;
     justify-content: start;
-    justify-items: start
+    justify-items: start;
   }
 
   .step-action:deep(.app-button) {
-    min-height: 2.25rem
+    min-height: 2.25rem;
   }
 
   .identity-card {
-    flex-wrap: wrap
+    flex-wrap: wrap;
   }
 
   .verified-seal {
     width: 100%;
-    padding-inline-start: 4rem
+    padding-inline-start: 4rem;
+  }
+
+  .section-heading {
+    top: 0;
   }
 }
 
 @media (max-width: 399px) {
   .wizard-progress {
-    grid-template-columns:minmax(0, 1fr)
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .wizard-progress__value {
     grid-row: 1;
     grid-column: 1;
     justify-self: end;
-    border-inline-start: 0
+    border-inline-start: 0;
   }
 
   .wizard-progress__copy {
-    padding-inline-end: 4.5rem
+    padding-inline-end: 4.5rem;
   }
 
   .wizard-progress__copy p {
-    display: none
+    display: none;
   }
 
   .wizard-form-heading {
     display: grid;
-    grid-template-columns:auto minmax(0, 1fr)
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .wizard-form-heading:deep(.status-badge) {
     grid-column: 2;
-    justify-self: start
+    justify-self: start;
   }
 
   .verification-hero {
     display: grid;
-    grid-template-columns:auto minmax(0, 1fr)
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .level-orbit {
     width: 4.75rem;
-    height: 4.75rem
+    height: 4.75rem;
   }
 
   .level-orbit strong {
-    font-size: var(--font-size-lg)
+    font-size: var(--font-size-lg);
   }
 
   .hero-copy {
-    width: auto
+    width: auto;
   }
 
   .hero-title {
-    gap: var(--space-2)
+    gap: var(--space-2);
   }
 
   .hero-title h2 {
-    font-size: var(--font-size-lg)
+    font-size: var(--font-size-lg);
   }
 
   .next-level {
-    align-items: flex-start
+    align-items: flex-start;
   }
 
   .trust-mark {
-    grid-column: 1/-1
+    grid-column: 1 / -1;
   }
 
   .card-heading {
-    align-items: flex-start
+    align-items: flex-start;
   }
 
   .card-heading > span {
-    white-space: nowrap
+    white-space: nowrap;
   }
 
   .step-action {
-    grid-template-columns:1fr;
-    width: 100%
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .step-action:deep(.app-button) {
     width: 100%;
-    min-height: 2.75rem
+    min-height: 2.75rem;
   }
 
-  .limit-title, .limit-values {
-    align-items: flex-start
+  .limit-title,
+  .limit-values {
+    align-items: flex-start;
   }
 
   .limit-values {
     flex-direction: column;
-    gap: .1rem
+    gap: .1rem;
   }
 }
 </style>

@@ -38,6 +38,10 @@ urlpatterns = [
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.accounts.api_urls")),
     path("api/v1/", api_v1_root, name="api-v1-root"),
+    path(
+        "api/v1/admin/",
+        include("apps.admin_panel.urls"),
+    ),
     path("api/v1/assets/", include("apps.assets.urls")),
     path("api/v1/wallets/", include("apps.wallets.urls")),
     path("api/v1/wallet", WalletSummaryAPIView.as_view(), name="wallet-summary"),

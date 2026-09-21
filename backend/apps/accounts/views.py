@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-from apps.kyc.serializers import AdminKycApplicationSerializer
+
 from apps.accounts.models import BankAccount, IranianBank
 from apps.accounts.serializers import (
     BankAccountSerializer,
@@ -30,6 +30,7 @@ from apps.accounts.services.session import (
     update_session,
 )
 from apps.kyc.models import KycApplication
+
 
 User = get_user_model()
 

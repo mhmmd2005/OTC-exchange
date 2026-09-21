@@ -37,21 +37,45 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    firstName = serializers.CharField(source="full_name", required=False)
-    lastName = serializers.CharField(required=False, allow_blank=True)
+    firstName = serializers.SerializerMethodField()
+    lastName = serializers.SerializerMethodField()
     fullName = serializers.CharField(source="full_name", read_only=True)
     mobile = serializers.CharField(source="phone_number", read_only=True)
     email = serializers.EmailField(required=False, allow_blank=True)
-    nationalId = serializers.CharField(required=False, allow_blank=True, default="")
-    birthDate = serializers.CharField(required=False, allow_blank=True, default="")
-    avatarUrl = serializers.ImageField(source="avatar", required=False, allow_null=True)
-    mobileVerified = serializers.BooleanField(source="is_phone_verified", read_only=True)
-    emailVerified = serializers.BooleanField(default=False)
-    bankVerified = serializers.BooleanField(default=False)
-    kycStatus = serializers.CharField(source="kyc_status", read_only=True)
-    accountLevel = serializers.CharField(source="kyc_level", read_only=True)
-    joinedAt = serializers.DateTimeField(source="created_at", read_only=True)
-    lastLoginAt = serializers.DateTimeField(source="updated_at", read_only=True)
+    identityVerified = serializers.SerializerMethodField()
+    nationalId = serializers.SerializerMethodField()
+    birthDate = serializers.SerializerMethodField()
+
+    avatarUrl = serializers.ImageField(
+        source="avatar",
+        required=False,
+        allow_null=True,
+    )
+
+    mobileVerified = serializers.BooleanField(
+        source="is_phone_verified",
+        read_only=True,
+    )
+
+    emailVerified = serializers.SerializerMethodField()
+    bankVerified = serializers.SerializerMethodField()
+
+    kycStatus = serializers.SerializerMethodField()
+
+    accountLevel = serializers.CharField(
+        source="kyc_level",
+        read_only=True,
+    )
+
+    joinedAt = serializers.DateTimeField(
+        source="created_at",
+        read_only=True,
+    )
+
+    lastLoginAt = serializers.DateTimeField(
+        source="updated_at",
+        read_only=True,
+    )
 
     class Meta:
         model = User
@@ -72,30 +96,102 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "accountLevel",
             "joinedAt",
             "lastLoginAt",
+            "identityVerified",
         ]
+
         read_only_fields = [
             "id",
+            "firstName",
+            "lastName",
             "fullName",
             "mobile",
+            "nationalId",
+            "birthDate",
+            "avatarUrl",
             "mobileVerified",
+            "emailVerified",
+            "bankVerified",
             "kycStatus",
             "accountLevel",
             "joinedAt",
             "lastLoginAt",
+            "identityVerified",
         ]
 
+    def _get_kyc(self, obj):
+        return getattr(obj, "kyc_application", None)
+
+    def get_firstName(self, obj):
+        kyc = self._get_kyc(obj)
+
+        if kyc and kyc.first_name:
+            return kyc.first_name
+
+        return obj.full_name.split(" ", 1)[0] if obj.full_name else ""
+
+    def get_lastName(self, obj):
+        kyc = self._get_kyc(obj)
+
+        if kyc and kyc.last_name:
+            return kyc.last_name
+
+        parts = obj.full_name.split(" ", 1) if obj.full_name else []
+        return parts[1] if len(parts) > 1 else ""
+
+    def get_nationalId(self, obj):
+        kyc = self._get_kyc(obj)
+        return kyc.national_id if kyc else ""
+
+    def get_birthDate(self, obj):
+        kyc = self._get_kyc(obj)
+
+        if not kyc or not kyc.birth_date:
+            return ""
+
+        return kyc.birth_date.isoformat()
+
+    def get_emailVerified(self, obj):
+        return False
+
+    def get_bankVerified(self, obj):
+        return obj.bank_accounts.filter(
+            status="verified",
+        ).exists()
+
+    def get_kycStatus(self, obj):
+        status_map = {
+            "not_started": "not_started",
+            "in_progress": "in_progress",
+            "pending_review": "pending",
+            "approved": "verified",
+            "rejected": "rejected",
+        }
+
+        return status_map.get(
+            obj.kyc_status,
+            obj.kyc_status,
+        )
+
+    def get_identityVerified(self, obj):
+        kyc = self._get_kyc(obj)
+        return bool(
+            kyc
+            and kyc.basic_info_status == "approved"
+            and kyc.identity_status == "approved"
+        )
+
     def update(self, instance, validated_data):
-        if "firstName" in validated_data or "lastName" in validated_data:
-            first_name = validated_data.pop("firstName", "")
-            last_name = validated_data.pop("lastName", "")
-            validated_data["full_name"] = f"{first_name} {last_name}".strip()
+        if "email" in validated_data:
+            new_email = validated_data["email"]
 
-        validated_data.pop("nationalId", None)
-        validated_data.pop("birthDate", None)
-        validated_data.pop("emailVerified", None)
-        validated_data.pop("bankVerified", None)
+            if new_email != instance.email:
+                # بعداً با سیستم تأیید ایمیل متصل می‌شود.
+                pass
 
-        return super().update(instance, validated_data)
+        return super().update(
+            instance,
+            validated_data,
+        )
 
 
 class UserPreferencesSerializer(serializers.Serializer):

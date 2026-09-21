@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "apps.support",
     "apps.notifications",
     "apps.markets",
+    "apps.admin_panel",
 ]
 
 MIDDLEWARE = [

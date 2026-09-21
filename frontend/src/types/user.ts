@@ -31,6 +31,7 @@ export interface UserProfile {
     accountLevel: AccountLevel
     joinedAt: ISODateString
     lastLoginAt: ISODateString
+    identityVerified: boolean
 }
 
 export interface UserLimits {

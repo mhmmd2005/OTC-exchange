@@ -1,6 +1,5 @@
 import type {DashboardSummary, UpdateProfileInput, UserPreferences, UserProfile,} from '@/types'
 import {api, resolveApi} from './api'
-import {authService} from './auth.service'
 import {mockDb} from './mock/state'
 
 export interface UserService {
@@ -19,7 +18,10 @@ export const userService: UserService = {
     getProfile() {
         return resolveApi(
             () => mockDb.user,
-            () => authService.getCurrentUser(),
+            () =>
+                api.get<UserProfile>(
+                    '/users/me',
+                ),
         )
     },
 

@@ -175,9 +175,29 @@ onMounted(loadAccounts)
 
 <template>
   <div class="page bank-page">
-    <PageHeader title="حساب‌های بانکی" description="حساب‌های به‌نام خودتان را برای واریز و برداشت مدیریت کنید.">
+    <PageHeader
+        title="حساب‌های بانکی"
+        description="حساب‌های به‌نام خودتان را برای واریز و برداشت مدیریت کنید."
+    >
       <template #actions>
-        <AppButton icon="plus" @click="openAdd">افزودن حساب</AppButton>
+        <div class="bank-header-actions">
+          <AppButton
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              :loading="loading"
+              @click="loadAccounts"
+          >
+            به‌روزرسانی
+          </AppButton>
+
+          <AppButton
+              icon="plus"
+              @click="openAdd"
+          >
+            افزودن حساب
+          </AppButton>
+        </div>
       </template>
     </PageHeader>
 
@@ -312,6 +332,12 @@ onMounted(loadAccounts)
   max-width: 76rem;
   align-content: start;
   gap: var(--space-5);
+}
+
+.bank-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .bank-page :deep(.page-header) {
