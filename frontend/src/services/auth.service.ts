@@ -188,6 +188,7 @@ function adaptBackendUser(
         lastName,
         fullName,
         mobile: normalizeMobile(user.phone_number),
+        identityVerified: false,
         email: undefined,
         nationalId: '',
         birthDate: '',

@@ -1,9 +1,9 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import (
-    ValidationError as DjangoValidationError,
-)
-from rest_framework import generics, status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import generics
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -21,8 +21,12 @@ from apps.accounts.serializers import (
     PhoneRequestSerializer,
     RegistrationPasswordSerializer,
     UserPreferencesSerializer,
-    UserProfileSerializer,
     UserSerializer,
+)
+from apps.accounts.serializers import (
+    UserProfileSerializer,
+    EmailVerificationSerializer,
+    EmailVerificationService
 )
 from apps.accounts.services.auth import AuthService
 from apps.accounts.services.session import (
@@ -30,7 +34,6 @@ from apps.accounts.services.session import (
     update_session,
 )
 from apps.kyc.models import KycApplication
-
 
 User = get_user_model()
 
@@ -697,6 +700,7 @@ class BankAccountListCreateAPIView(APIView):
                 status="pending",
                 preferred=False,
             )
+            kyc.sync_status()
 
         except Exception:
             return Response(
@@ -883,5 +887,31 @@ class VerifyPhoneVerificationOTPAPIView(APIView):
 
         return Response(
             result,
+            status=status.HTTP_200_OK,
+        )
+
+
+class EmailVerificationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = EmailVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            user = EmailVerificationService.verify(
+                request.user,
+                serializer.validated_data["token"],
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            UserProfileSerializer(user).data,
             status=status.HTTP_200_OK,
         )

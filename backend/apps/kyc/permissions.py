@@ -1,16 +1,18 @@
 from rest_framework.permissions import BasePermission
 
+from apps.kyc.models import KycApplication
+
 
 class IsKycOwner(BasePermission):
     def has_object_permission(
-        self,
-        request,
-        view,
-        obj,
+            self,
+            request,
+            view,
+            obj,
     ):
         return (
-            request.user.is_authenticated
-            and obj.user_id == request.user.id
+                request.user.is_authenticated
+                and obj.user_id == request.user.id
         )
 
 
@@ -32,8 +34,13 @@ class IsKycVerified(BasePermission):
     )
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.kyc_status == "approved"
-        )
+        if not (
+                request.user
+                and request.user.is_authenticated
+        ):
+            return False
+
+        return KycApplication.objects.filter(
+            user=request.user,
+            status="approved",
+        ).exists()

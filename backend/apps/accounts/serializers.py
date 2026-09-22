@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import (
 )
 
 from apps.accounts.models import BankAccount, IranianBank, User
+from apps.accounts.services.email import EmailVerificationService
 from apps.accounts.services.phone import normalize_phone_number
 from apps.accounts.services.session import (
     delete_session,
@@ -15,9 +16,36 @@ from apps.accounts.services.session import (
     get_user_session_version,
     update_session,
 )
+from apps.kyc.models import KycApplication
+
+
+def get_user_kyc_status(user):
+    kyc = (
+        KycApplication.objects
+        .filter(user=user)
+        .only("status")
+        .first()
+    )
+
+    if not kyc:
+        return "not_started"
+
+    return kyc.status
+
+
+def map_kyc_status(status):
+    return {
+        "not_started": "not_started",
+        "in_progress": "in_progress",
+        "pending": "pending_review",
+        "approved": "approved",
+        "rejected": "rejected",
+    }.get(status, "not_started")
 
 
 class UserSerializer(serializers.ModelSerializer):
+    kyc_status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -33,7 +61,13 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "created_at",
+            "kyc_status",
         ]
+
+    def get_kyc_status(self, obj):
+        return map_kyc_status(
+            get_user_kyc_status(obj),
+        )
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -151,7 +185,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return kyc.birth_date.isoformat()
 
     def get_emailVerified(self, obj):
-        return False
+        return bool(obj.email_verified_at)
 
     def get_bankVerified(self, obj):
         return obj.bank_accounts.filter(
@@ -168,8 +202,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         }
 
         return status_map.get(
-            obj.kyc_status,
-            obj.kyc_status,
+            map_kyc_status(
+                get_user_kyc_status(obj),
+            ),
+            "not_started",
         )
 
     def get_identityVerified(self, obj):
@@ -182,11 +218,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         if "email" in validated_data:
-            new_email = validated_data["email"]
+            new_email = validated_data.pop("email")
 
-            if new_email != instance.email:
-                # بعداً با سیستم تأیید ایمیل متصل می‌شود.
-                pass
+            EmailVerificationService.request_verification(
+                instance,
+                new_email,
+            )
 
         return super().update(
             instance,
@@ -213,7 +250,7 @@ class DashboardSummarySerializer(serializers.Serializer):
     cryptoValueToman = serializers.CharField(default="0")
     pendingOrdersCount = serializers.IntegerField(default=0)
     unreadNotificationsCount = serializers.IntegerField(default=0)
-    kycStatus = serializers.CharField(source="user.kyc_status", read_only=True)
+    kycStatus = serializers.SerializerMethodField()
     accountLevel = serializers.CharField(source="user.kyc_level", read_only=True)
 
 
@@ -235,6 +272,11 @@ class IranianBankSerializer(serializers.ModelSerializer):
             "color",
             "logoUrl",
         ]
+
+    def get_kycStatus(self, obj):
+        return map_kyc_status(
+            get_user_kyc_status(obj["user"])
+        )
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
@@ -406,3 +448,7 @@ class IdleTimeoutTokenRefreshSerializer(
             )
 
         return super().validate(attrs)
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    token = serializers.CharField()

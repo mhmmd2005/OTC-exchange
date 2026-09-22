@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .modal-layer { position: fixed; z-index: var(--z-modal); inset: 0; display: grid; align-items: center; justify-items: center; padding-top: calc(var(--space-5) + var(--safe-top)); padding-right: calc(var(--space-5) + var(--safe-right)); padding-bottom: calc(var(--space-5) + var(--safe-bottom)); padding-left: calc(var(--space-5) + var(--safe-left)); background: rgba(1, 7, 14, .72); backdrop-filter: blur(7px); }
-.modal-panel { width: min(100%, 34rem); max-height: min(90dvh, 50rem); overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-1); box-shadow: var(--shadow-md); }
+.modal-panel { width: min(100%, 30rem); max-height: min(90dvh, 50rem); overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface-1); box-shadow: var(--shadow-md); }
 .modal-panel--sm { width: min(100%, 27rem); }
 .modal-panel--lg { width: min(100%, 46rem); }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-block-end: 1px solid var(--color-border-soft); }

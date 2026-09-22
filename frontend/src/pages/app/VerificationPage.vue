@@ -1998,7 +1998,7 @@ onMounted(load)
 .identity-name {
   position: absolute;
   inset-inline-start: 0;
-  top: .45rem;
+  top: .65rem;
   color: var(--color-text-primary);
   font-weight: 700;
   line-height: 1.35;
@@ -2008,7 +2008,7 @@ onMounted(load)
 .identity-national-id {
   position: absolute;
   inset-inline-start: 0;
-  top: 2rem;
+  top: 18px;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   line-height: 1.35;

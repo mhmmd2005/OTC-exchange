@@ -311,7 +311,7 @@ onMounted(load)
             size="sm"
             icon="refresh"
             :loading="loading"
-            @click="load"
+            @click="load()"
         >
           به‌روزرسانی
         </AppButton>
@@ -328,7 +328,7 @@ onMounted(load)
     <div v-if="error" class="notice danger" role="alert">
       <AppIcon name="warning" :size="19"/>
       <span>{{ error }}</span>
-      <button type="button" @click="load">تلاش دوباره</button>
+      <button type="button" @click="load()">تلاش دوباره</button>
     </div>
 
     <template v-if="loading">
@@ -510,29 +510,90 @@ onMounted(load)
       </template>
     </AppModal>
 
-    <AppModal v-model="twoFactorOpen" title="فعال‌سازی ورود دومرحله‌ای"
-              description="کد QR را فقط در برنامه Authenticator خود اسکن کنید." size="sm"
-              :dismissible="!twoFactorLoading">
+    <AppModal
+        v-model="twoFactorOpen"
+        title="فعال‌سازی ورود دومرحله‌ای"
+        description="کد QR را فقط در برنامه Authenticator خود اسکن کنید."
+        size="md"
+        :dismissible="!twoFactorLoading"
+    >
       <form class="modal-form" @submit.prevent="enableTwoFactor">
         <div v-if="twoFactorSetup" class="two-factor-setup">
-          <QrCode :value="twoFactorSetup.otpauthUri" :size="156" label="کد QR راه‌اندازی ورود دومرحله‌ای"/>
-          <div><strong>۱. اسکن یا ورود دستی</strong>
-            <p>کد را در Google Authenticator، Microsoft Authenticator یا برنامه مشابه وارد کنید.</p><span
-                class="setup-secret"><bdi>{{ twoFactorSetup.secret }}</bdi><CopyButton :value="twoFactorSetup.secret"
-                                                                                       label="کپی کلید"/></span></div>
+          <div class="two-factor-qr">
+            <QrCode
+                :value="twoFactorSetup.otpauthUri"
+                :size="156"
+                label="کد QR راه‌اندازی ورود دومرحله‌ای"
+            />
+          </div>
+
+          <div class="two-factor-manual">
+            <strong>۱. اسکن یا ورود دستی</strong>
+
+            <p>
+              کد را در Google Authenticator، Microsoft Authenticator یا برنامه مشابه وارد کنید.
+            </p>
+
+            <span class="setup-secret">
+          <bdi>{{ twoFactorSetup.secret }}</bdi>
+
+          <CopyButton
+              :value="twoFactorSetup.secret"
+              label="کپی کلید"
+          />
+        </span>
+          </div>
         </div>
-        <div class="auth-guide"><span><AppIcon name="shield" :size="27"/></span>
-          <div><strong>۲. تأیید اتصال برنامه</strong>
-            <DemoCodeHint v-if="DemoCodeHint" context="two-factor"/>
-            <p v-else>کد شش‌رقمی فعلی برنامه را برای تکمیل اتصال وارد کنید.</p></div>
+
+        <div class="auth-guide">
+      <span>
+        <AppIcon name="shield" :size="27"/>
+      </span>
+
+          <div>
+            <strong>۲. تأیید اتصال برنامه</strong>
+
+            <DemoCodeHint
+                v-if="DemoCodeHint"
+                context="two-factor"
+            />
+
+            <p v-else>
+              کد شش‌رقمی فعلی برنامه را برای تکمیل اتصال وارد کنید.
+            </p>
+          </div>
         </div>
-        <AppInput :model-value="twoFactorCode" label="کد ۶ رقمی برنامه" inputmode="numeric" autocomplete="one-time-code"
-                  maxlength="6" ltr :error="twoFactorError" placeholder="••••••"
-                  @update:model-value="updateTwoFactorCode"/>
+
+        <AppInput
+            :model-value="twoFactorCode"
+            label="کد ۶ رقمی برنامه"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            ltr
+            :error="twoFactorError"
+            placeholder="••••••"
+            @update:model-value="updateTwoFactorCode"
+        />
       </form>
+
       <template #footer>
-        <AppButton block :loading="twoFactorLoading" @click="enableTwoFactor">تأیید و فعال‌سازی</AppButton>
-        <AppButton variant="secondary" :disabled="twoFactorLoading" @click="twoFactorOpen = false">انصراف</AppButton>
+        <div class="two-factor-actions">
+          <AppButton
+              :loading="twoFactorLoading"
+              @click="enableTwoFactor"
+          >
+            تأیید و فعال‌سازی
+          </AppButton>
+
+          <AppButton
+              variant="secondary"
+              :disabled="twoFactorLoading"
+              @click="twoFactorOpen = false"
+          >
+            انصراف
+          </AppButton>
+        </div>
       </template>
     </AppModal>
 
@@ -1092,8 +1153,6 @@ onMounted(load)
 
 .two-factor-setup {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
   gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border-soft);
@@ -1101,14 +1160,53 @@ onMounted(load)
   background: var(--color-surface-2);
 }
 
-.two-factor-setup > div {
+.two-factor-qr {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  padding-top: var(--space-1);
+}
+
+.two-factor-manual {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
   min-width: 0;
 }
 
-.two-factor-setup p {
-  margin: .2rem 0 var(--space-3);
+.two-factor-manual > strong {
+  font-size: var(--font-size-sm);
+}
+
+.two-factor-manual p {
+  margin: 0 0 var(--space-2);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+  line-height: 1.8;
+}
+
+.setup-secret {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  box-sizing: border-box;
+}
+
+.setup-secret bdi {
+  min-width: 0;
+  overflow: hidden;
+  direction: ltr;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .setup-secret {
@@ -1129,6 +1227,18 @@ onMounted(load)
   font-size: var(--font-size-xs);
   font-weight: 700;
   text-overflow: ellipsis;
+}
+
+.two-factor-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.two-factor-actions :deep(.app-button) {
+  width: 100%;
+  min-width: 0;
 }
 
 .auth-guide {
@@ -1368,18 +1478,77 @@ onMounted(load)
   .event-list p {
     line-height: 1.8;
   }
+}
 
-  .two-factor-setup {
-    grid-template-columns: 1fr;
-    justify-items: center;
+@media (max-width: 399px) {
+  .score-ring {
+    width: 4.75rem;
+    height: 4.75rem;
   }
 
-  .two-factor-setup > div {
+  .score-ring strong {
+    font-size: var(--font-size-xl);
+  }
+
+  .score-copy {
+    width: calc(100% - 5.75rem);
+  }
+
+  .score-copy h2 {
+    font-size: var(--font-size-lg);
+  }
+
+  .score-facts {
+    gap: var(--space-2);
+  }
+
+  .setting-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .setting-row > :deep(.status) {
+    display: inline-flex;
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .setting-row :deep(.app-button), .setting-row .row-note {
+    grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .feature-title :deep(.status) {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-inline-start: calc(2.5rem + var(--space-3));
+  }
+
+  .session-copy > span {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .session-copy > span i {
+    display: none;
+  }
+
+  .session-row :deep(.app-button) {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .event-icon {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 }
 
 @media (max-width: 399px) {
+  .two-factor-actions {
+    grid-template-columns: 1fr;
+  }
+
   .score-ring {
     width: 4.75rem;
     height: 4.75rem;

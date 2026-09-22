@@ -417,7 +417,7 @@ onMounted(() => {
       <div v-if="auxiliaryError" class="load-error" role="alert">
         <AppIcon name="warning" :size="19"/>
         <span>{{ auxiliaryError }}</span>
-        <button type="button" @click="load">تلاش دوباره</button>
+        <button type="button" @click="load()">تلاش دوباره</button>
       </div>
     </div>
   </div>

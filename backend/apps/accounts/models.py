@@ -1,7 +1,9 @@
-from apps.accounts.services.phone import normalize_phone_number
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
+
+from apps.accounts.services.phone import normalize_phone_number
+
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -38,21 +40,20 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     username = None
     email = models.EmailField(blank=True, null=True, unique=True, default=None)
+
     phone_number = models.CharField(max_length=20, unique=True, db_index=True)
     phone_verified_at = models.DateTimeField(null=True, blank=True)
     is_phone_verified = models.BooleanField(default=False)
     full_name = models.CharField(max_length=255, blank=True, default="")
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
-    kyc_status = models.CharField(
-        max_length=20,
-        choices=[
-            ("not_started", "Not started"),
-            ("in_progress", "In progress"),
-            ("pending_review", "Pending review"),
-            ("approved", "Approved"),
-            ("rejected", "Rejected"),
-        ],
-        default="not_started",
+    email_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    pending_email = models.EmailField(
+        blank=True,
+        null=True,
     )
     kyc_level = models.CharField(max_length=20, default="basic")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,10 +67,44 @@ class User(AbstractUser):
     class Meta:
         verbose_name = "User"
         verbose_name_plural = "Users"
-        indexes = [models.Index(fields=["phone_number"]), models.Index(fields=["kyc_status"])]
+        indexes = [
+            models.Index(fields=["phone_number"]),
+        ]
 
     def __str__(self):
         return self.phone_number
+
+
+class EmailVerification(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="email_verifications",
+    )
+    email = models.EmailField()
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+    )
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["user", "created_at"]
+            ),
+            models.Index(
+                fields=["expires_at"]
+            ),
+        ]
 
 
 class OTPVerification(models.Model):

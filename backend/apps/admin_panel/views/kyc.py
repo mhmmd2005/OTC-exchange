@@ -299,6 +299,7 @@ class AdminKycApproveBankAPIView(APIView):
 
         try:
             account.approve()
+            kyc.sync_status()
 
         except DjangoValidationError as exc:
             return Response(
@@ -371,6 +372,7 @@ class AdminKycRejectBankAPIView(APIView):
             account.reject(
                 serializer.validated_data["reason"],
             )
+            kyc.sync_status()
 
         except DjangoValidationError as exc:
             return Response(

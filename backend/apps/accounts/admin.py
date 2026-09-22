@@ -5,9 +5,9 @@ from .models import OTPVerification, User
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ["phone_number", "full_name", "email", "is_phone_verified", "is_active", "kyc_status"]
+    list_display = ["phone_number", "full_name", "email", "is_phone_verified", "is_active"]
     search_fields = ["phone_number", "full_name", "email"]
-    list_filter = ["is_phone_verified", "is_active", "kyc_status"]
+    list_filter = ["is_phone_verified", "is_active"]
 
 
 @admin.register(OTPVerification)

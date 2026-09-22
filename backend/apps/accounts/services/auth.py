@@ -26,6 +26,7 @@ from apps.accounts.services.session import (
     invalidate_all_user_sessions,
 )
 from apps.accounts.tasks import send_otp_sms_task
+from apps.kyc.models import KycApplication
 from apps.security.models import LoginHistory, SecurityEvent
 
 
@@ -159,6 +160,16 @@ class AuthService:
             "next_step": "otp",
             "account_exists": account_exists,
         }
+
+    @staticmethod
+    def get_kyc_status(user):
+        return (
+                KycApplication.objects
+                .filter(user=user)
+                .values_list("status", flat=True)
+                .first()
+                or "not_started"
+        )
 
     @staticmethod
     def verify_otp(
@@ -523,7 +534,7 @@ class AuthService:
                 "is_phone_verified": (
                     user.is_phone_verified
                 ),
-                "kyc_status": user.kyc_status,
+                "kyc_status": AuthService.get_kyc_status(user),
                 "kyc_level": user.kyc_level,
                 "created_at": (
                     user.created_at.isoformat()
@@ -618,7 +629,7 @@ class AuthService:
                 "is_phone_verified": (
                     user.is_phone_verified
                 ),
-                "kyc_status": user.kyc_status,
+                "kyc_status": AuthService.get_kyc_status(user),
                 "kyc_level": user.kyc_level,
                 "created_at": (
                     user.created_at.isoformat()

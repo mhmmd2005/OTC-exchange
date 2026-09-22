@@ -18,6 +18,13 @@ env = environ.Env(
     OTP_SEND_WINDOW_SECONDS=(int, 3600),
     OTP_IP_MAX_REQUESTS=(int, 10),
     OTP_IP_WINDOW_SECONDS=(int, 60),
+    EMAIL_HOST=(str, ""),
+    EMAIL_PORT=(int, 587),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_HOST_USER=(str, ""),
+    EMAIL_HOST_PASSWORD=(str, ""),
+    DEFAULT_FROM_EMAIL=(str, ""),
+    EMAIL_TIMEOUT=(int, 30),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -143,6 +150,14 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+FRONTEND_URL = env(
+    "FRONTEND_URL",
+    default="http://localhost:5173",
+)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@rosha.test"
+EMAIL_TIMEOUT = 30
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"

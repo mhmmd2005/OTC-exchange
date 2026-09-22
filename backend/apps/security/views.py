@@ -2,9 +2,11 @@ from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import LoginHistory, SecurityEvent
 from .serializers import LoginHistorySerializer, SecurityEventSerializer
+from .services import TwoFactorService
+from .models import LoginHistory, SecurityEvent
 
 
 class SecurityOverviewAPIView(APIView):
@@ -12,7 +14,9 @@ class SecurityOverviewAPIView(APIView):
 
     def get(self, request):
         return Response({
-            "two_factor_enabled": False,
+            "two_factor_enabled": TwoFactorService.is_enabled(
+                request.user
+            ),
             "anti_phishing_code_enabled": False,
             "withdrawal_whitelist_enabled": False,
             "active_sessions_count": 1,
@@ -98,26 +102,62 @@ class TwoFactorSetupAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        return Response({
-            "setup_token": "",
-            "secret": "",
-            "qr_code": "",
-            "enabled": False,
-        })
+        try:
+            setup = TwoFactorService.start_setup(
+                request.user
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            setup,
+            status=status.HTTP_200_OK,
+        )
 
 
 class TwoFactorAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        enabled = bool(request.data.get("enabled", False))
+        enabled = bool(
+            request.data.get("enabled", False)
+        )
 
-        return Response({
-            "two_factor_enabled": enabled,
-            "anti_phishing_code_enabled": False,
-            "withdrawal_whitelist_enabled": False,
-            "active_sessions_count": 1,
-        })
+        if enabled:
+            code = request.data.get("code")
+            setup_token = request.data.get("setupToken")
+
+            try:
+                TwoFactorService.confirm_setup(
+                    user=request.user,
+                    code=code or "",
+                    setup_token=setup_token or "",
+                )
+            except DjangoValidationError as exc:
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        else:
+            TwoFactorService.disable(
+                request.user
+            )
+
+        return Response(
+            {
+                "two_factor_enabled": TwoFactorService.is_enabled(
+                    request.user
+                ),
+                "anti_phishing_code_enabled": False,
+                "withdrawal_whitelist_enabled": False,
+                "active_sessions_count": 1,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AntiPhishingAPIView(APIView):

@@ -284,6 +284,15 @@ const appChildren: RouteRecordRaw[] = [
     },
 
     {
+        path: 'email/verify',
+        name: 'email-verification',
+        component: () => import('@/pages/app/EmailVerificationPage.vue'),
+        meta: {
+            title: 'تأیید ایمیل',
+        },
+    },
+
+    {
         path: 'security',
         name: 'security',
         component: () => import('@/pages/app/SecurityPage.vue'),

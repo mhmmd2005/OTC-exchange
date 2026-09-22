@@ -97,7 +97,7 @@ async function saveEmail(): Promise<void> {
     profile.value = updated
     auth.user = updated
     emailOpen.value = false
-    feedback.value = 'نشانی ایمیل به‌روزرسانی شد.'
+    feedback.value = 'لینک تأیید به ایمیل شما ارسال شد.'
   } catch (caught) {
     emailError.value = readableError(caught, 'به‌روزرسانی ایمیل انجام نشد.')
   } finally {

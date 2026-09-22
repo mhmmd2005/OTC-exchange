@@ -137,6 +137,7 @@ export const mockUser: UserProfile = {
     mobileVerified: true,
     emailVerified: false,
     bankVerified: true,
+    identityVerified: true,
     kycStatus: 'verified',
     accountLevel: 'level_2',
     joinedAt: '2024-02-11T08:20:00.000Z',

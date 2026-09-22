@@ -41,7 +41,7 @@ class KycApplicationModelTests(TestCase):
         self.assertFalse(kyc.can_edit)
         self.assertFalse(kyc.can_submit)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.kyc_status, "pending_review")
+        self.assertEqual(kyc.status, "pending_review")
 
     def test_approve_kyc(self):
         admin_user = User.objects.create_user(
@@ -62,7 +62,7 @@ class KycApplicationModelTests(TestCase):
         self.assertEqual(kyc.reviewed_by, admin_user)
         self.assertFalse(kyc.can_edit)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.kyc_status, "approved")
+        self.assertEqual(kyc.status, "approved")
 
     def test_reject_kyc(self):
         admin_user = User.objects.create_user(
@@ -84,7 +84,7 @@ class KycApplicationModelTests(TestCase):
         self.assertIsNotNone(kyc.reviewed_at)
         self.assertTrue(kyc.can_edit)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.kyc_status, "rejected")
+        self.assertEqual(kyc.status, "rejected")
 
 
 class KycApplicationAPITests(TestCase):
@@ -303,7 +303,7 @@ class AdminKycAPITests(TestCase):
         self.assertEqual(kyc.reviewed_by, self.admin_user)
         self.assertIsNotNone(kyc.reviewed_at)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.kyc_status, "approved")
+        self.assertEqual(kyc.status, "approved")
 
     def test_admin_cannot_approve_non_pending_kyc(self):
         kyc = KycApplication.objects.create(
@@ -335,7 +335,7 @@ class AdminKycAPITests(TestCase):
         self.assertEqual(kyc.reviewed_by, self.admin_user)
         self.assertIsNotNone(kyc.reviewed_at)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.kyc_status, "rejected")
+        self.assertEqual(kyc.status, "rejected")
 
     def test_admin_cannot_reject_without_reason(self):
         kyc = KycApplication.objects.create(

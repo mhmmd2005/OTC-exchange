@@ -152,7 +152,7 @@ export const bankService: BankService = {
     id
 }
 /preferred`),
-removeAccount: (id: string) => api.delete<void>(`/bank-accounts/${id}`),
+    removeAccount: (id: string) => api.delete<void>(`/bank-accounts/${id}`),
 }
 
 export const marketService: MarketService = {
@@ -283,6 +283,11 @@ export const userService: UserService = {
     getPreferences: () => api.get<UserPreferences>('/users/me/preferences'),
     updatePreferences: (input: Partial<UserPreferences>) =>
         api.patch<UserPreferences>('/users/me/preferences', input),
+    verifyEmail: (token: string) =>
+        api.post<UserProfile>(
+            '/users/me/email/verify',
+            {token},
+        ),
 }
 
 export const verificationService: {

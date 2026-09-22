@@ -49,3 +49,7 @@ backend/.env.*
 # Local project / generated files
 summary.xmlreview.txt
 review.txt
+
+
+celerybeat-schedule
+celerybeat-schedule.*

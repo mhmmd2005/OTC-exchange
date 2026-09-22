@@ -8,7 +8,8 @@ from .views import (
     IranianBankListAPIView,
     UserPreferencesAPIView,
     UserProfileAPIView,
-    BankAccountDetailAPIView
+    BankAccountDetailAPIView,
+    EmailVerificationAPIView
 )
 
 urlpatterns = [
@@ -51,5 +52,10 @@ urlpatterns = [
         "bank-accounts/<int:pk>/preferred",
         BankAccountPreferredAPIView.as_view(),
         name="bank-account-preferred",
+    ),
+    path(
+        "users/me/email/verify",
+        EmailVerificationAPIView.as_view(),
+        name="user-email-verify",
     ),
 ]

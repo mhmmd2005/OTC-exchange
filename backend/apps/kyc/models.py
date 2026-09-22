@@ -206,8 +206,8 @@ class KycApplication(models.Model):
     @property
     def both_identity_steps_approved(self):
         return (
-            self.basic_info_status == "approved"
-            and self.identity_status == "approved"
+                self.basic_info_status == "approved"
+                and self.identity_status == "approved"
         )
 
     def sync_status(self):
@@ -224,57 +224,42 @@ class KycApplication(models.Model):
         ).exists()
 
         if (
-            self.basic_info_status == "rejected"
-            or self.identity_status == "rejected"
+                self.basic_info_status == "rejected"
+                or self.identity_status == "rejected"
         ):
             self.status = "rejected"
-            self.user.kyc_status = "rejected"
 
         elif (
-            self.basic_info_status == "pending"
-            or self.identity_status == "pending"
+                self.basic_info_status == "pending"
+                or self.identity_status == "pending"
         ):
             self.status = "pending"
-            self.user.kyc_status = "pending_review"
 
         elif self.both_identity_steps_approved:
             if bank_verified:
                 self.status = "approved"
-                self.user.kyc_status = "approved"
 
             elif bank_pending:
                 self.status = "pending"
-                self.user.kyc_status = "pending_review"
 
             elif bank_rejected:
                 self.status = "rejected"
-                self.user.kyc_status = "rejected"
 
             else:
                 self.status = "in_progress"
-                self.user.kyc_status = "in_progress"
 
         elif (
-            self.basic_info_status != "not_started"
-            or self.identity_status != "not_started"
+                self.basic_info_status != "not_started"
+                or self.identity_status != "not_started"
         ):
             self.status = "in_progress"
-            self.user.kyc_status = "in_progress"
 
         else:
             self.status = "not_started"
-            self.user.kyc_status = "not_started"
 
         self.save(
             update_fields=[
                 "status",
-                "updated_at",
-            ],
-        )
-
-        self.user.save(
-            update_fields=[
-                "kyc_status",
                 "updated_at",
             ],
         )

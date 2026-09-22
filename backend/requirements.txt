@@ -9,3 +9,5 @@ Pillow==11.0.0
 drf-spectacular==0.28.0
 celery==5.4.0
 redis==5.1.0
+pyotp
+cryptography

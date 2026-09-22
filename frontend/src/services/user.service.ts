@@ -12,6 +12,8 @@ export interface UserService {
     getPreferences(): Promise<UserPreferences>
 
     updatePreferences(input: Partial<UserPreferences>): Promise<UserPreferences>
+
+    verifyEmail(token: string): Promise<UserProfile>
 }
 
 export const userService: UserService = {
@@ -24,7 +26,12 @@ export const userService: UserService = {
                 ),
         )
     },
-
+    verifyEmail(token: string): Promise<UserProfile> {
+        return resolveApi(
+            () => mockDb.user,
+            () => api.post<UserProfile>('/users/me/email/verify', {token}),
+        )
+    },
     updateProfile(input) {
         return resolveApi(
             () => {
