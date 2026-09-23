@@ -1,4 +1,5 @@
 import type {
+    AccountLevel,
     ActiveSession,
     AddBankAccountInput,
     AssetNetwork,
@@ -16,6 +17,7 @@ import type {
     DepositAddress,
     FaqItem,
     IranianBank,
+    KycStatus,
     LoginInput,
     MarketAsset,
     MarketListParams,
@@ -44,6 +46,7 @@ import type {
     TradeQuote,
     Transaction,
     TransactionFilters,
+    TwoFactorLoginChallenge,
     TwoFactorSetup,
     UpdateProfileInput,
     UserPreferences,
@@ -71,11 +74,14 @@ import type {UserService} from '../user.service'
 import type {VerificationService} from '../verification.service'
 import type {WalletService} from '../wallet.service'
 
-// Production services live behind a build-only alias in vite.config.ts. Keeping
-// this module free of imports from services/mock guarantees that demo state,
-// identities, addresses and fixed OTP/TOTP values cannot enter release chunks.
+/*
+ * Production services live behind a build-only alias in vite.config.ts.
+ * This module intentionally does not import runtime code from services/mock
+ * or the general auth.service implementation.
+ */
 
 export {ApiError, isMockApiEnabled} from '../api'
+
 export type {
     AuthService,
     BankService,
@@ -92,198 +98,791 @@ export type {
     WalletService,
 }
 
+interface BackendUser {
+    id: number
+    phone_number: string
+    full_name: string
+    avatar: string | null
+    is_phone_verified: boolean
+    kyc_status: string
+    kyc_level: string
+    created_at: string
+}
+
+interface BackendAuthResponse {
+    access: string
+    refresh: string
+    user: BackendUser
+}
+
+interface BackendTwoFactorLoginResponse {
+    next_step: 'two_factor'
+    two_factor_token: string
+    expires_in: number
+}
+
+type BackendLoginCompletionResponse =
+    | BackendAuthResponse
+    | BackendTwoFactorLoginResponse
+
+function normalizeMobile(value: string): string {
+    let mobile = normalizeDigits(value).replace(/\D/g, '')
+
+    if (
+        mobile.startsWith('98')
+        && mobile.length === 12
+    ) {
+        mobile = `0${mobile.slice(2)}`
+    }
+
+    return mobile
+}
+
+function mapBackendKycStatus(
+    value: string,
+): KycStatus {
+    switch (value) {
+        case 'in_progress':
+            return 'in_progress'
+        case 'pending_review':
+            return 'pending'
+        case 'approved':
+            return 'verified'
+        case 'rejected':
+            return 'rejected'
+        case 'needs_correction':
+            return 'needs_correction'
+        case 'verified':
+            return 'verified'
+        default:
+            return 'not_started'
+    }
+}
+
+function mapBackendAccountLevel(
+    value: string,
+): AccountLevel {
+    if (
+        value === 'level_0'
+        || value === 'level_1'
+        || value === 'level_2'
+        || value === 'level_3'
+    ) {
+        return value
+    }
+
+    switch (value) {
+        case 'basic':
+            return 'level_0'
+        case 'intermediate':
+            return 'level_1'
+        case 'advanced':
+            return 'level_2'
+        case 'professional':
+            return 'level_3'
+        default:
+            return 'level_0'
+    }
+}
+
+function adaptBackendUser(
+    user: BackendUser,
+): UserProfile {
+    const fullName = String(
+        user.full_name ?? '',
+    ).trim()
+
+    const parts = fullName
+        ? fullName.split(/\s+/)
+        : []
+
+    const firstName = parts.shift() ?? ''
+    const lastName = parts.join(' ')
+
+    return {
+        id: String(user.id),
+
+        firstName,
+        lastName,
+        fullName,
+
+        mobile: normalizeMobile(
+            user.phone_number,
+        ),
+
+        email: undefined,
+
+        nationalId: '',
+        birthDate: '',
+
+        avatarUrl:
+            user.avatar
+            || undefined,
+
+        mobileVerified: Boolean(
+            user.is_phone_verified,
+        ),
+
+        identityVerified:
+            user.kyc_status === 'approved',
+
+        emailVerified: false,
+        bankVerified: false,
+
+        kycStatus: mapBackendKycStatus(
+            user.kyc_status,
+        ),
+
+        accountLevel: mapBackendAccountLevel(
+            user.kyc_level,
+        ),
+
+        joinedAt: user.created_at,
+
+        lastLoginAt: user.created_at,
+    }
+}
+
+function adaptBackendAuthResponse(
+    response: BackendAuthResponse,
+): AuthResult {
+    return {
+        access: response.access,
+        refresh: response.refresh,
+        user: adaptBackendUser(
+            response.user,
+        ),
+    }
+}
+
+function createTwoFactorLoginChallenge(
+    response: BackendTwoFactorLoginResponse,
+): TwoFactorLoginChallenge {
+    if (!response.two_factor_token) {
+        throw new ApiError(
+            'توکن ورود دومرحله‌ای دریافت نشد.',
+            'SERVER_ERROR',
+            502,
+        )
+    }
+
+    if (
+        !Number.isFinite(
+            response.expires_in,
+        )
+        || response.expires_in <= 0
+    ) {
+        throw new ApiError(
+            'زمان اعتبار ورود دومرحله‌ای معتبر نیست.',
+            'SERVER_ERROR',
+            502,
+        )
+    }
+
+    return {
+        nextStep: 'two_factor',
+        twoFactorToken:
+        response.two_factor_token,
+
+        expiresAt: new Date(
+            Date.now()
+            + response.expires_in * 1000,
+        ).toISOString(),
+    }
+}
+
 export const authService: AuthService = {
     login: (input: LoginInput) =>
-        api.post<OtpChallenge>('/auth/request-login-otp/', {
-            phone_number: normalizeDigits(input.mobile),
-        }),
+        api.post<OtpChallenge>(
+            '/auth/request-login-otp/',
+            {
+                phone_number:
+                    normalizeDigits(
+                        input.mobile,
+                    ),
+            },
+        ),
 
-    completeLogin: (flowToken: string, password: string) =>
-        api.post<AuthResult>('/auth/login/verify-password/', {
-            flow_token: flowToken,
-            password,
-        }),
+    completeLogin: async (
+        flowToken: string,
+        password: string,
+    ) => {
+        const response =
+            await api.post<BackendLoginCompletionResponse>(
+                '/auth/login/verify-password/',
+                {
+                    flow_token: flowToken,
+                    password,
+                },
+            )
+
+        if ('access' in response) {
+            return adaptBackendAuthResponse(
+                response,
+            )
+        }
+
+        return createTwoFactorLoginChallenge(
+            response,
+        )
+    },
+
+    verifyLoginTwoFactor: async (
+        twoFactorToken: string,
+        code: string,
+    ): Promise<AuthResult> => {
+        const response =
+            await api.post<BackendAuthResponse>(
+                '/auth/login/verify-two-factor/',
+                {
+                    two_factor_token:
+                    twoFactorToken,
+                    code:
+                        normalizeDigits(
+                            code,
+                        ).replace(
+                            /\D/g,
+                            '',
+                        ),
+                },
+            )
+
+        return adaptBackendAuthResponse(
+            response,
+        )
+    },
 
     register: (input: RegisterInput) =>
-        api.post<OtpChallenge>('/auth/request-registration-otp/', {
-            phone_number: normalizeDigits(input.mobile),
-        }),
+        api.post<OtpChallenge>(
+            '/auth/request-registration-otp/',
+            {
+                phone_number:
+                    normalizeDigits(
+                        input.mobile,
+                    ),
+            },
+        ),
 
     completeRegistration: (
         flowToken: string,
         password: string,
         passwordConfirmation: string,
     ) =>
-        api.post<AuthResult>('/auth/register/set-password/', {
-            flow_token: flowToken,
-            password,
-            confirm_password: passwordConfirmation,
-        }),
+        api.post<AuthResult>(
+            '/auth/register/set-password/',
+            {
+                flow_token: flowToken,
+                password,
+                confirm_password:
+                passwordConfirmation,
+            },
+        ),
 
-    requestOtp: (input: RequestOtpInput) => api.post<OtpChallenge>('/auth/otp', input),
+    requestOtp: (
+        input: RequestOtpInput,
+    ) =>
+        api.post<OtpChallenge>(
+            '/auth/otp',
+            input,
+        ),
 
-    verifyOtp: (input: VerifyOtpInput) =>
-        api.post<AuthFlowResult>('/auth/verify-otp/', {
-            challenge_id: input.challengeId,
-            otp: normalizeDigits(input.code).replace(/\D/g, ''),
-        }),
+    verifyOtp: (
+        input: VerifyOtpInput,
+    ) =>
+        api.post<AuthFlowResult>(
+            '/auth/verify-otp/',
+            {
+                challenge_id:
+                input.challengeId,
+                otp:
+                    normalizeDigits(
+                        input.code,
+                    ).replace(
+                        /\D/g,
+                        '',
+                    ),
+            },
+        ),
 
-    verifyPasswordResetOtp: (input: VerifyOtpInput) =>
-        api.post<PasswordResetProof>('/auth/password/verify', input),
+    verifyPasswordResetOtp: (
+        input: VerifyOtpInput,
+    ) =>
+        api.post<PasswordResetProof>(
+            '/auth/password/verify',
+            input,
+        ),
 
-    resetPassword: (input: ResetPasswordInput) => api.post<void>('/auth/reset-password/', input),
+    resetPassword: (
+        input: ResetPasswordInput,
+    ) =>
+        api.post<void>(
+            '/auth/reset-password/',
+            input,
+        ),
 
-    getCurrentUser: () => api.get<UserProfile>('/auth/me/'),
+    getCurrentUser: () =>
+        api.get<UserProfile>(
+            '/auth/me/',
+        ),
 
-    logout: (refreshToken: string) =>
-        api.post<void>('/auth/logout/', {refresh: refreshToken}),
+    logout: (
+        refreshToken: string,
+    ) =>
+        api.post<void>(
+            '/auth/logout/',
+            {
+                refresh: refreshToken,
+            },
+        ),
 }
 
 export const bankService: BankService = {
-    listBanks: () => api.get<IranianBank[]>('/banks'),
-    listAccounts: () => api.get<BankAccount[]>('/bank-accounts'),
+    listBanks: () =>
+        api.get<IranianBank[]>(
+            '/banks',
+        ),
+
+    listAccounts: () =>
+        api.get<BankAccount[]>(
+            '/bank-accounts',
+        ),
+
     detectBank(cardNumber: string) {
-        const bin = normalizeDigits(cardNumber).replace(/\D/g, '').slice(0, 6)
-        return api.post<IranianBank | null>('/banks/detect', {bin})
+        const bin =
+            normalizeDigits(cardNumber)
+                .replace(/\D/g, '')
+                .slice(0, 6)
+
+        return api.post<IranianBank | null>(
+            '/banks/detect',
+            {bin},
+        )
     },
-    addAccount: (input: AddBankAccountInput) => api.post<BankAccount>('/bank-accounts', input),
-    setPreferred: (id: string) => api.post<BankAccount>(` / bank - accounts / $
-{
-    id
-}
-/preferred`),
-    removeAccount: (id: string) => api.delete<void>(`/bank-accounts/${id}`),
+
+    addAccount: (
+        input: AddBankAccountInput,
+    ) =>
+        api.post<BankAccount>(
+            '/bank-accounts',
+            input,
+        ),
+
+    setPreferred: (
+        id: string,
+    ) =>
+        api.post<BankAccount>(
+            `/bank-accounts/${id}/preferred`,
+        ),
+
+    removeAccount: (
+        id: string,
+    ) =>
+        api.delete<void>(
+            `/bank-accounts/${id}`,
+        ),
 }
 
 export const marketService: MarketService = {
-    list(params: MarketListParams = {}) {
-        return api.get<MarketAsset[]>('/markets', {
-            query: {
-                search: params.search,
-                favoritesOnly: params.favoritesOnly,
-                sortBy: params.sortBy,
-                sortDirection: params.sortDirection,
-                favorites: params.favorites,
+    list(
+        params: MarketListParams = {},
+    ) {
+        return api.get<MarketAsset[]>(
+            '/markets',
+            {
+                query: {
+                    search:
+                    params.search,
+                    favoritesOnly:
+                    params.favoritesOnly,
+                    sortBy:
+                    params.sortBy,
+                    sortDirection:
+                    params.sortDirection,
+                    favorites:
+                    params.favorites,
+                },
             },
-        })
+        )
     },
-    getBySymbol: (symbol: AssetSymbol) => api.get<MarketAsset>(`/markets/${symbol}`),
-    getPriceHistory: (symbol: AssetSymbol, period: '24h' | '7d' | '30d' = '24h') =>
-        api.get<PricePoint[]>(`/markets/${symbol}/history`, {query: {period}}),
+
+    getBySymbol: (
+        symbol: AssetSymbol,
+    ) =>
+        api.get<MarketAsset>(
+            `/markets/${symbol}`,
+        ),
+
+    getPriceHistory: (
+        symbol: AssetSymbol,
+        period:
+            | '24h'
+            | '7d'
+            | '30d' = '24h',
+    ) =>
+        api.get<PricePoint[]>(
+            `/markets/${symbol}/history`,
+            {
+                query: {period},
+            },
+        ),
 }
 
 export const notificationService: NotificationService = {
-    list(filters: NotificationFilters = {}) {
-        return api.get<PaginatedResult<NotificationItem>>('/notifications', {
-            query: {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                category: filters.category,
-                read: filters.read,
+    list(
+        filters: NotificationFilters = {},
+    ) {
+        return api.get<
+            PaginatedResult<NotificationItem>
+        >(
+            '/notifications',
+            {
+                query: {
+                    page:
+                    filters.page,
+                    pageSize:
+                    filters.pageSize,
+                    category:
+                    filters.category,
+                    read:
+                    filters.read,
+                },
             },
-        })
+        )
     },
-    getUnreadCount: () => api.get<number>('/notifications/unread-count'),
-    markAsRead: (id: string) => api.patch<NotificationItem>(`/notifications/${id}`, {read: true}),
-    markAllAsRead: () => api.post<void>('/notifications/read-all'),
-    remove: (id: string) => api.delete<void>(`/notifications/${id}`),
+
+    getUnreadCount: () =>
+        api.get<number>(
+            '/notifications/unread-count',
+        ),
+
+    markAsRead: (
+        id: string,
+    ) =>
+        api.patch<NotificationItem>(
+            `/notifications/${id}`,
+            {read: true},
+        ),
+
+    markAllAsRead: () =>
+        api.post<void>(
+            '/notifications/read-all',
+        ),
+
+    remove: (
+        id: string,
+    ) =>
+        api.delete<void>(
+            `/notifications/${id}`,
+        ),
 }
 
 export const orderService: OrderService = {
-    list(filters: OrderFilters = {}) {
-        return api.get<PaginatedResult<OtcOrder>>('/orders', {
-            query: {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                side: filters.side,
-                status: filters.status,
-                asset: filters.assetSymbol,
-                search: filters.search,
+    list(
+        filters: OrderFilters = {},
+    ) {
+        return api.get<
+            PaginatedResult<OtcOrder>
+        >(
+            '/orders',
+            {
+                query: {
+                    page:
+                    filters.page,
+                    pageSize:
+                    filters.pageSize,
+                    side:
+                    filters.side,
+                    status:
+                    filters.status,
+                    asset:
+                    filters.assetSymbol,
+                    search:
+                    filters.search,
+                },
             },
-        })
+        )
     },
-    getById: (id: string) => api.get<OtcOrder>(`/orders/${id}`),
-    cancel: (id: string) => api.post<OtcOrder>(`/orders/${id}/cancel`),
+
+    getById: (
+        id: string,
+    ) =>
+        api.get<OtcOrder>(
+            `/orders/${id}`,
+        ),
+
+    cancel: (
+        id: string,
+    ) =>
+        api.post<OtcOrder>(
+            `/orders/${id}/cancel`,
+        ),
 }
 
 export const securityService: SecurityService = {
-    getOverview: () => api.get<SecurityOverview>('/security'),
-    listSessions: () => api.get<ActiveSession[]>('/security/sessions'),
-    revokeSession: (id: string) => api.delete<void>(`/security/sessions/${id}`),
-    revokeOtherSessions: () => api.delete<void>('/security/sessions/others'),
-    listEvents: () => api.get<SecurityEvent[]>('/security/events'),
-    changePassword: (input: ChangePasswordInput) => api.post<void>('/security/password', input),
-    startTwoFactorSetup: () => api.post<TwoFactorSetup>('/security/two-factor/setup'),
-    setTwoFactor: (enabled: boolean, code?: string, setupToken?: string) =>
-        api.patch<SecurityOverview>('/security/two-factor', {enabled, code, setupToken}),
-    setAntiPhishingCode: (code: string | null) =>
-        api.patch<SecurityOverview>('/security/anti-phishing', {code}),
-    setWithdrawalWhitelist: (enabled: boolean) =>
-        api.patch<SecurityOverview>('/security/withdrawal-whitelist', {enabled}),
+    getOverview: () =>
+        api.get<SecurityOverview>(
+            '/security',
+        ),
+
+    listSessions: () =>
+        api.get<ActiveSession[]>(
+            '/security/sessions',
+        ),
+
+    revokeSession: (
+        id: string,
+    ) =>
+        api.delete<void>(
+            `/security/sessions/${id}`,
+        ),
+
+    revokeOtherSessions: () =>
+        api.delete<void>(
+            '/security/sessions/others',
+        ),
+
+    listEvents: () =>
+        api.get<SecurityEvent[]>(
+            '/security/events',
+        ),
+
+    changePassword: (
+        input: ChangePasswordInput,
+    ) =>
+        api.post<void>(
+            '/security/password',
+            input,
+        ),
+
+    startTwoFactorSetup: () =>
+        api.post<TwoFactorSetup>(
+            '/security/two-factor/setup',
+        ),
+
+    setTwoFactor: (
+        enabled: boolean,
+        code?: string,
+        setupToken?: string,
+    ) =>
+        api.patch<SecurityOverview>(
+            '/security/two-factor',
+            {
+                enabled,
+                code,
+                setupToken,
+            },
+        ),
+
+    setAntiPhishingCode: (
+        code: string | null,
+    ) =>
+        api.patch<SecurityOverview>(
+            '/security/anti-phishing',
+            {code},
+        ),
+
+    setWithdrawalWhitelist: (
+        enabled: boolean,
+    ) =>
+        api.patch<SecurityOverview>(
+            '/security/withdrawal-whitelist',
+            {enabled},
+        ),
 }
 
 export const supportService: SupportService = {
-    listFaqs: (search?: string, category?: SupportCategory) =>
-        api.get<FaqItem[]>('/support/faqs', {query: {search, category}}),
-    listTickets(filters: TicketFilters = {}) {
-        return api.get<PaginatedResult<SupportTicket>>('/support/tickets', {
-            query: {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                status: filters.status,
-                category: filters.category,
-                search: filters.search,
+    listFaqs: (
+        search?: string,
+        category?: SupportCategory,
+    ) =>
+        api.get<FaqItem[]>(
+            '/support/faqs',
+            {
+                query: {
+                    search,
+                    category,
+                },
             },
-        })
+        ),
+
+    listTickets(
+        filters: TicketFilters = {},
+    ) {
+        return api.get<
+            PaginatedResult<SupportTicket>
+        >(
+            '/support/tickets',
+            {
+                query: {
+                    page:
+                    filters.page,
+                    pageSize:
+                    filters.pageSize,
+                    status:
+                    filters.status,
+                    category:
+                    filters.category,
+                    search:
+                    filters.search,
+                },
+            },
+        )
     },
-    getTicket: (id: string) => api.get<SupportTicket>(`/support/tickets/${id}`),
-    createTicket: (input: CreateTicketInput) => api.post<SupportTicket>('/support/tickets', input),
-    reply: (ticketId: string, body: string) =>
-        api.post<TicketMessage>(`/support/tickets/${ticketId}/messages`, {body}),
-    close: (ticketId: string) => api.post<SupportTicket>(`/support/tickets/${ticketId}/close`),
+
+    getTicket: (
+        id: string,
+    ) =>
+        api.get<SupportTicket>(
+            `/support/tickets/${id}`,
+        ),
+
+    createTicket: (
+        input: CreateTicketInput,
+    ) =>
+        api.post<SupportTicket>(
+            '/support/tickets',
+            input,
+        ),
+
+    reply: (
+        ticketId: string,
+        body: string,
+    ) =>
+        api.post<TicketMessage>(
+            `/support/tickets/${ticketId}/messages`,
+            {body},
+        ),
+
+    close: (
+        ticketId: string,
+    ) =>
+        api.post<SupportTicket>(
+            `/support/tickets/${ticketId}/close`,
+        ),
 }
 
 export const tradeService: TradeService = {
-    getQuote: (input: QuoteRequest, signal?: AbortSignal) =>
-        api.post<TradeQuote>('/trade/quotes', input, {signal}),
-    getQuoteById: (id: string) => api.get<TradeQuote>(`/trade/quotes/${id}`),
-    createOrder(input: CreateOrderInput) {
-        if (!input.clientRequestId.trim()) {
-            return Promise.reject(new ApiError('شناسه امن درخواست ارسال نشده است.', 'VALIDATION_ERROR', 422))
+    getQuote: (
+        input: QuoteRequest,
+        signal?: AbortSignal,
+    ) =>
+        api.post<TradeQuote>(
+            '/trade/quotes',
+            input,
+            {signal},
+        ),
+
+    getQuoteById: (
+        id: string,
+    ) =>
+        api.get<TradeQuote>(
+            `/trade/quotes/${id}`,
+        ),
+
+    createOrder(
+        input: CreateOrderInput,
+    ) {
+        if (
+            !input.clientRequestId.trim()
+        ) {
+            return Promise.reject(
+                new ApiError(
+                    'شناسه امن درخواست ارسال نشده است.',
+                    'VALIDATION_ERROR',
+                    422,
+                ),
+            )
         }
-        return api.post<OtcOrder>('/trade/orders', input, {
-            headers: {'Idempotency-Key': input.clientRequestId},
-        })
+
+        return api.post<OtcOrder>(
+            '/trade/orders',
+            input,
+            {
+                headers: {
+                    'Idempotency-Key':
+                    input.clientRequestId,
+                },
+            },
+        )
     },
 }
 
 export const transactionService: TransactionService = {
-    list(filters: TransactionFilters = {}) {
-        return api.get<PaginatedResult<Transaction>>('/transactions', {
-            query: {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                type: filters.type,
-                status: filters.status,
-                asset: filters.assetSymbol,
-                network: filters.networkCode,
-                from: filters.from,
-                to: filters.to,
-                search: filters.search,
+    list(
+        filters: TransactionFilters = {},
+    ) {
+        return api.get<
+            PaginatedResult<Transaction>
+        >(
+            '/transactions',
+            {
+                query: {
+                    page:
+                    filters.page,
+                    pageSize:
+                    filters.pageSize,
+                    type:
+                    filters.type,
+                    status:
+                    filters.status,
+                    asset:
+                    filters.assetSymbol,
+                    network:
+                    filters.networkCode,
+                    from:
+                    filters.from,
+                    to:
+                    filters.to,
+                    search:
+                    filters.search,
+                },
             },
-        })
+        )
     },
-    getById: (id: string) => api.get<Transaction>(`/transactions/${id}`),
+
+    getById: (
+        id: string,
+    ) =>
+        api.get<Transaction>(
+            `/transactions/${id}`,
+        ),
 }
 
 export const userService: UserService = {
-    getProfile: () => api.get<UserProfile>('/users/me'),
-    updateProfile: (input: UpdateProfileInput) => api.patch<UserProfile>('/users/me', input),
-    getDashboardSummary: () => api.get<DashboardSummary>('/dashboard/summary'),
-    getPreferences: () => api.get<UserPreferences>('/users/me/preferences'),
-    updatePreferences: (input: Partial<UserPreferences>) =>
-        api.patch<UserPreferences>('/users/me/preferences', input),
-    verifyEmail: (token: string) =>
+    getProfile: () =>
+        api.get<UserProfile>(
+            '/users/me',
+        ),
+
+    updateProfile: (
+        input: UpdateProfileInput,
+    ) =>
+        api.patch<UserProfile>(
+            '/users/me',
+            input,
+        ),
+
+    getDashboardSummary: () =>
+        api.get<DashboardSummary>(
+            '/dashboard/summary',
+        ),
+
+    getPreferences: () =>
+        api.get<UserPreferences>(
+            '/users/me/preferences',
+        ),
+
+    updatePreferences: (
+        input: Partial<UserPreferences>,
+    ) =>
+        api.patch<UserPreferences>(
+            '/users/me/preferences',
+            input,
+        ),
+
+    verifyEmail: (
+        token: string,
+    ) =>
         api.post<UserProfile>(
             '/users/me/email/verify',
             {token},
@@ -291,50 +890,161 @@ export const userService: UserService = {
 }
 
 export const verificationService: {
-    getSummary: () => Promise<VerificationSummary>;
-    submitBasicInfo: (input: BasicIdentityInput) => Promise<VerificationSubmission>
+    getSummary: () =>
+        Promise<VerificationSummary>
+    submitBasicInfo: (
+        input: BasicIdentityInput,
+    ) =>
+        Promise<VerificationSubmission>
 } = {
-    getSummary: () => api.get<VerificationSummary>('/verification'),
-    submitBasicInfo: (input: BasicIdentityInput) =>
-        api.post<VerificationSubmission>('/verification/basic-info', input),
+    getSummary: () =>
+        api.get<VerificationSummary>(
+            '/verification',
+        ),
+
+    submitBasicInfo: (
+        input: BasicIdentityInput,
+    ) =>
+        api.post<VerificationSubmission>(
+            '/verification/basic-info',
+            input,
+        ),
 }
 
 export const walletService: WalletService = {
-    getSummary: () => api.get<WalletSummary>('/wallet'),
-    getAsset: (symbol: AssetSymbol) => api.get<WalletAsset>(`/wallet/${symbol}`),
-    getNetworks: (symbol: AssetSymbol) => api.get<AssetNetwork[]>(`/wallet/${symbol}/networks`),
-    getDepositAddress: (symbol: AssetSymbol, networkCode: string) =>
-        api.get<DepositAddress>(`/wallet/${symbol}/deposit-address`, {query: {network: networkCode}}),
-    createTomanDeposit: (input: TomanDepositInput) =>
-        api.post<TomanDepositResult>('/wallet/toman/deposits', input),
-    getTomanDeposit: (id: string) => api.get<TomanDepositResult>(`/wallet/toman/deposits/${id}`),
-    completeTomanDeposit: (id: string) =>
-        api.post<Transaction>(`/wallet/toman/deposits/${id}/complete`),
-    estimateTomanWithdrawal: (input: TomanWithdrawalDraft) =>
-        api.post<WithdrawalEstimate>('/wallet/toman/withdrawals/estimate', input),
-    createTomanWithdrawal(input: TomanWithdrawalInput) {
-        const {idempotencyKey, ...payload} = input
-        return api.post<Transaction>('/wallet/toman/withdrawals', payload, {
-            headers: {'Idempotency-Key': idempotencyKey},
-        })
+    getSummary: () =>
+        api.get<WalletSummary>(
+            '/wallet',
+        ),
+
+    getAsset: (
+        symbol: AssetSymbol,
+    ) =>
+        api.get<WalletAsset>(
+            `/wallet/${symbol}`,
+        ),
+
+    getNetworks: (
+        symbol: AssetSymbol,
+    ) =>
+        api.get<AssetNetwork[]>(
+            `/wallet/${symbol}/networks`,
+        ),
+
+    getDepositAddress: (
+        symbol: AssetSymbol,
+        networkCode: string,
+    ) =>
+        api.get<DepositAddress>(
+            `/wallet/${symbol}/deposit-address`,
+            {
+                query: {
+                    network:
+                    networkCode,
+                },
+            },
+        ),
+
+    createTomanDeposit: (
+        input: TomanDepositInput,
+    ) =>
+        api.post<TomanDepositResult>(
+            '/wallet/toman/deposits',
+            input,
+        ),
+
+    getTomanDeposit: (
+        id: string,
+    ) =>
+        api.get<TomanDepositResult>(
+            `/wallet/toman/deposits/${id}`,
+        ),
+
+    completeTomanDeposit: (
+        id: string,
+    ) =>
+        api.post<Transaction>(
+            `/wallet/toman/deposits/${id}/complete`,
+        ),
+
+    estimateTomanWithdrawal: (
+        input: TomanWithdrawalDraft,
+    ) =>
+        api.post<WithdrawalEstimate>(
+            '/wallet/toman/withdrawals/estimate',
+            input,
+        ),
+
+    createTomanWithdrawal(
+        input: TomanWithdrawalInput,
+    ) {
+        const {
+            idempotencyKey,
+            ...payload
+        } = input
+
+        return api.post<Transaction>(
+            '/wallet/toman/withdrawals',
+            payload,
+            {
+                headers: {
+                    'Idempotency-Key':
+                    idempotencyKey,
+                },
+            },
+        )
     },
-    estimateCryptoWithdrawal: (input: CryptoWithdrawalDraft) =>
-        api.post<CryptoWithdrawalEstimate>('/wallet/crypto/withdrawals/estimate', input),
-    requestCryptoWithdrawalOtp: (estimateToken: string, estimateVersion: number) =>
-        api.post<WithdrawalOtpChallenge>('/wallet/crypto/withdrawals/otp-challenges', {
-            estimateToken,
-            estimateVersion,
-            purpose: 'crypto_withdrawal',
-        }),
-    resendCryptoWithdrawalOtp: (challengeToken: string) =>
+
+    estimateCryptoWithdrawal: (
+        input: CryptoWithdrawalDraft,
+    ) =>
+        api.post<CryptoWithdrawalEstimate>(
+            '/wallet/crypto/withdrawals/estimate',
+            input,
+        ),
+
+    requestCryptoWithdrawalOtp: (
+        estimateToken: string,
+        estimateVersion: number,
+    ) =>
+        api.post<WithdrawalOtpChallenge>(
+            '/wallet/crypto/withdrawals/otp-challenges',
+            {
+                estimateToken,
+                estimateVersion,
+                purpose:
+                    'crypto_withdrawal',
+            },
+        ),
+
+    resendCryptoWithdrawalOtp: (
+        challengeToken: string,
+    ) =>
         api.post<WithdrawalOtpChallenge>(
             `/wallet/crypto/withdrawals/otp-challenges/${challengeToken}/resend`,
-            {purpose: 'crypto_withdrawal'},
+            {
+                purpose:
+                    'crypto_withdrawal',
+            },
         ),
-    createCryptoWithdrawal(input: CryptoWithdrawalInput) {
-        const {idempotencyKey, ...payload} = input
-        return api.post<Transaction>('/wallet/crypto/withdrawals', payload, {
-            headers: {'Idempotency-Key': idempotencyKey},
-        })
+
+    createCryptoWithdrawal(
+        input: CryptoWithdrawalInput,
+    ) {
+        const {
+            idempotencyKey,
+            ...payload
+        } = input
+
+        return api.post<Transaction>(
+            '/wallet/crypto/withdrawals',
+            payload,
+            {
+                headers: {
+                    'Idempotency-Key':
+                    idempotencyKey,
+                },
+            },
+        )
     },
 }

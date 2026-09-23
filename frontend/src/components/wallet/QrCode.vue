@@ -15,13 +15,6 @@ const props = withDefaults(defineProps<{
   size: 168,
   label: 'کد QR آدرس واریز',
 })
-
-/*
- * QR Model 2, byte mode, error-correction level L. Versions 1–10 cover
- * payloads up to 271 UTF-8 bytes, which comfortably includes wallet addresses.
- * Keeping this encoder local makes the address QR available offline and avoids
- * sending a deposit address to an external image service.
- */
 const BLOCKS: Readonly<Record<number, readonly ReedSolomonBlock[]>> = {
   1: [{ count: 1, totalCodewords: 26, dataCodewords: 19 }],
   2: [{ count: 1, totalCodewords: 44, dataCodewords: 34 }],

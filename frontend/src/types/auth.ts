@@ -61,6 +61,12 @@ export interface AuthFlowResult {
     expiresAt: ISODateString
 }
 
+export interface TwoFactorLoginChallenge {
+    nextStep: 'two_factor'
+    twoFactorToken: string
+    expiresAt: ISODateString
+}
+
 export interface AuthResult {
     access: string
     refresh: string

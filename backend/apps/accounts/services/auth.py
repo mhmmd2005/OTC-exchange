@@ -1,3 +1,5 @@
+import secrets
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -6,7 +8,10 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import AuthenticationFailed, Throttled
+from rest_framework.exceptions import (
+    AuthenticationFailed,
+    Throttled,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import OTPVerification, User
@@ -20,7 +25,9 @@ from apps.accounts.services.otp import (
     is_expired,
     store_otp_code,
 )
-from apps.accounts.services.phone import normalize_phone_number
+from apps.accounts.services.phone import (
+    normalize_phone_number,
+)
 from apps.accounts.services.session import (
     create_session,
     invalidate_all_user_sessions,
@@ -28,12 +35,58 @@ from apps.accounts.services.session import (
 from apps.accounts.tasks import send_otp_sms_task
 from apps.kyc.models import KycApplication
 from apps.security.models import LoginHistory, SecurityEvent
+from apps.security.services import TwoFactorService
 
 
 class AuthService:
+    LOGIN_2FA_CACHE_PREFIX = "auth:login:2fa:"
+    LOGIN_2FA_TTL_SECONDS = 5 * 60
+    LOGIN_2FA_MAX_ATTEMPTS = 5
+
     @staticmethod
     def normalize_phone(phone_number):
-        return normalize_phone_number(phone_number)
+        return normalize_phone_number(
+            phone_number
+        )
+
+    @classmethod
+    def _two_factor_cache_key(
+            cls,
+            token: str,
+    ) -> str:
+        return (
+            f"{cls.LOGIN_2FA_CACHE_PREFIX}"
+            f"{token}"
+        )
+
+    @classmethod
+    def _create_two_factor_login_challenge(
+            cls,
+            user,
+            challenge,
+    ) -> dict:
+        token = secrets.token_urlsafe(32)
+        expires_at = (
+            int(time.time())
+            + cls.LOGIN_2FA_TTL_SECONDS
+        )
+
+        cache.set(
+            cls._two_factor_cache_key(token),
+            {
+                "user_id": user.id,
+                "challenge_id": challenge.id,
+                "attempts": 0,
+                "expires_at": expires_at,
+            },
+            timeout=cls.LOGIN_2FA_TTL_SECONDS,
+        )
+
+        return {
+            "next_step": "two_factor",
+            "two_factor_token": token,
+            "expires_in": cls.LOGIN_2FA_TTL_SECONDS,
+        }
 
     @staticmethod
     def request_otp(
@@ -46,14 +99,19 @@ class AuthService:
             phone_number
         )
 
-        ip_limit = check_and_increment_ip_rate_limit(
-            request_ip,
-            "request",
+        ip_limit = (
+            check_and_increment_ip_rate_limit(
+                request_ip,
+                "request",
+            )
         )
 
         if not ip_limit["allowed"]:
             raise Throttled(
-                detail="Too many OTP requests from this IP. Please try again later.",
+                detail=(
+                    "Too many OTP requests from this IP. "
+                    "Please try again later."
+                ),
                 wait=ip_limit["retry_after"],
             )
 
@@ -61,7 +119,10 @@ class AuthService:
             phone_number=normalized_phone
         ).exists()
 
-        if purpose == "login" and not account_exists:
+        if (
+                purpose == "login"
+                and not account_exists
+        ):
             return {
                 "allowed": False,
                 "account_exists": False,
@@ -69,11 +130,16 @@ class AuthService:
                 "phone_number": normalized_phone,
             }
 
-        if purpose == "registration" and account_exists:
+        if (
+                purpose == "registration"
+                and account_exists
+        ):
             return {
                 "allowed": False,
                 "account_exists": True,
-                "message": "This phone number already has an account.",
+                "message": (
+                    "This phone number already has an account."
+                ),
                 "next_step": "login",
                 "phone_number": normalized_phone,
             }
@@ -85,15 +151,24 @@ class AuthService:
             return {
                 "allowed": False,
                 "account_exists": False,
-                "message": "No account was found for this phone number.",
+                "message": (
+                    "No account was found for this phone number."
+                ),
                 "next_step": "password_reset",
                 "phone_number": normalized_phone,
             }
 
-        if not can_resend(normalized_phone, purpose):
+        if not can_resend(
+            normalized_phone,
+            purpose,
+        ):
             raise Throttled(
-                detail="Please wait before requesting a new OTP.",
-                wait=settings.OTP_RESEND_COOLDOWN_SECONDS,
+                detail=(
+                    "Please wait before requesting a new OTP."
+                ),
+                wait=(
+                    settings.OTP_RESEND_COOLDOWN_SECONDS
+                ),
             )
 
         if (
@@ -104,7 +179,10 @@ class AuthService:
                 >= settings.OTP_MAX_SENDS
         ):
             raise Throttled(
-                detail="Too many OTP requests. Please try again later.",
+                detail=(
+                    "Too many OTP requests. "
+                    "Please try again later."
+                ),
                 wait=settings.OTP_SEND_WINDOW_SECONDS,
             )
 
@@ -119,9 +197,11 @@ class AuthService:
             phone_number=normalized_phone,
             purpose=purpose,
             code_hash=hash_otp(code),
-            expires_at=timezone.now()
-                       + timedelta(
-                seconds=settings.OTP_TTL_SECONDS
+            expires_at=(
+                timezone.now()
+                + timedelta(
+                    seconds=settings.OTP_TTL_SECONDS
+                )
             ),
             max_attempts=settings.OTP_MAX_ATTEMPTS,
             request_ip=request_ip,
@@ -164,11 +244,14 @@ class AuthService:
     @staticmethod
     def get_kyc_status(user):
         return (
-                KycApplication.objects
-                .filter(user=user)
-                .values_list("status", flat=True)
-                .first()
-                or "not_started"
+            KycApplication.objects
+            .filter(user=user)
+            .values_list(
+                "status",
+                flat=True,
+            )
+            .first()
+            or "not_started"
         )
 
     @staticmethod
@@ -180,7 +263,9 @@ class AuthService:
             user=None,
     ):
         try:
-            challenge_id = int(challenge_id)
+            challenge_id = int(
+                challenge_id
+            )
         except (TypeError, ValueError):
             raise ValidationError(
                 "Invalid verification challenge."
@@ -193,14 +278,19 @@ class AuthService:
 
         otp = str(otp or "").strip()
 
-        if not otp.isdigit() or len(otp) != 6:
+        if (
+                not otp.isdigit()
+                or len(otp) != 6
+        ):
             raise ValidationError(
                 "Invalid OTP."
             )
 
-        rate_limit = check_and_increment_ip_rate_limit(
-            request_ip,
-            "verify",
+        rate_limit = (
+            check_and_increment_ip_rate_limit(
+                request_ip,
+                "verify",
+            )
         )
 
         if not rate_limit["allowed"]:
@@ -331,17 +421,20 @@ class AuthService:
             ),
             ip_address=request_ip,
         )
+
         flow_token = signing.dumps(
             {
                 "challenge_id": str(
                     challenge.id
                 ),
-                "phone_number": challenge.phone_number,
+                "phone_number": (
+                    challenge.phone_number
+                ),
                 "purpose": challenge.purpose,
                 "exp": int(
                     (
-                            timezone.now()
-                            + timedelta(minutes=10)
+                        timezone.now()
+                        + timedelta(minutes=10)
                     ).timestamp()
                 ),
             },
@@ -353,7 +446,8 @@ class AuthService:
             "flow_token": flow_token,
             "next_step": (
                 "completed"
-                if challenge.purpose == "phone_verification"
+                if challenge.purpose
+                == "phone_verification"
                 else "password"
             ),
             "expires_in": 600,
@@ -392,9 +486,11 @@ class AuthService:
             )
 
         challenge = (
-            OTPVerification.objects.filter(
+            OTPVerification.objects
+            .filter(
                 id=challenge_id
-            ).first()
+            )
+            .first()
         )
 
         if not challenge:
@@ -421,15 +517,16 @@ class AuthService:
 
         return challenge, payload
 
-    @staticmethod
+    @classmethod
     def verify_login_password(
+            cls,
             flow_token,
             password,
             request_ip=None,
             user_agent="",
     ):
         challenge, _ = (
-            AuthService.validate_flow_token(
+            cls.validate_flow_token(
                 flow_token,
                 expected_purpose="login",
             )
@@ -446,6 +543,7 @@ class AuthService:
                 user_agent=user_agent[:500],
                 success=False,
             )
+
             raise AuthenticationFailed(
                 "Invalid credentials."
             )
@@ -462,7 +560,8 @@ class AuthService:
 
         if failed_attempts >= 5:
             raise AuthenticationFailed(
-                "Too many failed login attempts. Please try later."
+                "Too many failed login attempts. "
+                "Please try later."
             )
 
         if not user.check_password(password):
@@ -492,9 +591,20 @@ class AuthService:
                 "Invalid credentials."
             )
 
-        cache.delete(cache_key)
+        cache.delete(
+            cache_key
+        )
 
-        refresh = RefreshToken.for_user(user)
+        if TwoFactorService.is_enabled(user):
+            return cls._create_two_factor_login_challenge(
+                user=user,
+                challenge=challenge,
+            )
+
+        refresh = RefreshToken.for_user(
+            user
+        )
+
         session_id = create_session(
             user.id
         )
@@ -534,7 +644,216 @@ class AuthService:
                 "is_phone_verified": (
                     user.is_phone_verified
                 ),
-                "kyc_status": AuthService.get_kyc_status(user),
+                "kyc_status": (
+                    cls.get_kyc_status(user)
+                ),
+                "kyc_level": user.kyc_level,
+                "created_at": (
+                    user.created_at.isoformat()
+                    if user.created_at
+                    else None
+                ),
+            },
+        }
+
+    @classmethod
+    def verify_login_two_factor(
+            cls,
+            two_factor_token,
+            code,
+            request_ip=None,
+            user_agent="",
+    ):
+        two_factor_token = str(
+            two_factor_token or ""
+        ).strip()
+
+        if not two_factor_token:
+            raise AuthenticationFailed(
+                "Two-factor verification token is required."
+            )
+
+        cache_key = cls._two_factor_cache_key(
+            two_factor_token
+        )
+
+        challenge_data = cache.get(
+            cache_key
+        )
+
+        if not challenge_data:
+            raise AuthenticationFailed(
+                "فرایند تأیید ورود دومرحله‌ای منقضی شده است."
+            )
+
+        expires_at = int(
+            challenge_data.get(
+                "expires_at",
+                0,
+            )
+        )
+
+        remaining = (
+            expires_at
+            - int(time.time())
+        )
+
+        if remaining <= 0:
+            cache.delete(cache_key)
+
+            raise AuthenticationFailed(
+                "فرایند تأیید ورود دومرحله‌ای منقضی شده است."
+            )
+
+        try:
+            user_id = int(
+                challenge_data.get(
+                    "user_id"
+                )
+            )
+            challenge_id = int(
+                challenge_data.get(
+                    "challenge_id"
+                )
+            )
+        except (
+                TypeError,
+                ValueError,
+        ):
+            cache.delete(cache_key)
+
+            raise AuthenticationFailed(
+                "توکن تأیید ورود معتبر نیست."
+            )
+
+        user = User.objects.filter(
+            id=user_id,
+            is_active=True,
+        ).first()
+
+        if not user:
+            cache.delete(cache_key)
+
+            raise AuthenticationFailed(
+                "حساب کاربری معتبر نیست."
+            )
+
+        challenge = (
+            OTPVerification.objects
+            .filter(
+                id=challenge_id,
+                purpose="login",
+                is_used=True,
+            )
+            .first()
+        )
+
+        if (
+                not challenge
+                or not challenge.verified_at
+        ):
+            cache.delete(cache_key)
+
+            raise AuthenticationFailed(
+                "فرایند ورود معتبر نیست."
+            )
+
+        if not TwoFactorService.is_enabled(
+            user
+        ):
+            cache.delete(cache_key)
+
+            raise AuthenticationFailed(
+                "ورود دومرحله‌ای برای این حساب فعال نیست."
+            )
+
+        try:
+            TwoFactorService.verify_code(
+                user=user,
+                code=code,
+            )
+        except ValidationError as exc:
+            attempts = int(
+                challenge_data.get(
+                    "attempts",
+                    0,
+                )
+            ) + 1
+
+            if (
+                    attempts
+                    >= cls.LOGIN_2FA_MAX_ATTEMPTS
+            ):
+                cache.delete(
+                    cache_key
+                )
+
+                raise AuthenticationFailed(
+                    "تعداد تلاش‌های ورود دومرحله‌ای بیش از حد مجاز است. "
+                    "لطفاً دوباره وارد شوید."
+                )
+
+            challenge_data["attempts"] = attempts
+
+            cache.set(
+                cache_key,
+                challenge_data,
+                timeout=remaining,
+            )
+
+            raise exc
+
+        cache.delete(
+            cache_key
+        )
+
+        refresh = RefreshToken.for_user(
+            user
+        )
+
+        session_id = create_session(
+            user.id
+        )
+
+        refresh["session_id"] = session_id
+
+        access = refresh.access_token
+
+        LoginHistory.objects.create(
+            user=user,
+            ip_address=request_ip,
+            user_agent=user_agent[:500],
+            success=True,
+        )
+
+        SecurityEvent.objects.create(
+            user=user,
+            event_type="login_success",
+            description=(
+                "Successful login via OTP, password, "
+                "and Authenticator."
+            ),
+            ip_address=request_ip,
+        )
+
+        return {
+            "refresh": str(refresh),
+            "access": str(access),
+            "user": {
+                "id": user.id,
+                "phone_number": user.phone_number,
+                "full_name": user.full_name,
+                "avatar": (
+                    user.avatar.url
+                    if user.avatar
+                    else None
+                ),
+                "is_phone_verified": (
+                    user.is_phone_verified
+                ),
+                "kyc_status": (
+                    cls.get_kyc_status(user)
+                ),
                 "kyc_level": user.kyc_level,
                 "created_at": (
                     user.created_at.isoformat()
@@ -569,7 +888,9 @@ class AuthService:
             validate_password,
         )
 
-        validate_password(password)
+        validate_password(
+            password
+        )
 
         if User.objects.filter(
                 phone_number=challenge.phone_number
@@ -585,7 +906,9 @@ class AuthService:
             phone_verified_at=timezone.now(),
         )
 
-        user.set_password(password)
+        user.set_password(
+            password
+        )
 
         user.save(
             update_fields=[
@@ -596,7 +919,10 @@ class AuthService:
             ]
         )
 
-        refresh = RefreshToken.for_user(user)
+        refresh = RefreshToken.for_user(
+            user
+        )
+
         session_id = create_session(
             user.id
         )
@@ -629,7 +955,11 @@ class AuthService:
                 "is_phone_verified": (
                     user.is_phone_verified
                 ),
-                "kyc_status": AuthService.get_kyc_status(user),
+                "kyc_status": (
+                    AuthService.get_kyc_status(
+                        user
+                    )
+                ),
                 "kyc_level": user.kyc_level,
                 "created_at": (
                     user.created_at.isoformat()
@@ -664,7 +994,9 @@ class AuthService:
             validate_password,
         )
 
-        validate_password(password)
+        validate_password(
+            password
+        )
 
         user = User.objects.filter(
             phone_number=challenge.phone_number,
@@ -676,7 +1008,9 @@ class AuthService:
                 "User account not found."
             )
 
-        user.set_password(password)
+        user.set_password(
+            password
+        )
 
         user.save(
             update_fields=[

@@ -361,6 +361,14 @@ class LoginPasswordSerializer(serializers.Serializer):
         write_only=True
     )
 
+class TwoFactorLoginSerializer(serializers.Serializer):
+    two_factor_token = serializers.CharField()
+    code = serializers.CharField(
+        min_length=6,
+        max_length=6,
+    )
+
+
 
 class RegistrationPasswordSerializer(serializers.Serializer):
     flow_token = serializers.CharField()

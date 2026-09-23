@@ -8,13 +8,22 @@ import type {
     RegisterInput,
     RequestOtpInput,
     ResetPasswordInput,
+    TwoFactorLoginChallenge,
     UserProfile,
     VerifyOtpInput,
 } from '@/types'
 import {authService} from '@/services/auth.service'
-import {ApiError, clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens,} from '@/services/api'
+import {
+    ApiError,
+    clearAuthTokens,
+    getAccessToken,
+    getRefreshToken,
+    setAuthTokens,
+} from '@/services/api'
 
-function errorMessage(error: unknown): string {
+function errorMessage(
+    error: unknown,
+): string {
     return error instanceof Error
         ? error.message
         : 'خطای پیش‌بینی‌نشده‌ای رخ داد.'
@@ -38,6 +47,11 @@ export const useAuthStore = defineStore(
         const otpChallenge =
             ref<OtpChallenge | null>(null)
 
+        const twoFactorLoginChallenge =
+            ref<TwoFactorLoginChallenge | null>(
+                null,
+            )
+
         const pendingLoginPassword =
             ref<string | null>(null)
 
@@ -51,7 +65,9 @@ export const useAuthStore = defineStore(
             ref<string | null>(null)
 
         const isAuthenticated =
-            computed(() => Boolean(user.value))
+            computed(() =>
+                Boolean(user.value)
+            )
 
         const displayName =
             computed(
@@ -77,7 +93,8 @@ export const useAuthStore = defineStore(
             pendingLoginPassword.value =
                 null
 
-            pendingLoginRemember.value = true
+            pendingLoginRemember.value =
+                true
 
             pendingRegistrationPassword.value =
                 null
@@ -89,7 +106,9 @@ export const useAuthStore = defineStore(
         function clearAuth(): void {
             user.value = null
             otpChallenge.value = null
+            twoFactorLoginChallenge.value = null
             passwordResetProof.value = null
+
             clearPendingFlow()
             clearAuthTokens()
         }
@@ -98,9 +117,20 @@ export const useAuthStore = defineStore(
             passwordResetProof.value = null
         }
 
+        function cancelTwoFactorLogin(): void {
+            twoFactorLoginChallenge.value =
+                null
+
+            otpChallenge.value = null
+
+            clearPendingFlow()
+        }
+
         function expireSession(): void {
             clearAuth()
+
             initialized.value = true
+
             error.value =
                 'نشست شما منقضی شده است؛ دوباره وارد شوید.'
         }
@@ -123,6 +153,7 @@ export const useAuthStore = defineStore(
                     await authService.getCurrentUser()
             } catch (caught) {
                 clearAuth()
+
                 error.value =
                     errorMessage(caught)
             } finally {
@@ -138,7 +169,9 @@ export const useAuthStore = defineStore(
             error.value = null
 
             clearPendingFlow()
+
             otpChallenge.value = null
+            twoFactorLoginChallenge.value = null
 
             try {
                 const challenge =
@@ -173,7 +206,9 @@ export const useAuthStore = defineStore(
             error.value = null
 
             clearPendingFlow()
+
             otpChallenge.value = null
+            twoFactorLoginChallenge.value = null
 
             try {
                 const challenge =
@@ -214,7 +249,15 @@ export const useAuthStore = defineStore(
                 ) {
                     passwordResetProof.value =
                         null
+
                     clearPendingFlow()
+                }
+
+                if (
+                    input.purpose !== 'login'
+                ) {
+                    twoFactorLoginChallenge.value =
+                        null
                 }
 
                 const challenge =
@@ -250,6 +293,9 @@ export const useAuthStore = defineStore(
                         )
 
                 otpChallenge.value = null
+                twoFactorLoginChallenge.value =
+                    null
+
                 passwordResetProof.value =
                     proof
 
@@ -266,16 +312,25 @@ export const useAuthStore = defineStore(
 
         async function verifyOtp(
             input: VerifyOtpInput,
-        ): Promise<UserProfile> {
+        ): Promise<
+            UserProfile
+            | TwoFactorLoginChallenge
+        > {
             loading.value = true
             error.value = null
 
             try {
                 const flow =
-                    await authService.verifyOtp(input)
+                    await authService.verifyOtp(
+                        input,
+                    )
 
-                if (input.purpose === 'login') {
-                    if (!pendingLoginPassword.value) {
+                if (
+                    input.purpose === 'login'
+                ) {
+                    if (
+                        !pendingLoginPassword.value
+                    ) {
                         throw new ApiError(
                             'اطلاعات ورود در این مرورگر در دسترس نیست؛ دوباره وارد شوید.',
                             'BAD_REQUEST',
@@ -289,19 +344,49 @@ export const useAuthStore = defineStore(
                             pendingLoginPassword.value,
                         )
 
+                    if (
+                        'twoFactorToken' in result
+                    ) {
+                        twoFactorLoginChallenge.value =
+                            result
+
+                        otpChallenge.value =
+                            null
+
+                        /*
+                         * بعد از بررسی رمز عبور،
+                         * دیگر نیازی به نگه‌داشتن رمز خام
+                         * در حافظه frontend نداریم.
+                         *
+                         * فقط remember را برای مرحله نهایی نگه می‌داریم.
+                         */
+                        pendingLoginPassword.value =
+                            null
+
+                        initialized.value = true
+
+                        return result
+                    }
+
                     applyAuth(
                         result,
                         pendingLoginRemember.value,
                     )
 
                     otpChallenge.value = null
+                    twoFactorLoginChallenge.value =
+                        null
+
                     clearPendingFlow()
+
                     initialized.value = true
 
                     return result.user
                 }
 
-                if (input.purpose === 'register') {
+                if (
+                    input.purpose === 'register'
+                ) {
                     if (
                         !pendingRegistrationPassword.value
                         || !pendingRegistrationConfirmation.value
@@ -326,21 +411,28 @@ export const useAuthStore = defineStore(
                     )
 
                     otpChallenge.value = null
+                    twoFactorLoginChallenge.value =
+                        null
+
                     clearPendingFlow()
+
                     initialized.value = true
 
                     return result.user
                 }
 
                 if (
-                    input.purpose === 'phone_verification'
+                    input.purpose
+                    === 'phone_verification'
                 ) {
                     otpChallenge.value = null
 
                     const refreshedUser =
                         await authService.getCurrentUser()
 
-                    user.value = refreshedUser
+                    user.value =
+                        refreshedUser
+
                     initialized.value = true
 
                     return refreshedUser
@@ -351,6 +443,56 @@ export const useAuthStore = defineStore(
                     'BAD_REQUEST',
                     400,
                 )
+            } catch (caught) {
+                error.value =
+                    errorMessage(caught)
+
+                throw caught
+            } finally {
+                loading.value = false
+            }
+        }
+
+        async function verifyTwoFactorLogin(
+            code: string,
+        ): Promise<UserProfile> {
+            if (
+                !twoFactorLoginChallenge.value
+            ) {
+                throw new ApiError(
+                    'درخواست ورود دومرحله‌ای در دسترس نیست؛ دوباره وارد شوید.',
+                    'BAD_REQUEST',
+                    400,
+                )
+            }
+
+            loading.value = true
+            error.value = null
+
+            try {
+                const result =
+                    await authService.verifyLoginTwoFactor(
+                        twoFactorLoginChallenge
+                            .value
+                            .twoFactorToken,
+                        code,
+                    )
+
+                applyAuth(
+                    result,
+                    pendingLoginRemember.value,
+                )
+
+                twoFactorLoginChallenge.value =
+                    null
+
+                otpChallenge.value = null
+
+                clearPendingFlow()
+
+                initialized.value = true
+
+                return result.user
             } catch (caught) {
                 error.value =
                     errorMessage(caught)
@@ -394,8 +536,8 @@ export const useAuthStore = defineStore(
                 await authService.resetPassword({
                     ...input,
                     flowToken:
-                    passwordResetProof.value
-                        .flowToken,
+                        passwordResetProof.value
+                            .flowToken,
                 })
 
                 passwordResetProof.value =
@@ -473,6 +615,7 @@ export const useAuthStore = defineStore(
             error,
             passwordResetProof,
             otpChallenge,
+            twoFactorLoginChallenge,
             isAuthenticated,
             displayName,
             hydrate,
@@ -482,6 +625,8 @@ export const useAuthStore = defineStore(
             requestOtp,
             verifyOtp,
             verifyPasswordResetOtp,
+            verifyTwoFactorLogin,
+            cancelTwoFactorLogin,
             refreshUser,
             resetPassword,
             expireSession,

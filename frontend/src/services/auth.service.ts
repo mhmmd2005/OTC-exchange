@@ -9,6 +9,7 @@ import type {
     RegisterInput,
     RequestOtpInput,
     ResetPasswordInput,
+    TwoFactorLoginChallenge,
     UserProfile,
     VerifyOtpInput,
 } from '@/types'
@@ -27,7 +28,15 @@ export interface AuthService {
 
     verifyOtp(input: VerifyOtpInput): Promise<AuthFlowResult>
 
-    completeLogin(flowToken: string, password: string): Promise<AuthResult>
+    completeLogin(
+        flowToken: string,
+        password: string,
+    ): Promise<AuthResult | TwoFactorLoginChallenge>
+
+    verifyLoginTwoFactor(
+        twoFactorToken: string,
+        code: string,
+    ): Promise<AuthResult>
 
     completeRegistration(
         flowToken: string,
@@ -35,7 +44,9 @@ export interface AuthService {
         passwordConfirmation: string,
     ): Promise<AuthResult>
 
-    verifyPasswordResetOtp(input: VerifyOtpInput): Promise<PasswordResetProof>
+    verifyPasswordResetOtp(
+        input: VerifyOtpInput,
+    ): Promise<PasswordResetProof>
 
     resetPassword(input: ResetPasswordInput): Promise<void>
 
@@ -78,6 +89,16 @@ interface BackendAuthResponse {
     user: BackendUser
 }
 
+interface BackendTwoFactorLoginResponse {
+    next_step: 'two_factor'
+    two_factor_token: string
+    expires_in: number
+}
+
+type BackendLoginCompletionResponse =
+    | BackendAuthResponse
+    | BackendTwoFactorLoginResponse
+
 interface MockOtpChallenge extends OtpChallenge {
     attempts: number
 }
@@ -92,11 +113,15 @@ interface MockFlow {
     expiresAt: number
 }
 
-const mockOtpChallenges = new Map<string, MockOtpChallenge>()
-const mockFlows = new Map<string, MockFlow>()
+const mockOtpChallenges =
+    new Map<string, MockOtpChallenge>()
+
+const mockFlows =
+    new Map<string, MockFlow>()
 
 function normalizeMobile(value: string): string {
-    let mobile = normalizeDigits(value).replace(/\D/g, '')
+    let mobile = normalizeDigits(value)
+        .replace(/\D/g, '')
 
     if (
         mobile.startsWith('98')
@@ -124,7 +149,9 @@ function assertMobile(mobile: string): void {
     }
 }
 
-function mapBackendKycStatus(value: string): KycStatus {
+function mapBackendKycStatus(
+    value: string,
+): KycStatus {
     switch (value) {
         case 'in_progress':
             return 'in_progress'
@@ -143,7 +170,9 @@ function mapBackendKycStatus(value: string): KycStatus {
     }
 }
 
-function mapBackendAccountLevel(value: string): AccountLevel {
+function mapBackendAccountLevel(
+    value: string,
+): AccountLevel {
     if (
         value === 'level_0'
         || value === 'level_1'
@@ -187,7 +216,9 @@ function adaptBackendUser(
         firstName,
         lastName,
         fullName,
-        mobile: normalizeMobile(user.phone_number),
+        mobile: normalizeMobile(
+            user.phone_number,
+        ),
         identityVerified: false,
         email: undefined,
         nationalId: '',
@@ -201,9 +232,10 @@ function adaptBackendUser(
         kycStatus: mapBackendKycStatus(
             user.kyc_status,
         ),
-        accountLevel: mapBackendAccountLevel(
-            user.kyc_level,
-        ),
+        accountLevel:
+            mapBackendAccountLevel(
+                user.kyc_level,
+            ),
         joinedAt: user.created_at,
         lastLoginAt:
             lastLoginAt
@@ -221,6 +253,29 @@ function adaptBackendAuthResponse(
             response.user,
             new Date().toISOString(),
         ),
+    }
+}
+
+function createTwoFactorLoginChallenge(
+    response: BackendTwoFactorLoginResponse,
+): TwoFactorLoginChallenge {
+    if (!response.two_factor_token) {
+        throw new ApiError(
+            'توکن ورود دومرحله‌ای دریافت نشد.',
+            'SERVER_ERROR',
+            502,
+        )
+    }
+
+    return {
+        nextStep: 'two_factor',
+        twoFactorToken:
+        response.two_factor_token,
+        expiresAt: new Date(
+            Date.now()
+            + Number(response.expires_in || 300)
+            * 1000,
+        ).toISOString(),
     }
 }
 
@@ -280,7 +335,9 @@ function createChallengeFromBackend(
 
     if (
         !response.challenge_id
-        || !Number.isFinite(response.expires_in)
+        || !Number.isFinite(
+            response.expires_in,
+        )
         || !Number.isFinite(
             response.resend_available_in,
         )
@@ -292,24 +349,29 @@ function createChallengeFromBackend(
         )
     }
 
-    const normalizedMobile = normalizeMobile(
-        response.phone_number
-        || input.mobile,
-    )
+    const normalizedMobile =
+        normalizeMobile(
+            response.phone_number
+            || input.mobile,
+        )
 
     return {
-        challengeId: String(
-            response.challenge_id,
-        ),
+        challengeId:
+            String(
+                response.challenge_id,
+            ),
         mobile: normalizedMobile,
         purpose: input.purpose,
         expiresAt: new Date(
             Date.now()
-            + Number(response.expires_in) * 1000,
+            + Number(response.expires_in)
+            * 1000,
         ).toISOString(),
         resendAt: new Date(
             Date.now()
-            + Number(response.resend_available_in) * 1000,
+            + Number(
+                response.resend_available_in,
+            ) * 1000,
         ).toISOString(),
     }
 }
@@ -326,11 +388,14 @@ function createFlowFromBackend(
     }
 
     return {
-        flowToken: response.flow_token,
+        flowToken:
+        response.flow_token,
         nextStep: 'password',
         expiresAt: new Date(
             Date.now()
-            + Number(response.expires_in || 600) * 1000,
+            + Number(
+                response.expires_in || 600,
+            ) * 1000,
         ).toISOString(),
     }
 }
@@ -374,9 +439,10 @@ async function requestBackendOtp(
         await api.post<BackendOtpResponse>(
             endpoint,
             {
-                phone_number: normalizeMobile(
-                    input.mobile,
-                ),
+                phone_number:
+                    normalizeMobile(
+                        input.mobile,
+                    ),
             },
         )
 
@@ -393,13 +459,18 @@ async function verifyBackendOtp(
         await api.post<BackendFlowResponse>(
             '/auth/verify-otp/',
             {
-                challenge_id: input.challengeId,
-                otp: normalizeDigits(input.code)
-                    .replace(/\D/g, ''),
+                challenge_id:
+                input.challengeId,
+                otp:
+                    normalizeDigits(
+                        input.code,
+                    ).replace(/\D/g, ''),
             },
         )
 
-    return createFlowFromBackend(response)
+    return createFlowFromBackend(
+        response,
+    )
 }
 
 async function verifyBackendPhoneVerificationOtp(
@@ -409,13 +480,18 @@ async function verifyBackendPhoneVerificationOtp(
         await api.post<BackendFlowResponse>(
             '/auth/verify-phone-otp/',
             {
-                challenge_id: input.challengeId,
-                otp: normalizeDigits(input.code)
-                    .replace(/\D/g, ''),
+                challenge_id:
+                input.challengeId,
+                otp:
+                    normalizeDigits(
+                        input.code,
+                    ).replace(/\D/g, ''),
             },
         )
 
-    return createFlowFromBackend(response)
+    return createFlowFromBackend(
+        response,
+    )
 }
 
 function createMockChallenge(
@@ -428,7 +504,8 @@ function createMockChallenge(
     assertMobile(mobile)
 
     const challenge: MockOtpChallenge = {
-        challengeId: createMockId('otp'),
+        challengeId:
+            createMockId('otp'),
         mobile,
         purpose: input.purpose,
         expiresAt: futureIso(180),
@@ -447,8 +524,12 @@ function createMockChallenge(
 function createMockFlow(
     challenge: MockOtpChallenge,
 ): AuthFlowResult {
-    const flowToken = createMockId('flow')
-    const expiresAt = Date.now() + 10 * 60 * 1000
+    const flowToken =
+        createMockId('flow')
+
+    const expiresAt =
+        Date.now()
+        + 10 * 60 * 1000
 
     mockFlows.set(
         flowToken,
@@ -468,7 +549,9 @@ function createMockFlow(
         flowToken,
         nextStep: 'password',
         expiresAt:
-            new Date(expiresAt).toISOString(),
+            new Date(
+                expiresAt,
+            ).toISOString(),
     }
 }
 
@@ -479,7 +562,8 @@ function getMockFlow(
         | 'register'
         | 'reset_password',
 ): MockFlow {
-    const flow = mockFlows.get(flowToken)
+    const flow =
+        mockFlows.get(flowToken)
 
     if (
         !flow
@@ -501,10 +585,11 @@ function getMockFlow(
 export const authService: AuthService = {
     login(input) {
         return resolveApi(
-            () => createMockChallenge({
-                mobile: input.mobile,
-                purpose: 'login',
-            }),
+            () =>
+                createMockChallenge({
+                    mobile: input.mobile,
+                    purpose: 'login',
+                }),
             () =>
                 requestBackendOtp({
                     mobile: input.mobile,
@@ -516,9 +601,10 @@ export const authService: AuthService = {
     register(input) {
         return resolveApi(
             () => {
-                const mobile = normalizeMobile(
-                    input.mobile,
-                )
+                const mobile =
+                    normalizeMobile(
+                        input.mobile,
+                    )
 
                 assertMobile(mobile)
 
@@ -536,7 +622,9 @@ export const authService: AuthService = {
                     || input.privacyVersion
                     !== LEGAL_DOCUMENTS.privacy.version
                     || !Number.isFinite(
-                        Date.parse(input.acceptedAt),
+                        Date.parse(
+                            input.acceptedAt,
+                        ),
                     )
                 ) {
                     throw new ApiError(
@@ -605,9 +693,13 @@ export const authService: AuthService = {
                     )
                 }
 
-                const code = normalizeDigits(
-                    input.code,
-                ).replace(/\D/g, '')
+                const code =
+                    normalizeDigits(
+                        input.code,
+                    ).replace(
+                        /\D/g,
+                        '',
+                    )
 
                 if (code !== '123456') {
                     challenge.attempts += 1
@@ -634,7 +726,8 @@ export const authService: AuthService = {
                 )
             },
             () =>
-                input.purpose === 'phone_verification'
+                input.purpose ===
+                'phone_verification'
                     ? verifyBackendPhoneVerificationOtp(
                         input,
                     )
@@ -648,12 +741,15 @@ export const authService: AuthService = {
     ) {
         return resolveApi(
             () => {
-                const flow = getMockFlow(
-                    flowToken,
-                    'login',
-                )
+                const flow =
+                    getMockFlow(
+                        flowToken,
+                        'login',
+                    )
 
-                if (password.length < 8) {
+                if (
+                    password.length < 8
+                ) {
                     throw new ApiError(
                         'رمز عبور صحیح نیست.',
                         'UNAUTHENTICATED',
@@ -661,9 +757,71 @@ export const authService: AuthService = {
                     )
                 }
 
-                mockDb.user.mobile = flow.mobile
-                mockDb.user.lastLoginAt = nowIso()
-                mockDb.user.mobileVerified = true
+                mockDb.user.mobile =
+                    flow.mobile
+
+                mockDb.user.lastLoginAt =
+                    nowIso()
+
+                mockDb.user.mobileVerified =
+                    true
+
+                return {
+                    access:
+                        `mock_access_${createMockId('token')}`,
+                    refresh:
+                        `mock_refresh_${createMockId('token')}`,
+                    user: mockDb.user,
+                }
+            },
+            async () => {
+                const response =
+                    await api.post<BackendLoginCompletionResponse>(
+                        '/auth/login/verify-password/',
+                        {
+                            flow_token:
+                            flowToken,
+                            password,
+                        },
+                    )
+
+                if ('access' in response) {
+                    return adaptBackendAuthResponse(
+                        response,
+                    )
+                }
+
+                return createTwoFactorLoginChallenge(
+                    response,
+                )
+            },
+        )
+    },
+
+    verifyLoginTwoFactor(
+        twoFactorToken,
+        code,
+    ) {
+        return resolveApi(
+            () => {
+                const normalizedCode =
+                    normalizeDigits(
+                        code,
+                    ).replace(
+                        /\D/g,
+                        '',
+                    )
+
+                if (
+                    normalizedCode !==
+                    '123456'
+                ) {
+                    throw new ApiError(
+                        'کد Authenticator صحیح نیست.',
+                        'VALIDATION_ERROR',
+                        422,
+                    )
+                }
 
                 return {
                     access:
@@ -676,10 +834,17 @@ export const authService: AuthService = {
             async () => {
                 const response =
                     await api.post<BackendAuthResponse>(
-                        '/auth/login/verify-password/',
+                        '/auth/login/verify-two-factor/',
                         {
-                            flow_token: flowToken,
-                            password,
+                            two_factor_token:
+                            twoFactorToken,
+                            code:
+                                normalizeDigits(
+                                    code,
+                                ).replace(
+                                    /\D/g,
+                                    '',
+                                ),
                         },
                     )
 
@@ -697,14 +862,16 @@ export const authService: AuthService = {
     ) {
         return resolveApi(
             () => {
-                const flow = getMockFlow(
-                    flowToken,
-                    'register',
-                )
+                const flow =
+                    getMockFlow(
+                        flowToken,
+                        'register',
+                    )
 
                 if (
                     password.length < 8
-                    || password !== passwordConfirmation
+                    || password
+                    !== passwordConfirmation
                 ) {
                     throw new ApiError(
                         'رمز عبور معتبر نیست.',
@@ -713,16 +880,22 @@ export const authService: AuthService = {
                     )
                 }
 
-                mockDb.user.mobile = flow.mobile
-                mockDb.user.mobileVerified = true
-                mockDb.user.lastLoginAt = nowIso()
+                mockDb.user.mobile =
+                    flow.mobile
+
+                mockDb.user.mobileVerified =
+                    true
+
+                mockDb.user.lastLoginAt =
+                    nowIso()
 
                 return {
                     access:
                         `mock_access_${createMockId('token')}`,
                     refresh:
                         `mock_refresh_${createMockId('token')}`,
-                    user: mockDb.user,
+                    user:
+                    mockDb.user,
                 }
             },
             async () => {
@@ -730,7 +903,8 @@ export const authService: AuthService = {
                     await api.post<BackendAuthResponse>(
                         '/auth/register/set-password/',
                         {
-                            flow_token: flowToken,
+                            flow_token:
+                            flowToken,
                             password,
                             confirm_password:
                             passwordConfirmation,
@@ -756,20 +930,26 @@ export const authService: AuthService = {
                     mobile: normalizeMobile(
                         input.mobile,
                     ),
-                    flowToken: flow.flowToken,
-                    expiresAt: flow.expiresAt,
+                    flowToken:
+                    flow.flowToken,
+                    expiresAt:
+                    flow.expiresAt,
                 }
             },
             async () => {
                 const flow =
-                    await verifyBackendOtp(input)
+                    await verifyBackendOtp(
+                        input,
+                    )
 
                 return {
                     mobile: normalizeMobile(
                         input.mobile,
                     ),
-                    flowToken: flow.flowToken,
-                    expiresAt: flow.expiresAt,
+                    flowToken:
+                    flow.flowToken,
+                    expiresAt:
+                    flow.expiresAt,
                 }
             },
         )
@@ -800,14 +980,17 @@ export const authService: AuthService = {
                     input.flowToken,
                 )
 
-                mockDb.user.mobile = flow.mobile
+                mockDb.user.mobile =
+                    flow.mobile
             },
             async () => {
                 await api.post(
                     '/auth/reset-password/',
                     {
-                        flow_token: input.flowToken,
-                        password: input.password,
+                        flow_token:
+                        input.flowToken,
+                        password:
+                        input.password,
                         confirm_password:
                         input.passwordConfirmation,
                     },
@@ -841,7 +1024,8 @@ export const authService: AuthService = {
                 await api.post(
                     '/auth/logout/',
                     {
-                        refresh: refreshToken,
+                        refresh:
+                        refreshToken,
                     },
                 )
             },

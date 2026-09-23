@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AuthTokenRefreshView,
     LoginVerifyPasswordAPIView,
+    LoginVerifyTwoFactorAPIView,
     LogoutAPIView,
     MeAPIView,
     RegistrationSetPasswordAPIView,
@@ -12,7 +13,7 @@ from .views import (
     ResetPasswordAPIView,
     VerifyOTPAPIView,
     VerifyPhoneVerificationOTPAPIView,
-    RequestPhoneVerificationOTPAPIView
+    RequestPhoneVerificationOTPAPIView,
 )
 
 urlpatterns = [
@@ -35,6 +36,11 @@ urlpatterns = [
         "login/verify-password/",
         LoginVerifyPasswordAPIView.as_view(),
         name="login-verify-password",
+    ),
+    path(
+        "login/verify-two-factor/",
+        LoginVerifyTwoFactorAPIView.as_view(),
+        name="login-verify-two-factor",
     ),
     path(
         "register/set-password/",

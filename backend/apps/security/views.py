@@ -1,26 +1,34 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.core.exceptions import ValidationError as DjangoValidationError
+
 from .models import LoginHistory, SecurityEvent
 from .serializers import LoginHistorySerializer, SecurityEventSerializer
 from .services import TwoFactorService
-from .models import LoginHistory, SecurityEvent
 
 
 class SecurityOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({
-            "two_factor_enabled": TwoFactorService.is_enabled(
-                request.user
-            ),
-            "anti_phishing_code_enabled": False,
-            "withdrawal_whitelist_enabled": False,
-            "active_sessions_count": 1,
-        })
+        return Response(
+            {
+                "mobile_verified": request.user.is_phone_verified,
+                "email_verified": (
+                        request.user.email_verified_at is not None
+                ),
+                "two_factor_enabled": (
+                    TwoFactorService.is_enabled(
+                        request.user
+                    )
+                ),
+                "anti_phishing_code_enabled": False,
+                "withdrawal_whitelist_enabled": False,
+                "active_sessions_count": 1,
+            }
+        )
 
 
 class SecuritySessionsAPIView(APIView):
@@ -32,18 +40,20 @@ class SecuritySessionsAPIView(APIView):
         if request.auth:
             session_id = request.auth.get("session_id")
 
-        return Response([
-            {
-                "id": str(session_id or "current"),
-                "device": "مرورگر فعلی",
-                "browser": "Browser",
-                "os": "Linux",
-                "ip_address": request.META.get("REMOTE_ADDR"),
-                "is_current": True,
-                "created_at": None,
-                "last_activity": None,
-            }
-        ])
+        return Response(
+            [
+                {
+                    "id": str(session_id or "current"),
+                    "device": "مرورگر فعلی",
+                    "browser": "Browser",
+                    "os": "Linux",
+                    "ip_address": request.META.get("REMOTE_ADDR"),
+                    "is_current": True,
+                    "created_at": None,
+                    "last_activity": None,
+                }
+            ]
+        )
 
 
 class SecuritySessionRevokeAPIView(APIView):
@@ -51,7 +61,12 @@ class SecuritySessionRevokeAPIView(APIView):
 
     def delete(self, request, session_id):
         return Response(
-            {"detail": "این قابلیت در این مرحله هنوز به SessionService متصل نشده است."},
+            {
+                "detail": (
+                    "این قابلیت در این مرحله هنوز به "
+                    "SessionService متصل نشده است."
+                )
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -61,7 +76,11 @@ class SecurityOtherSessionsRevokeAPIView(APIView):
 
     def delete(self, request):
         return Response(
-            {"detail": "تمام نشست‌های دیگر در این مرحله نمایشی هستند."},
+            {
+                "detail": (
+                    "تمام نشست‌های دیگر در این مرحله نمایشی هستند."
+                )
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -92,7 +111,10 @@ class SecurityPasswordAPIView(APIView):
     def post(self, request):
         return Response(
             {
-                "message": "تغییر رمز عبور در مرحله بعد به منطق امنیتی متصل می‌شود."
+                "message": (
+                    "تغییر رمز عبور در مرحله بعد "
+                    "به منطق امنیتی متصل می‌شود."
+                )
             },
             status=status.HTTP_200_OK,
         )
@@ -143,14 +165,29 @@ class TwoFactorAPIView(APIView):
                 )
 
         else:
-            TwoFactorService.disable(
-                request.user
-            )
+            code = request.data.get("code")
+
+            try:
+                TwoFactorService.disable(
+                    user=request.user,
+                    code=code or "",
+                )
+            except DjangoValidationError as exc:
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         return Response(
             {
-                "two_factor_enabled": TwoFactorService.is_enabled(
-                    request.user
+                "mobile_verified": request.user.is_phone_verified,
+                "email_verified": (
+                        request.user.email_verified_at is not None
+                ),
+                "two_factor_enabled": (
+                    TwoFactorService.is_enabled(
+                        request.user
+                    )
                 ),
                 "anti_phishing_code_enabled": False,
                 "withdrawal_whitelist_enabled": False,
@@ -166,12 +203,24 @@ class AntiPhishingAPIView(APIView):
     def patch(self, request):
         code = request.data.get("code")
 
-        return Response({
-            "two_factor_enabled": False,
-            "anti_phishing_code_enabled": bool(code),
-            "withdrawal_whitelist_enabled": False,
-            "active_sessions_count": 1,
-        })
+        return Response(
+            {
+                "mobile_verified": (
+                    request.user.is_phone_verified
+                ),
+                "email_verified": (
+                        request.user.email_verified_at is not None
+                ),
+                "two_factor_enabled": (
+                    TwoFactorService.is_enabled(
+                        request.user
+                    )
+                ),
+                "anti_phishing_code_enabled": bool(code),
+                "withdrawal_whitelist_enabled": False,
+                "active_sessions_count": 1,
+            }
+        )
 
 
 class WithdrawalWhitelistAPIView(APIView):
@@ -185,9 +234,21 @@ class WithdrawalWhitelistAPIView(APIView):
             )
         )
 
-        return Response({
-            "two_factor_enabled": False,
-            "anti_phishing_code_enabled": False,
-            "withdrawal_whitelist_enabled": enabled,
-            "active_sessions_count": 1,
-        })
+        return Response(
+            {
+                "mobile_verified": (
+                    request.user.is_phone_verified
+                ),
+                "email_verified": (
+                        request.user.email_verified_at is not None
+                ),
+                "two_factor_enabled": (
+                    TwoFactorService.is_enabled(
+                        request.user
+                    )
+                ),
+                "anti_phishing_code_enabled": False,
+                "withdrawal_whitelist_enabled": enabled,
+                "active_sessions_count": 1,
+            }
+        )

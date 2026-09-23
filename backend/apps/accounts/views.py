@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     RegistrationPasswordSerializer,
     UserPreferencesSerializer,
     UserSerializer,
+    TwoFactorLoginSerializer,
 )
 from apps.accounts.serializers import (
     UserProfileSerializer,
@@ -183,6 +184,50 @@ class LoginVerifyPasswordAPIView(APIView):
         except DjangoValidationError as exc:
             return Response(
                 {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
+
+
+class LoginVerifyTwoFactorAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = TwoFactorLoginSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        try:
+            result = AuthService.verify_login_two_factor(
+                two_factor_token=(
+                    serializer.validated_data[
+                        "two_factor_token"
+                    ]
+                ),
+                code=serializer.validated_data[
+                    "code"
+                ],
+                request_ip=request.META.get(
+                    "REMOTE_ADDR"
+                ),
+                user_agent=request.META.get(
+                    "HTTP_USER_AGENT",
+                    "",
+                ),
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -56,8 +56,17 @@ function readableError(caught: unknown, fallback: string): string {
 }
 
 function maskMobile(value: string): string {
-  const digits = value.replace(/\D/g, '')
-  return digits.length >= 11 ? `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}` : value
+  let digits = value.replace(/\D/g, '')
+
+  if (digits.startsWith('98') && digits.length === 12) {
+    digits = `0${digits.slice(2)}`
+  }
+
+  if (digits.length === 11 && digits.startsWith('09')) {
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`
+  }
+
+  return value
 }
 
 async function load(): Promise<void> {
@@ -137,153 +146,489 @@ onMounted(load)
           </div>
         </div>
       </AppCard>
+
       <div class="profile-layout">
         <AppCard padding="lg">
-          <AppSkeleton v-for="i in 5" :key="i" height="3.7rem" :style="{ marginBottom: '1rem' }"/>
+          <AppSkeleton
+              v-for="i in 5"
+              :key="i"
+              height="3.7rem"
+              :style="{ marginBottom: '1rem' }"
+          />
         </AppCard>
+
         <AppCard padding="lg">
-          <AppSkeleton v-for="i in 4" :key="i" height="3rem" :style="{ marginBottom: '1rem' }"/>
+          <AppSkeleton
+              v-for="i in 4"
+              :key="i"
+              height="3rem"
+              :style="{ marginBottom: '1rem' }"
+          />
         </AppCard>
       </div>
     </template>
 
-    <AppCard v-else-if="error || !profile" padding="none">
-      <EmptyState icon="warning" title="پروفایل بارگیری نشد" :description="error">
-        <AppButton variant="secondary" icon="refresh" @click="load">تلاش دوباره</AppButton>
+    <AppCard
+        v-else-if="error || !profile"
+        padding="none"
+    >
+      <EmptyState
+          icon="warning"
+          title="پروفایل بارگیری نشد"
+          :description="error"
+      >
+        <AppButton
+            variant="secondary"
+            icon="refresh"
+            @click="load"
+        >
+          تلاش دوباره
+        </AppButton>
       </EmptyState>
     </AppCard>
 
     <template v-else>
-      <div v-if="feedback" class="feedback" role="status">
-        <AppIcon name="check" :size="18"/>
+      <div
+          v-if="feedback"
+          class="feedback"
+          role="status"
+      >
+        <AppIcon
+            name="check"
+            :size="18"
+        />
+
         <span>{{ feedback }}</span>
-        <button type="button" aria-label="بستن" @click="feedback = ''">
-          <AppIcon name="close" :size="16"/>
+
+        <button
+            type="button"
+            aria-label="بستن"
+            @click="feedback = ''"
+        >
+          <AppIcon
+              name="close"
+              :size="16"
+          />
         </button>
       </div>
 
-      <AppCard class="profile-hero" padding="lg">
+      <AppCard
+          class="profile-hero"
+          padding="lg"
+      >
         <div class="avatar-wrap">
-          <img v-if="profile.avatarUrl" :src="profile.avatarUrl" :alt="profile.fullName"/>
+          <img
+              v-if="profile.avatarUrl"
+              :src="profile.avatarUrl"
+              :alt="profile.fullName"
+          />
+
           <span v-else>{{ initials }}</span>
+
           <i v-if="profile.kycStatus === 'verified'">
-            <AppIcon name="check" :size="14"/>
+            <AppIcon
+                name="check"
+                :size="14"
+            />
           </i>
         </div>
+
         <div class="hero-copy">
-          <div><h2>{{ profile.fullName }}</h2>
-            <StatusBadge domain="kyc" :status="profile.kycStatus"/>
+          <div>
+            <h2>{{ profile.fullName }}</h2>
+
+            <StatusBadge
+                domain="kyc"
+                :status="profile.kycStatus"
+            />
           </div>
-          <p><span class="ltr">{{ toPersianDigits(maskMobile(profile.mobile)) }}</span><i/>عضو روشا از
-            {{ formatPersianDate(profile.joinedAt, {month: 'long'}) }}</p>
+
+          <p>
+            <span class="ltr">
+              {{ toPersianDigits(maskMobile(profile.mobile)) }}
+            </span>
+
+            <i/>
+
+            عضو روشا از
+            {{ formatPersianDate(profile.joinedAt, {month: 'long'}) }}
+          </p>
         </div>
-        <div class="level-card-mini"><span><AppIcon name="star" :size="19"/></span>
-          <div><small>سطح حساب</small><strong>{{ levelLabel }}</strong></div>
-          <RouterLink to="/app/verification" aria-label="مشاهده احراز هویت">
-            <AppIcon name="chevronLeft" :size="18"/>
+
+        <div class="level-card-mini">
+          <span>
+            <AppIcon
+                name="star"
+                :size="19"
+            />
+          </span>
+
+          <div>
+            <small>سطح حساب</small>
+            <strong>{{ levelLabel }}</strong>
+          </div>
+
+          <RouterLink
+              to="/app/verification"
+              aria-label="مشاهده احراز هویت"
+          >
+            <AppIcon
+                name="chevronLeft"
+                :size="18"
+            />
           </RouterLink>
         </div>
       </AppCard>
 
       <div class="profile-layout">
-        <AppCard padding="lg" class="identity-section">
-          <div class="section-heading">
-            <div><span><AppIcon name="profile" :size="21"/></span>
-              <div><h2>اطلاعات هویتی</h2>
-                <p>اطلاعات تطبیق‌داده‌شده با ثبت احوال</p></div>
+        <div class="profile-main-column">
+          <AppCard
+              padding="lg"
+              class="identity-section"
+          >
+            <div class="section-heading">
+              <div>
+                <span>
+                  <AppIcon
+                      name="profile"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <h2>اطلاعات هویتی</h2>
+
+                  <p>
+                    اطلاعات تطبیق‌داده‌شده با ثبت احوال
+                  </p>
+                </div>
+              </div>
+
+              <span class="locked-label">
+                <AppIcon
+                    name="lock"
+                    :size="14"
+                />
+                فقط خواندنی
+              </span>
             </div>
-            <span class="locked-label"><AppIcon name="lock" :size="14"/>فقط خواندنی</span></div>
-          <div class="legal-note">
-            <AppIcon name="shield" :size="18"/>
-            <span>برای حفظ امنیت و انطباق قانونی، اطلاعات هویتی تأییدشده از این صفحه قابل ویرایش نیست.</span></div>
-          <div class="identity-grid">
-            <AppInput :model-value="profile.firstName" label="نام" readonly/>
-            <AppInput :model-value="profile.lastName" label="نام خانوادگی" readonly/>
-            <AppInput :model-value="toPersianDigits(profile.nationalId)" label="کد ملی" readonly ltr/>
-            <AppInput :model-value="toPersianDigits(profile.birthDate)" label="تاریخ تولد" readonly ltr/>
-            <AppInput :model-value="toPersianDigits(maskMobile(profile.mobile))" label="شماره موبایل" readonly ltr>
-              <template #action><span class="field-check"><AppIcon name="check" :size="15"/>تأییدشده</span></template>
-            </AppInput>
-            <AppInput
-                class="email-field"
-                :model-value="profile.email || 'ثبت نشده'"
-                label="ایمیل"
-                readonly
-                ltr
-            >
-              <template #action>
-                <button
-                    type="button"
-                    class="field-edit"
-                    aria-label="ویرایش ایمیل"
-                    @click.prevent="openEmail"
-                >
-                  <AppIcon name="edit" :size="17"/>
-                </button>
-              </template>
-            </AppInput>
-          </div>
-          <div class="identity-help"><span>نیاز به اصلاح اطلاعات قانونی دارید؟</span>
-            <AppButton to="/app/support?new=1" variant="ghost" size="sm" icon="help">تماس با پشتیبانی</AppButton>
-          </div>
-        </AppCard>
+
+            <div class="legal-note">
+              <AppIcon
+                  name="shield"
+                  :size="18"
+              />
+
+              <span>
+                برای حفظ امنیت و انطباق قانونی، اطلاعات هویتی تأییدشده از این صفحه قابل ویرایش نیست.
+              </span>
+            </div>
+
+            <div class="identity-grid">
+              <AppInput
+                  :model-value="profile.firstName"
+                  label="نام"
+                  readonly
+              />
+
+              <AppInput
+                  :model-value="profile.lastName"
+                  label="نام خانوادگی"
+                  readonly
+              />
+
+              <AppInput
+                  :model-value="toPersianDigits(profile.nationalId)"
+                  label="کد ملی"
+                  readonly
+                  ltr
+              />
+
+              <AppInput
+                  :model-value="toPersianDigits(profile.birthDate)"
+                  label="تاریخ تولد"
+                  readonly
+                  ltr
+              />
+
+              <AppInput
+                  :model-value="toPersianDigits(maskMobile(profile.mobile))"
+                  label="شماره موبایل"
+                  readonly
+                  ltr
+              >
+                <template #action>
+                  <span class="field-check">
+                    <AppIcon
+                        name="check"
+                        :size="15"
+                    />
+                    تأییدشده
+                  </span>
+                </template>
+              </AppInput>
+
+              <AppInput
+                  class="email-field"
+                  :model-value="profile.email || 'ثبت نشده'"
+                  label="ایمیل"
+                  readonly
+                  ltr
+              >
+                <template #action>
+                  <button
+                      type="button"
+                      class="field-edit"
+                      aria-label="ویرایش ایمیل"
+                      @click.prevent="openEmail"
+                  >
+                    <AppIcon
+                        name="edit"
+                        :size="17"
+                    />
+                  </button>
+                </template>
+              </AppInput>
+            </div>
+
+            <div class="identity-help">
+              <span>نیاز به اصلاح اطلاعات قانونی دارید؟</span>
+
+              <AppButton
+                  to="/app/support?new=1"
+                  variant="ghost"
+                  size="sm"
+                  icon="help"
+              >
+                تماس با پشتیبانی
+              </AppButton>
+            </div>
+          </AppCard>
+
+          <AppCard
+              padding="lg"
+              class="login-card"
+          >
+            <span>
+              <AppIcon
+                  name="clock"
+                  :size="20"
+              />
+            </span>
+
+            <div>
+              <small>آخرین ورود به حساب</small>
+
+              <strong>
+                {{ formatPersianDateTime(profile.lastLoginAt) }}
+              </strong>
+            </div>
+          </AppCard>
+        </div>
 
         <aside class="profile-aside">
-          <AppCard padding="lg" class="completion-card">
+          <AppCard
+              padding="lg"
+              class="completion-card"
+          >
             <div class="completion-head">
-              <div><h2>آمادگی حساب</h2>
-                <p>موارد پیشنهادی برای حساب کامل‌تر</p></div>
-              <strong>{{ toPersianDigits(completionPercent) }}٪</strong></div>
-            <div class="completion-track" role="progressbar" aria-label="درصد آمادگی حساب" aria-valuemin="0"
-                 aria-valuemax="100" :aria-valuenow="completionPercent"><i :style="{ width: `${completionPercent}%` }"/>
+              <div>
+                <h2>آمادگی حساب</h2>
+
+                <p>
+                  موارد پیشنهادی برای حساب کامل‌تر
+                </p>
+              </div>
+
+              <strong>
+                {{ toPersianDigits(completionPercent) }}٪
+              </strong>
             </div>
+
+            <div
+                class="completion-track"
+                role="progressbar"
+                aria-label="درصد آمادگی حساب"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="completionPercent"
+            >
+              <i
+                  :style="{
+                  width: `${completionPercent}%`,
+                }"
+              />
+            </div>
+
             <ul>
-              <li v-for="item in completionItems" :key="item.label" :class="{ complete: item.complete }"><span><AppIcon
-                  :name="item.icon" :size="18"/>{{ item.label }}</span>
-                <AppIcon :name="item.complete ? 'check' : 'clock'" :size="17"/>
+              <li
+                  v-for="item in completionItems"
+                  :key="item.label"
+                  :class="{
+                  complete: item.complete,
+                }"
+              >
+                <span>
+                  <AppIcon
+                      :name="item.icon"
+                      :size="18"
+                  />
+
+                  {{ item.label }}
+                </span>
+
+                <AppIcon
+                    :name="
+                    item.complete
+                      ? 'check'
+                      : 'clock'
+                  "
+                    :size="17"
+                />
               </li>
             </ul>
-            <AppButton v-if="completionPercent < 100" to="/app/security" block variant="secondary">تکمیل امنیت حساب
+
+            <AppButton
+                v-if="completionPercent < 100"
+                to="/app/security"
+                block
+                variant="secondary"
+            >
+              تکمیل امنیت حساب
             </AppButton>
           </AppCard>
 
-          <AppCard padding="none" class="account-links">
-            <RouterLink to="/app/verification"><span class="link-icon"><AppIcon name="verify" :size="21"/></span>
-              <div><strong>احراز هویت</strong><small>{{ levelLabel }}</small></div>
-              <StatusBadge domain="kyc" :status="profile.kycStatus"/>
-              <AppIcon name="chevronLeft" :size="18"/>
-            </RouterLink>
-            <RouterLink to="/app/bank-accounts"><span class="link-icon"><AppIcon name="bank" :size="21"/></span>
-              <div><strong>حساب‌های
-                بانکی</strong><small>{{ profile.bankVerified ? 'حساب تأییدشده دارید' : 'نیاز به تکمیل' }}</small></div>
-              <StatusBadge domain="bank" :status="profile.bankVerified ? 'verified' : 'pending'"/>
-              <AppIcon name="chevronLeft" :size="18"/>
-            </RouterLink>
-            <RouterLink to="/app/security"><span class="link-icon"><AppIcon name="shield" :size="21"/></span>
-              <div><strong>امنیت</strong><small>امتیاز {{ toPersianDigits(security?.score ?? 0) }} از ۱۰۰</small></div>
-              <StatusBadge domain="security" :status="(security?.score ?? 0) >= 80 ? 'secure' : 'attention'"/>
-              <AppIcon name="chevronLeft" :size="18"/>
-            </RouterLink>
-          </AppCard>
+          <AppCard
+              padding="none"
+              class="account-links"
+          >
+            <RouterLink to="/app/verification">
+              <span class="link-icon">
+                <AppIcon
+                    name="verify"
+                    :size="21"
+                />
+              </span>
 
-          <AppCard padding="lg" class="login-card"><span><AppIcon name="clock" :size="20"/></span>
-            <div><small>آخرین ورود به حساب</small><strong>{{ formatPersianDateTime(profile.lastLoginAt) }}</strong>
-            </div>
+              <div>
+                <strong>احراز هویت</strong>
+                <small>{{ levelLabel }}</small>
+              </div>
+
+              <StatusBadge
+                  domain="kyc"
+                  :status="profile.kycStatus"
+              />
+
+              <AppIcon
+                  name="chevronLeft"
+                  :size="18"
+              />
+            </RouterLink>
+
+            <RouterLink to="/app/bank-accounts">
+              <span class="link-icon">
+                <AppIcon
+                    name="bank"
+                    :size="21"
+                />
+              </span>
+
+              <div>
+                <strong>حساب‌های بانکی</strong>
+
+                <small>
+                  {{
+                    profile.bankVerified
+                        ? 'حساب تأییدشده دارید'
+                        : 'نیاز به تکمیل'
+                  }}
+                </small>
+              </div>
+
+              <StatusBadge
+                  domain="bank"
+                  :status="
+                  profile.bankVerified
+                    ? 'verified'
+                    : 'pending'
+                "
+              />
+
+              <AppIcon
+                  name="chevronLeft"
+                  :size="18"
+              />
+            </RouterLink>
+
+            <RouterLink to="/app/security">
+              <span class="link-icon">
+                <AppIcon
+                    name="shield"
+                    :size="21"
+                />
+              </span>
+
+              <div>
+                <strong>امنیت</strong>
+
+                <small>
+                  امتیاز
+                  {{ toPersianDigits(security?.score ?? 0) }}
+                  از ۱۰۰
+                </small>
+              </div>
+
+              <StatusBadge
+                  domain="security"
+                  :status="
+                  (security?.score ?? 0) >= 80
+                    ? 'secure'
+                    : 'attention'
+                "
+              />
+
+              <AppIcon
+                  name="chevronLeft"
+                  :size="18"
+              />
+            </RouterLink>
           </AppCard>
         </aside>
       </div>
     </template>
 
-    <AppModal v-model="emailOpen" title="ویرایش نشانی ایمیل"
-              description="اطلاعیه‌های امنیتی و بازیابی حساب به این نشانی ارسال می‌شوند." size="sm">
-      <form class="email-form" @submit.prevent="saveEmail">
-        <AppInput v-model="email" label="نشانی ایمیل" type="email" inputmode="email" autocomplete="email" ltr
-                  :error="emailError" placeholder="name@example.com"/>
+    <AppModal
+        v-model="emailOpen"
+        title="ویرایش نشانی ایمیل"
+        description="اطلاعیه‌های امنیتی و بازیابی حساب به این نشانی ارسال می‌شوند."
+        size="sm"
+    >
+      <form
+          class="email-form"
+          @submit.prevent="saveEmail"
+      >
+        <AppInput
+            v-model="email"
+            label="نشانی ایمیل"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            ltr
+            :error="emailError"
+            placeholder="name@example.com"
+        />
+
         <div class="email-note">
-          <AppIcon name="info" :size="17"/>
+          <AppIcon
+              name="info"
+              :size="17"
+          />
+
           پس از تغییر ایمیل، ممکن است برای تأیید آن یک پیام دریافت کنید.
         </div>
       </form>
+
       <template #footer>
         <div class="email-actions">
           <AppButton
@@ -318,6 +663,11 @@ onMounted(load)
   .hero-copy h2 {
     font-size: var(--font-size-xl);
   }
+}
+
+.profile-main-column {
+  display: grid;
+  gap: var(--space-5);
 }
 
 .profile-page {
