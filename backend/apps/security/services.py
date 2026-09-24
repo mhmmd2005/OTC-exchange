@@ -202,13 +202,13 @@ class TwoFactorService:
                 )
 
         account_name = (
-            getattr(user, "email", None)
-            or getattr(
-                user,
-                "phone_number",
-                None,
-            )
-            or str(user.pk)
+                getattr(user, "email", None)
+                or getattr(
+            user,
+            "phone_number",
+            None,
+        )
+                or str(user.pk)
         )
 
         totp = pyotp.TOTP(secret)
@@ -231,10 +231,10 @@ class TwoFactorService:
         )
 
         expires_at = (
-            timezone.now()
-            + timedelta(
-                seconds=cls.SETUP_TTL_SECONDS
-            )
+                timezone.now()
+                + timedelta(
+            seconds=cls.SETUP_TTL_SECONDS
+        )
         )
 
         return {
@@ -252,6 +252,7 @@ class TwoFactorService:
             user,
             code: str,
             setup_token: str,
+            request_ip=None,
     ) -> bool:
         if cls.is_enabled(user):
             raise ValidationError(
@@ -338,6 +339,7 @@ class TwoFactorService:
             description=(
                 "ورود دومرحله‌ای با Authenticator فعال شد."
             ),
+            ip_address=request_ip,
         )
 
         return True
@@ -347,6 +349,7 @@ class TwoFactorService:
             cls,
             user,
             code: str,
+            request_ip=None,
     ) -> None:
         credential = (
             TwoFactorCredential.objects
@@ -405,6 +408,7 @@ class TwoFactorService:
             description=(
                 "ورود دومرحله‌ای غیرفعال شد."
             ),
+            ip_address=request_ip,
         )
 
     @classmethod

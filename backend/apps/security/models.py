@@ -13,24 +13,57 @@ class SecurityEvent(models.Model):
         ("registration_success", "Registration success"),
         ("logout", "Logout"),
         ("password_change", "Password change"),
+        ("password_reset_success", "Password reset success"),
         ("kyc_update", "KYC update"),
         ("security_alert", "Security alert"),
         ("two_factor_enabled", "Two-factor enabled"),
         ("two_factor_disabled", "Two-factor disabled"),
+        ("anti_phishing_created", "Anti-phishing created"),
+        ("anti_phishing_updated", "Anti-phishing updated"),
+        ("anti_phishing_deleted", "Anti-phishing deleted"),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, related_name="security_events", null=True, blank=True)
-    event_type = models.CharField(max_length=32, choices=EVENT_CHOICES, default="login_success")
-    description = models.TextField(blank=True, default="")
-    ip_address = models.GenericIPAddressField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="security_events",
+        null=True,
+        blank=True,
+    )
+
+    event_type = models.CharField(
+        max_length=32,
+        choices=EVENT_CHOICES,
+        default="login_success",
+    )
+
+    description = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    ip_address = models.GenericIPAddressField(
+        blank=True,
+        null=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["user", "event_type"])]
+        indexes = [
+            models.Index(
+                fields=["user", "event_type"]
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.user or 'system'} - {self.event_type}"
+        return (
+            f"{self.user or 'system'} - "
+            f"{self.event_type}"
+        )
 
 
 class LoginHistory(models.Model):
@@ -46,8 +79,6 @@ class LoginHistory(models.Model):
 
     def __str__(self):
         return f"{self.user or 'unknown'} login @ {self.created_at.isoformat()}"
-
-
 
 
 class TwoFactorCredential(models.Model):

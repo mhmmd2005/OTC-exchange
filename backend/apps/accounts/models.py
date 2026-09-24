@@ -51,6 +51,7 @@ class User(AbstractUser):
         blank=True,
     )
 
+
     pending_email = models.EmailField(
         blank=True,
         null=True,
@@ -58,7 +59,7 @@ class User(AbstractUser):
     kyc_level = models.CharField(max_length=20, default="basic")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    anti_phishing_code = models.CharField(max_length=20, blank=True, default="")
     USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = ["full_name"]
 

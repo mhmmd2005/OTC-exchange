@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, defineAsyncComponent, onMounted, reactive, ref, watch} from 'vue'
+import {computed, defineAsyncComponent, onMounted, reactive, ref, watch,} from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -13,30 +13,34 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import QrCode from '@/components/wallet/QrCode.vue'
 import {ApiError, securityService} from '@/services'
-import type {
-  ActiveSession,
-  SecurityEvent,
-  SecurityEventType,
-  SecurityOverview,
-  TwoFactorSetup,
-} from '@/types'
-import {
-  formatPersianDateTime,
-  formatRelativeTime,
-  normalizeDigits,
-  toPersianDigits,
-} from '@/utils/formatters'
+import type {ActiveSession, SecurityEvent, SecurityEventType, SecurityOverview, TwoFactorSetup,} from '@/types'
+import {formatPersianDateTime, formatRelativeTime, normalizeDigits, toPersianDigits,} from '@/utils/formatters'
 
 const DemoCodeHint =
-    import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_API === 'true'
-        ? defineAsyncComponent(() => import('@/components/ui/DemoCodeHint.vue'))
+    import.meta.env.DEV &&
+    import.meta.env.VITE_USE_MOCK_API === 'true'
+        ? defineAsyncComponent(
+            () => import('@/components/ui/DemoCodeHint.vue'),
+        )
         : null
 
 type ConfirmationAction =
-    | { kind: 'session'; session: ActiveSession }
-    | { kind: 'other-sessions' }
-    | { kind: 'disable-2fa' }
-    | { kind: 'whitelist'; enabled: boolean }
+    | {
+  kind: 'session'
+  session: ActiveSession
+}
+    | {
+  kind: 'other-sessions'
+}
+    | {
+  kind: 'disable-2fa'
+}
+    | {
+  kind: 'whitelist'
+  enabled: boolean
+}
+
+type PhishingMode = 'create' | 'existing'
 
 const overview = ref<SecurityOverview | null>(null)
 const sessions = ref<ActiveSession[]>([])
@@ -61,7 +65,8 @@ const twoFactorOpen = ref(false)
 const twoFactorCode = ref('')
 const twoFactorError = ref('')
 const twoFactorLoading = ref(false)
-const twoFactorSetup = ref<TwoFactorSetup | null>(null)
+const twoFactorSetup =
+    ref<TwoFactorSetup | null>(null)
 
 const disableTwoFactorCode = ref('')
 const disableTwoFactorError = ref('')
@@ -78,14 +83,23 @@ const phishingOpen = ref(false)
 const phishingCode = ref('')
 const phishingError = ref('')
 const phishingLoading = ref(false)
+const phishingMode =
+    ref<PhishingMode>('create')
 
 const otherSessionCount = computed(() =>
-    sessions.value.filter((session) => !session.current).length,
+    sessions.value.filter(
+        (session) => !session.current,
+    ).length,
 )
 
 const scoreTone = computed(() => {
   const score = overview.value?.score ?? 0
-  return score >= 85 ? 'strong' : score >= 65 ? 'medium' : 'weak'
+
+  return score >= 85
+      ? 'strong'
+      : score >= 65
+          ? 'medium'
+          : 'weak'
 })
 
 const scoreLabel = computed(() =>
@@ -110,7 +124,8 @@ const confirmationCopy = computed(() => {
   if (action.kind === 'session') {
     return {
       title: 'خروج این دستگاه؟',
-      description: `دسترسی ${action.session.deviceName} قطع می‌شود و برای ورود دوباره به رمز و کد تأیید نیاز دارد.`,
+      description:
+          `دسترسی ${action.session.deviceName} قطع می‌شود و برای ورود دوباره به رمز و کد تأیید نیاز دارد.`,
       confirm: 'بله، خارج شود',
     }
   }
@@ -118,7 +133,8 @@ const confirmationCopy = computed(() => {
   if (action.kind === 'other-sessions') {
     return {
       title: 'خروج از سایر دستگاه‌ها؟',
-      description: `${toPersianDigits(otherSessionCount.value)} نشست دیگر پایان می‌یابد و فقط همین دستگاه متصل می‌ماند.`,
+      description:
+          `${toPersianDigits(otherSessionCount.value)} نشست دیگر پایان می‌یابد و فقط همین دستگاه متصل می‌ماند.`,
       confirm: 'خروج از همه',
     }
   }
@@ -126,7 +142,8 @@ const confirmationCopy = computed(() => {
   if (action.kind === 'disable-2fa') {
     return {
       title: 'غیرفعال‌کردن ورود دومرحله‌ای؟',
-      description: 'با غیرفعال‌کردن این لایه، امنیت ورود حساب کمتر می‌شود.',
+      description:
+          'با غیرفعال‌کردن این لایه، امنیت ورود حساب کمتر می‌شود.',
       confirm: 'غیرفعال شود',
     }
   }
@@ -138,15 +155,24 @@ const confirmationCopy = computed(() => {
     description: action.enabled
         ? 'پس از فعال‌سازی، برداشت فقط به آدرس‌های تأییدشده انجام می‌شود.'
         : 'پس از غیرفعال‌سازی، امکان برداشت به آدرس‌های تازه نیز وجود خواهد داشت.',
-    confirm: action.enabled ? 'فعال شود' : 'غیرفعال شود',
+    confirm: action.enabled
+        ? 'فعال شود'
+        : 'غیرفعال شود',
   }
 })
 
-function readableError(caught: unknown, fallback: string): string {
-  return caught instanceof Error ? caught.message : fallback
+function readableError(
+    caught: unknown,
+    fallback: string,
+): string {
+  return caught instanceof Error
+      ? caught.message
+      : fallback
 }
 
-function deviceIcon(type: ActiveSession['deviceType']): string {
+function deviceIcon(
+    type: ActiveSession['deviceType'],
+): string {
   return type === 'mobile'
       ? 'phone'
       : type === 'tablet'
@@ -154,23 +180,65 @@ function deviceIcon(type: ActiveSession['deviceType']): string {
           : 'markets'
 }
 
-function eventIcon(type: SecurityEventType): string {
-  const icons: Record<SecurityEventType, string> = {
+function eventIcon(
+    type: SecurityEventType,
+): string {
+  const icons: Record<
+      SecurityEventType,
+      string
+  > = {
+    otp_requested: 'shield',
+    otp_verified: 'shield',
+    otp_failed: 'warning',
     login_success: 'shield',
-    login_failed: 'warning',
-    password_changed: 'lock',
+    login_failure: 'warning',
+    registration_success: 'check',
+    logout: 'logout',
+    password_change: 'lock',
+    password_reset_success: 'lock',
+    kyc_update: 'verify',
+    security_alert: 'warning',
     two_factor_enabled: 'shield',
+    two_factor_disabled: 'shield',
+    anti_phishing_created: 'mail',
+    anti_phishing_updated: 'mail',
+    anti_phishing_deleted: 'mail',
     session_revoked: 'logout',
     withdrawal_confirmed: 'wallet',
   }
 
-  return icons[type]
+  return icons[type] ?? 'clock'
 }
 
-function eventTone(type: SecurityEventType): string {
-  if (type === 'login_failed') return 'danger'
-  if (type === 'withdrawal_confirmed') return 'warning'
-  if (type === 'two_factor_enabled' || type === 'password_changed') return 'success'
+function eventTone(
+    type: SecurityEventType,
+): string {
+  if (
+      type === 'login_failure' ||
+      type === 'otp_failed'
+  ) {
+    return 'danger'
+  }
+
+  if (
+      type === 'two_factor_disabled' ||
+      type === 'anti_phishing_deleted' ||
+      type === 'logout'
+  ) {
+    return 'warning'
+  }
+
+  if (
+      type === 'two_factor_enabled' ||
+      type === 'password_change' ||
+      type === 'password_reset_success' ||
+      type === 'anti_phishing_created' ||
+      type === 'anti_phishing_updated' ||
+      type === 'registration_success'
+  ) {
+    return 'success'
+  }
+
   return 'info'
 }
 
@@ -179,7 +247,11 @@ async function load(): Promise<void> {
   error.value = ''
 
   try {
-    const [securityOverview, activeSessions, securityEvents] = await Promise.all([
+    const [
+      securityOverview,
+      activeSessions,
+      securityEvents,
+    ] = await Promise.all([
       securityService.getOverview(),
       securityService.listSessions(),
       securityService.listEvents(),
@@ -204,7 +276,9 @@ function resetPasswordForm(): void {
   passwordForm.newPasswordConfirmation = ''
   passwordError.value = ''
 
-  Object.keys(passwordFields).forEach((key) => delete passwordFields[key])
+  Object.keys(passwordFields).forEach(
+      (key) => delete passwordFields[key],
+  )
 }
 
 function openPassword(): void {
@@ -213,14 +287,18 @@ function openPassword(): void {
 }
 
 function validatePassword(): boolean {
-  Object.keys(passwordFields).forEach((key) => delete passwordFields[key])
+  Object.keys(passwordFields).forEach(
+      (key) => delete passwordFields[key],
+  )
 
   if (passwordForm.currentPassword.length < 8) {
-    passwordFields.currentPassword = 'رمز عبور فعلی را کامل وارد کنید.'
+    passwordFields.currentPassword =
+        'رمز عبور فعلی را کامل وارد کنید.'
   }
 
   if (passwordForm.newPassword.length < 8) {
-    passwordFields.newPassword = 'رمز جدید باید حداقل ۸ کاراکتر باشد.'
+    passwordFields.newPassword =
+        'رمز جدید باید حداقل ۸ کاراکتر باشد.'
   }
 
   if (
@@ -231,12 +309,17 @@ function validatePassword(): boolean {
         'تکرار رمز با رمز جدید یکسان نیست.'
   }
 
-  if (passwordForm.currentPassword === passwordForm.newPassword) {
+  if (
+      passwordForm.currentPassword ===
+      passwordForm.newPassword
+  ) {
     passwordFields.newPassword =
         'رمز جدید باید با رمز فعلی متفاوت باشد.'
   }
 
-  return Object.keys(passwordFields).length === 0
+  return (
+      Object.keys(passwordFields).length === 0
+  )
 }
 
 async function changePassword(): Promise<void> {
@@ -246,16 +329,27 @@ async function changePassword(): Promise<void> {
   passwordError.value = ''
 
   try {
-    await securityService.changePassword(passwordForm)
+    await securityService.changePassword(
+        passwordForm,
+    )
 
     passwordOpen.value = false
     resetPasswordForm()
 
-    feedback.value = 'رمز عبور با موفقیت تغییر کرد.'
-    events.value = await securityService.listEvents()
+    feedback.value =
+        'رمز عبور با موفقیت تغییر کرد.'
+
+    events.value =
+        await securityService.listEvents()
   } catch (caught) {
-    if (caught instanceof ApiError && caught.details?.fields) {
-      Object.assign(passwordFields, caught.details.fields)
+    if (
+        caught instanceof ApiError &&
+        caught.details?.fields
+    ) {
+      Object.assign(
+          passwordFields,
+          caught.details.fields,
+      )
     }
 
     passwordError.value = readableError(
@@ -298,7 +392,9 @@ async function requestTwoFactorChange(): Promise<void> {
   }
 }
 
-function updateTwoFactorCode(value: string): void {
+function updateTwoFactorCode(
+    value: string,
+): void {
   twoFactorCode.value =
       normalizeDigits(value)
           .replace(/\D/g, '')
@@ -307,7 +403,9 @@ function updateTwoFactorCode(value: string): void {
   twoFactorError.value = ''
 }
 
-function updateDisableTwoFactorCode(value: string): void {
+function updateDisableTwoFactorCode(
+    value: string,
+): void {
   disableTwoFactorCode.value =
       normalizeDigits(value)
           .replace(/\D/g, '')
@@ -317,8 +415,9 @@ function updateDisableTwoFactorCode(value: string): void {
 }
 
 async function enableTwoFactor(): Promise<void> {
-  const code = normalizeDigits(twoFactorCode.value)
-      .replace(/\D/g, '')
+  const code = normalizeDigits(
+      twoFactorCode.value,
+  ).replace(/\D/g, '')
 
   if (!twoFactorSetup.value) {
     twoFactorError.value =
@@ -335,20 +434,23 @@ async function enableTwoFactor(): Promise<void> {
   twoFactorLoading.value = true
 
   try {
-    overview.value = await securityService.setTwoFactor(
-        true,
-        code,
-        twoFactorSetup.value.setupToken,
-    )
+    overview.value =
+        await securityService.setTwoFactor(
+            true,
+            code,
+            twoFactorSetup.value.setupToken,
+        )
 
-    events.value = await securityService.listEvents()
+    events.value =
+        await securityService.listEvents()
 
     twoFactorOpen.value = false
     twoFactorSetup.value = null
     twoFactorCode.value = ''
     twoFactorError.value = ''
 
-    feedback.value = 'ورود دومرحله‌ای فعال شد.'
+    feedback.value =
+        'ورود دومرحله‌ای فعال شد.'
   } catch (caught) {
     twoFactorError.value = readableError(
         caught,
@@ -359,23 +461,67 @@ async function enableTwoFactor(): Promise<void> {
   }
 }
 
-function openPhishing(): void {
-  phishingCode.value =
-      overview.value?.antiPhishingCode ?? ''
-
+async function openPhishing(): Promise<void> {
   phishingError.value = ''
-  phishingOpen.value = true
+  phishingLoading.value = true
+
+  try {
+    const latestOverview =
+        await securityService.getOverview()
+
+    overview.value = latestOverview
+
+    const existingCode =
+        String(
+            latestOverview.antiPhishingCode ?? '',
+        ).trim()
+
+    phishingCode.value = existingCode
+
+    phishingMode.value =
+        existingCode.length > 0
+            ? 'existing'
+            : 'create'
+
+    phishingOpen.value = true
+  } catch (caught) {
+    error.value = readableError(
+        caught,
+        'اطلاعات کد ضد فیشینگ دریافت نشد.',
+    )
+  } finally {
+    phishingLoading.value = false
+  }
 }
 
-function updatePhishingCode(value: string): void {
-  phishingCode.value = value.slice(0, 20)
+function updatePhishingCode(
+    value: string,
+): void {
+  if (phishingMode.value === 'existing') {
+    return
+  }
+
+  phishingCode.value =
+      value.slice(0, 20)
+
   phishingError.value = ''
 }
 
 async function savePhishing(): Promise<void> {
-  const code = phishingCode.value.trim()
+  if (phishingMode.value !== 'create') {
+    return
+  }
 
-  if (code && (code.length < 4 || code.length > 20)) {
+  const code =
+      phishingCode.value.trim()
+
+  if (
+      code &&
+      (
+          code.length < 4 ||
+          code.length > 20
+      )
+  ) {
     phishingError.value =
         'عبارت باید بین ۴ تا ۲۰ کاراکتر باشد.'
     return
@@ -385,10 +531,23 @@ async function savePhishing(): Promise<void> {
   phishingError.value = ''
 
   try {
-    overview.value =
+    const updatedOverview =
         await securityService.setAntiPhishingCode(
             code || null,
         )
+
+    overview.value = updatedOverview
+
+    events.value =
+        await securityService.listEvents()
+
+    if (code) {
+      phishingMode.value = 'existing'
+      phishingCode.value = code
+    } else {
+      phishingMode.value = 'create'
+      phishingCode.value = ''
+    }
 
     phishingOpen.value = false
 
@@ -406,8 +565,33 @@ async function savePhishing(): Promise<void> {
 }
 
 async function removePhishing(): Promise<void> {
-  phishingCode.value = ''
-  await savePhishing()
+  phishingLoading.value = true
+  phishingError.value = ''
+
+  try {
+    const updatedOverview =
+        await securityService.setAntiPhishingCode(
+            null,
+        )
+
+    overview.value = updatedOverview
+
+    events.value =
+        await securityService.listEvents()
+
+    phishingCode.value = ''
+    phishingMode.value = 'create'
+
+    feedback.value =
+        'کد ضد فیشینگ حذف شد.'
+  } catch (caught) {
+    phishingError.value = readableError(
+        caught,
+        'حذف کد ضد فیشینگ انجام نشد.',
+    )
+  } finally {
+    phishingLoading.value = false
+  }
 }
 
 function closeConfirmation(): void {
@@ -446,22 +630,29 @@ async function runConfirmation(): Promise<void> {
           action.session.id,
       )
 
-      sessions.value = sessions.value.filter(
-          (session) => session.id !== action.session.id,
-      )
+      sessions.value =
+          sessions.value.filter(
+              (session) =>
+                  session.id !== action.session.id,
+          )
 
       feedback.value =
           `دسترسی ${action.session.deviceName} قطع شد.`
-    } else if (action.kind === 'other-sessions') {
+    } else if (
+        action.kind === 'other-sessions'
+    ) {
       await securityService.revokeOtherSessions()
 
-      sessions.value = sessions.value.filter(
-          (session) => session.current,
-      )
+      sessions.value =
+          sessions.value.filter(
+              (session) => session.current,
+          )
 
       feedback.value =
           'همه نشست‌های دیگر پایان یافتند.'
-    } else if (action.kind === 'disable-2fa') {
+    } else if (
+        action.kind === 'disable-2fa'
+    ) {
       overview.value =
           await securityService.setTwoFactor(
               false,
@@ -500,7 +691,9 @@ async function runConfirmation(): Promise<void> {
 
     confirmation.value = null
   } catch (caught) {
-    if (action.kind === 'disable-2fa') {
+    if (
+        action.kind === 'disable-2fa'
+    ) {
       disableTwoFactorError.value =
           readableError(
               caught,
@@ -519,10 +712,13 @@ async function runConfirmation(): Promise<void> {
   }
 }
 
-function onWhitelistInput(enabled: boolean): void {
+function onWhitelistInput(
+    enabled: boolean,
+): void {
   if (
       !overview.value ||
-      enabled === overview.value.withdrawalWhitelistEnabled
+      enabled ===
+      overview.value.withdrawalWhitelistEnabled
   ) {
     return
   }
@@ -560,7 +756,10 @@ onMounted(load)
         class="notice success"
         role="status"
     >
-      <AppIcon name="check" :size="19"/>
+      <AppIcon
+          name="check"
+          :size="19"
+      />
 
       <span>{{ feedback }}</span>
 
@@ -569,7 +768,10 @@ onMounted(load)
           aria-label="بستن"
           @click="feedback = ''"
       >
-        <AppIcon name="close" :size="16"/>
+        <AppIcon
+            name="close"
+            :size="16"
+        />
       </button>
     </div>
 
@@ -578,7 +780,10 @@ onMounted(load)
         class="notice danger"
         role="alert"
     >
-      <AppIcon name="warning" :size="19"/>
+      <AppIcon
+          name="warning"
+          :size="19"
+      />
 
       <span>{{ error }}</span>
 
@@ -637,7 +842,10 @@ onMounted(load)
       >
         <div
             class="score-ring"
-            :style="{ '--score-angle': `${overview.score * 3.6}deg` }"
+            :style="{
+            '--score-angle':
+              `${overview.score * 3.6}deg`,
+          }"
             role="progressbar"
             aria-label="امتیاز امنیت حساب"
             aria-valuemin="0"
@@ -645,7 +853,10 @@ onMounted(load)
             :aria-valuenow="overview.score"
         >
           <span>
-            <strong>{{ toPersianDigits(overview.score) }}</strong>
+            <strong>
+              {{ toPersianDigits(overview.score) }}
+            </strong>
+
             <small>از ۱۰۰</small>
           </span>
         </div>
@@ -656,14 +867,17 @@ onMounted(load)
           <h2>{{ scoreLabel }}</h2>
 
           <p>
-            با فعال‌کردن ورود دومرحله‌ای و کنترل نشست‌های ناشناس،
-            امنیت حساب را بالاتر ببرید.
+            با فعال‌کردن ورود دومرحله‌ای و کنترل
+            نشست‌های ناشناس، امنیت حساب را بالاتر ببرید.
           </p>
         </div>
 
         <div class="score-facts">
           <div>
-            <AppIcon name="phone" :size="19"/>
+            <AppIcon
+                name="phone"
+                :size="19"
+            />
 
             <span>
               <small>موبایل</small>
@@ -679,7 +893,10 @@ onMounted(load)
           </div>
 
           <div>
-            <AppIcon name="shield" :size="19"/>
+            <AppIcon
+                name="shield"
+                :size="19"
+            />
 
             <span>
               <small>ورود دومرحله‌ای</small>
@@ -695,7 +912,10 @@ onMounted(load)
           </div>
 
           <div>
-            <AppIcon name="markets" :size="19"/>
+            <AppIcon
+                name="markets"
+                :size="19"
+            />
 
             <span>
               <small>نشست فعال</small>
@@ -720,24 +940,34 @@ onMounted(load)
         >
           <div class="section-heading">
             <span>
-              <AppIcon name="lock" :size="21"/>
+              <AppIcon
+                  name="lock"
+                  :size="21"
+              />
             </span>
 
             <div>
               <h2>ورود و بازیابی</h2>
-              <p>راه‌های ورود و تأیید هویت حساب</p>
+              <p>
+                راه‌های ورود و تأیید هویت حساب
+              </p>
             </div>
           </div>
 
           <div class="setting-list">
             <div class="setting-row">
               <span class="setting-icon">
-                <AppIcon name="lock" :size="21"/>
+                <AppIcon
+                    name="lock"
+                    :size="21"
+                />
               </span>
 
               <div>
                 <strong>رمز عبور</strong>
-                <small>برای حساب شما تنظیم شده است</small>
+                <small>
+                  برای حساب شما تنظیم شده است
+                </small>
               </div>
 
               <StatusBadge
@@ -755,13 +985,20 @@ onMounted(load)
               </AppButton>
             </div>
 
-            <div class="setting-row featured">
+            <div
+                class="setting-row featured"
+            >
               <span class="setting-icon">
-                <AppIcon name="shield" :size="21"/>
+                <AppIcon
+                    name="shield"
+                    :size="21"
+                />
               </span>
 
               <div>
-                <strong>ورود دومرحله‌ای</strong>
+                <strong>
+                  ورود دومرحله‌ای
+                </strong>
 
                 <small>
                   تأیید ورود با کد برنامه Authenticator
@@ -771,18 +1008,18 @@ onMounted(load)
               <StatusBadge
                   domain="security"
                   :status="
-                    overview.twoFactorEnabled
-                        ? 'enabled'
-                        : 'disabled'
-                  "
+                  overview.twoFactorEnabled
+                    ? 'enabled'
+                    : 'disabled'
+                "
               />
 
               <AppButton
                   :variant="
-                    overview.twoFactorEnabled
-                        ? 'ghost'
-                        : 'primary'
-                  "
+                  overview.twoFactorEnabled
+                    ? 'ghost'
+                    : 'primary'
+                "
                   size="sm"
                   @click="requestTwoFactorChange"
               >
@@ -796,21 +1033,29 @@ onMounted(load)
 
             <div class="setting-row">
               <span class="setting-icon">
-                <AppIcon name="phone" :size="21"/>
+                <AppIcon
+                    name="phone"
+                    :size="21"
+                />
               </span>
 
               <div>
-                <strong>شماره موبایل</strong>
-                <small>برای کدهای امنیتی و بازیابی</small>
+                <strong>
+                  شماره موبایل
+                </strong>
+
+                <small>
+                  برای کدهای امنیتی و بازیابی
+                </small>
               </div>
 
               <StatusBadge
                   domain="security"
                   :status="
-                    overview.mobileVerified
-                        ? 'verified'
-                        : 'unverified'
-                  "
+                  overview.mobileVerified
+                    ? 'verified'
+                    : 'unverified'
+                "
               />
 
               <span class="row-note">
@@ -824,21 +1069,29 @@ onMounted(load)
 
             <div class="setting-row">
               <span class="setting-icon">
-                <AppIcon name="mail" :size="21"/>
+                <AppIcon
+                    name="mail"
+                    :size="21"
+                />
               </span>
 
               <div>
-                <strong>نشانی ایمیل</strong>
-                <small>برای هشدارهای ورود و بازیابی</small>
+                <strong>
+                  نشانی ایمیل
+                </strong>
+
+                <small>
+                  برای هشدارهای ورود و بازیابی
+                </small>
               </div>
 
               <StatusBadge
                   domain="security"
                   :status="
-                    overview.emailVerified
-                        ? 'verified'
-                        : 'unverified'
-                  "
+                  overview.emailVerified
+                    ? 'verified'
+                    : 'unverified'
+                "
               />
 
               <AppButton
@@ -866,60 +1119,66 @@ onMounted(load)
         >
           <div class="section-heading">
             <span>
-              <AppIcon name="wallet" :size="21"/>
+              <AppIcon
+                  name="wallet"
+                  :size="21"
+              />
             </span>
 
             <div>
               <h2>امنیت برداشت</h2>
-              <p>کنترل‌های تکمیلی برای خروج دارایی</p>
+
+              <p>
+                کنترل‌های تکمیلی برای خروج دارایی
+              </p>
             </div>
           </div>
 
-          <div class="feature-block">
+          <div
+              class="feature-block phishing-feature"
+          >
             <div class="feature-title">
               <span>
-                <AppIcon name="mail" :size="21"/>
+                <AppIcon
+                    name="mail"
+                    :size="21"
+                />
               </span>
 
               <div>
-                <strong>کد ضد فیشینگ</strong>
+                <strong>
+                  کد ضد فیشینگ
+                </strong>
 
                 <small>
                   نمایش عبارت اختصاصی شما در پیام‌های معتبر روشا
                 </small>
               </div>
+            </div>
 
+            <div class="phishing-status-row">
               <StatusBadge
                   domain="security"
                   :status="
-                    overview.antiPhishingEnabled
-                        ? 'enabled'
-                        : 'disabled'
-                  "
+                  overview.antiPhishingEnabled
+                    ? 'enabled'
+                    : 'disabled'
+                "
               />
             </div>
 
-            <div
-                v-if="overview.antiPhishingCode"
-                class="phishing-preview"
-            >
-              <small>عبارت فعلی</small>
-
-              <strong>
-                {{ overview.antiPhishingCode }}
-              </strong>
-            </div>
 
             <AppButton
-                block
+                class="phishing-action"
                 variant="secondary"
                 size="sm"
+                :loading="phishingLoading"
                 icon="edit"
                 @click="openPhishing"
             >
               {{
                 overview.antiPhishingEnabled
-                    ? 'ویرایش عبارت'
+                    ? 'مشاهده کد'
                     : 'تنظیم عبارت'
               }}
             </AppButton>
@@ -928,29 +1187,37 @@ onMounted(load)
           <div class="feature-block">
             <div class="feature-title">
               <span>
-                <AppIcon name="check" :size="21"/>
+                <AppIcon
+                    name="check"
+                    :size="21"
+                />
               </span>
 
               <div>
-                <strong>فهرست مجاز آدرس برداشت</strong>
+                <strong>
+                  فهرست مجاز آدرس برداشت
+                </strong>
 
                 <small>
-                  برداشت فقط به آدرس‌هایی که از قبل تأیید کرده‌اید
+                  برداشت فقط به آدرس‌هایی که از قبل
+                  تأیید کرده‌اید
                 </small>
               </div>
             </div>
 
             <AppSwitch
                 :model-value="
-                  overview.withdrawalWhitelistEnabled
-                "
+                overview.withdrawalWhitelistEnabled
+              "
                 :label="
-                  overview.withdrawalWhitelistEnabled
-                      ? 'فهرست مجاز فعال است'
-                      : 'فهرست مجاز غیرفعال است'
-                "
+                overview.withdrawalWhitelistEnabled
+                  ? 'فهرست مجاز فعال است'
+                  : 'فهرست مجاز غیرفعال است'
+              "
                 description="تغییر این گزینه نیازمند تأیید شماست."
-                @update:model-value="onWhitelistInput"
+                @update:model-value="
+                onWhitelistInput
+              "
             />
           </div>
         </AppCard>
@@ -963,15 +1230,20 @@ onMounted(load)
         <header class="list-header">
           <div>
             <span>
-              <AppIcon name="markets" :size="21"/>
+              <AppIcon
+                  name="markets"
+                  :size="21"
+              />
             </span>
 
             <div>
-              <h2>دستگاه‌های فعال</h2>
+              <h2>
+                دستگاه‌های فعال
+              </h2>
 
               <p>
-                اگر دستگاهی را نمی‌شناسید، فوراً دسترسی آن را قطع
-                و رمز عبور را تغییر دهید.
+                اگر دستگاهی را نمی‌شناسید، فوراً دسترسی
+                آن را قطع و رمز عبور را تغییر دهید.
               </p>
             </div>
           </div>
@@ -982,10 +1254,10 @@ onMounted(load)
               size="sm"
               icon="logout"
               @click="
-                confirmation = {
-                  kind: 'other-sessions',
-                }
-              "
+              confirmation = {
+                kind: 'other-sessions',
+              }
+            "
           >
             خروج از سایر دستگاه‌ها
           </AppButton>
@@ -996,18 +1268,26 @@ onMounted(load)
               v-for="session in sessions"
               :key="session.id"
               class="session-row"
-              :class="{ current: session.current }"
+              :class="{
+              current: session.current,
+            }"
           >
             <span class="device-icon">
               <AppIcon
-                  :name="deviceIcon(session.deviceType)"
+                  :name="
+                  deviceIcon(
+                    session.deviceType,
+                  )
+                "
                   :size="23"
               />
             </span>
 
             <div class="session-copy">
               <div>
-                <h3>{{ session.deviceName }}</h3>
+                <h3>
+                  {{ session.deviceName }}
+                </h3>
 
                 <StatusBadge
                     v-if="session.current"
@@ -1017,7 +1297,8 @@ onMounted(load)
               </div>
 
               <p>
-                {{ session.browser }} روی {{ session.os }}
+                {{ session.browser }} روی
+                {{ session.os }}
               </p>
 
               <span>
@@ -1025,21 +1306,27 @@ onMounted(load)
                   {{ session.ipAddress }}
                 </bdi>
 
-                <i v-if="session.approximateLocation"/>
+                <i
+                    v-if="
+                    session.approximateLocation
+                  "
+                />
 
                 {{ session.approximateLocation }}
               </span>
             </div>
 
             <div class="session-time">
-              <small>آخرین فعالیت</small>
+              <small>
+                آخرین فعالیت
+              </small>
 
               <strong
                   :title="
-                    formatPersianDateTime(
-                        session.lastActiveAt,
-                    )
-                  "
+                  formatPersianDateTime(
+                    session.lastActiveAt,
+                  )
+                "
               >
                 {{
                   session.current
@@ -1057,11 +1344,11 @@ onMounted(load)
                 size="sm"
                 icon="logout"
                 @click="
-                  confirmation = {
-                    kind: 'session',
-                    session,
-                  }
-                "
+                confirmation = {
+                  kind: 'session',
+                  session,
+                }
+              "
             >
               خروج دستگاه
             </AppButton>
@@ -1076,12 +1363,20 @@ onMounted(load)
         <header class="list-header">
           <div>
             <span>
-              <AppIcon name="clock" :size="21"/>
+              <AppIcon
+                  name="clock"
+                  :size="21"
+              />
             </span>
 
             <div>
-              <h2>تاریخچه امنیتی</h2>
-              <p>آخرین ورودها و تغییرات مهم حساب</p>
+              <h2>
+                تاریخچه امنیتی
+              </h2>
+
+              <p>
+                آخرین ورودها و تغییرات مهم حساب
+              </p>
             </div>
           </div>
         </header>
@@ -1096,16 +1391,22 @@ onMounted(load)
           >
             <span
                 class="event-icon"
-                :class="`tone-${eventTone(event.type)}`"
+                :class="
+                `tone-${eventTone(event.type)}`
+              "
             >
               <AppIcon
-                  :name="eventIcon(event.type)"
+                  :name="
+                  eventIcon(event.type)
+                "
                   :size="20"
               />
             </span>
 
             <div>
-              <h3>{{ event.title }}</h3>
+              <h3>
+                {{ event.title }}
+              </h3>
 
               <p>
                 {{ event.description }}
@@ -1113,6 +1414,7 @@ onMounted(load)
 
               <small>
                 {{ event.deviceName }} ·
+
                 <bdi dir="ltr">
                   {{ event.ipAddress }}
                 </bdi>
@@ -1122,12 +1424,16 @@ onMounted(load)
             <time
                 :datetime="event.createdAt"
                 :title="
-                  formatPersianDateTime(
-                      event.createdAt,
-                  )
-                "
+                formatPersianDateTime(
+                  event.createdAt,
+                )
+              "
             >
-              {{ formatRelativeTime(event.createdAt) }}
+              {{
+                formatRelativeTime(
+                    event.createdAt,
+                )
+              }}
             </time>
           </article>
         </div>
@@ -1146,7 +1452,9 @@ onMounted(load)
         title="تغییر رمز عبور"
         description="رمزی انتخاب کنید که در سرویس دیگری استفاده نمی‌کنید."
         size="sm"
-        :dismissible="!changingPassword"
+        :dismissible="
+        !changingPassword
+      "
     >
       <form
           class="modal-form"
@@ -1161,35 +1469,50 @@ onMounted(load)
         </div>
 
         <AppInput
-            v-model="passwordForm.currentPassword"
+            v-model="
+            passwordForm.currentPassword
+          "
             type="password"
             label="رمز عبور فعلی"
             autocomplete="current-password"
-            :error="passwordFields.currentPassword"
+            :error="
+            passwordFields.currentPassword
+          "
         />
 
         <AppInput
-            v-model="passwordForm.newPassword"
+            v-model="
+            passwordForm.newPassword
+          "
             type="password"
             label="رمز عبور جدید"
             autocomplete="new-password"
             hint="حداقل ۸ کاراکتر"
-            :error="passwordFields.newPassword"
+            :error="
+            passwordFields.newPassword
+          "
         />
 
         <AppInput
-            v-model="passwordForm.newPasswordConfirmation"
+            v-model="
+            passwordForm.newPasswordConfirmation
+          "
             type="password"
             label="تکرار رمز عبور جدید"
             autocomplete="new-password"
-            :error="passwordFields.newPasswordConfirmation"
+            :error="
+            passwordFields
+              .newPasswordConfirmation
+          "
         />
       </form>
 
       <template #footer>
         <AppButton
             block
-            :loading="changingPassword"
+            :loading="
+            changingPassword
+          "
             @click="changePassword"
         >
           تغییر رمز عبور
@@ -1197,8 +1520,12 @@ onMounted(load)
 
         <AppButton
             variant="secondary"
-            :disabled="changingPassword"
-            @click="passwordOpen = false"
+            :disabled="
+            changingPassword
+          "
+            @click="
+            passwordOpen = false
+          "
         >
           انصراف
         </AppButton>
@@ -1210,7 +1537,9 @@ onMounted(load)
         title="فعال‌سازی ورود دومرحله‌ای"
         description="کد QR را فقط در برنامه Authenticator خود اسکن کنید."
         size="md"
-        :dismissible="!twoFactorLoading"
+        :dismissible="
+        !twoFactorLoading
+      "
     >
       <form
           class="modal-form"
@@ -1222,18 +1551,23 @@ onMounted(load)
         >
           <div class="two-factor-qr">
             <QrCode
-                :value="twoFactorSetup.otpauthUri"
+                :value="
+                twoFactorSetup.otpauthUri
+              "
                 :size="156"
                 label="کد QR راه‌اندازی ورود دومرحله‌ای"
             />
           </div>
 
           <div class="two-factor-manual">
-            <strong>۱. اسکن یا ورود دستی</strong>
+            <strong>
+              ۱. اسکن یا ورود دستی
+            </strong>
 
             <p>
               کد را در Google Authenticator،
-              Microsoft Authenticator یا برنامه مشابه وارد کنید.
+              Microsoft Authenticator یا برنامه مشابه
+              وارد کنید.
             </p>
 
             <span class="setup-secret">
@@ -1242,7 +1576,9 @@ onMounted(load)
               </bdi>
 
               <CopyButton
-                  :value="twoFactorSetup.secret"
+                  :value="
+                  twoFactorSetup.secret
+                "
                   label="کپی کلید"
               />
             </span>
@@ -1251,11 +1587,16 @@ onMounted(load)
 
         <div class="auth-guide">
           <span>
-            <AppIcon name="shield" :size="27"/>
+            <AppIcon
+                name="shield"
+                :size="27"
+            />
           </span>
 
           <div>
-            <strong>۲. تأیید اتصال برنامه</strong>
+            <strong>
+              ۲. تأیید اتصال برنامه
+            </strong>
 
             <DemoCodeHint
                 v-if="DemoCodeHint"
@@ -1263,37 +1604,54 @@ onMounted(load)
             />
 
             <p v-else>
-              کد شش‌رقمی فعلی برنامه را برای تکمیل اتصال وارد کنید.
+              کد شش‌رقمی فعلی برنامه را برای تکمیل
+              اتصال وارد کنید.
             </p>
           </div>
         </div>
 
         <AppInput
-            :model-value="twoFactorCode"
+            :model-value="
+            twoFactorCode
+          "
             label="کد ۶ رقمی برنامه"
             inputmode="numeric"
             autocomplete="one-time-code"
             maxlength="6"
             ltr
-            :error="twoFactorError"
+            :error="
+            twoFactorError
+          "
             placeholder="••••••"
-            @update:model-value="updateTwoFactorCode"
+            @update:model-value="
+            updateTwoFactorCode
+          "
         />
       </form>
 
       <template #footer>
-        <div class="two-factor-actions">
+        <div
+            class="two-factor-actions"
+        >
           <AppButton
-              :loading="twoFactorLoading"
-              @click="enableTwoFactor"
+              :loading="
+              twoFactorLoading
+            "
+              @click="
+              enableTwoFactor
+            "
           >
             تأیید و فعال‌سازی
           </AppButton>
 
           <AppButton
               variant="secondary"
-              :disabled="twoFactorLoading"
-              @click="twoFactorOpen = false"
+              :disabled="
+              twoFactorLoading
+            "
+              @click="
+              twoFactorOpen = false
+            "
           >
             انصراف
           </AppButton>
@@ -1306,106 +1664,192 @@ onMounted(load)
         title="کد ضد فیشینگ"
         description="این عبارت باید در پیام‌های معتبر روشا نمایش داده شود."
         size="sm"
-        :dismissible="!phishingLoading"
+        :dismissible="
+        !phishingLoading
+      "
     >
       <form
           class="modal-form"
-          @submit.prevent="savePhishing"
+          @submit.prevent="
+          phishingMode === 'create'
+            ? savePhishing()
+            : undefined
+        "
       >
         <AppInput
-            :model-value="phishingCode"
-            label="عبارت اختصاصی"
-            placeholder="مثلاً: rosha-arya"
+            :model-value="
+            phishingCode
+          "
+            label="عبارت اختصاصی شما :"
+            :placeholder="
+            phishingMode === 'create'
+              ? 'مثلاً: rosha-arya'
+              : ''
+          "
+            :readonly="
+            phishingMode === 'existing'
+          "
             ltr
-            :error="phishingError"
-            hint="بین ۴ تا ۲۰ کاراکتر و قابل تشخیص برای خودتان"
-            @update:model-value="updatePhishingCode"
+            :error="
+            phishingError
+          "
+            :hint="
+            phishingMode === 'existing'
+              ? 'کد فعلی ضد فیشینگ شما'
+              : 'بین ۴ تا ۲۰ کاراکتر و قابل تشخیص برای خودتان'
+          "
+            @update:model-value="
+            updatePhishingCode
+          "
         />
 
         <div class="phishing-help">
-          <AppIcon name="warning" :size="18"/>
+          <AppIcon
+              name="warning"
+              :size="18"
+          />
 
-          اگر پیامی این عبارت را نداشت، روی لینک‌های آن کلیک نکنید.
+          <span>
+            اگر پیامی این عبارت را نداشت،
+            روی لینک‌های آن کلیک نکنید.
+          </span>
         </div>
       </form>
 
       <template #footer>
-        <AppButton
-            block
-            :loading="phishingLoading"
-            @click="savePhishing"
+        <template
+            v-if="
+            phishingMode === 'create'
+          "
         >
-          ذخیره عبارت
-        </AppButton>
+          <AppButton
+              block
+              :loading="
+              phishingLoading
+            "
+              @click="
+              savePhishing
+            "
+          >
+            ذخیره عبارت
+          </AppButton>
 
-        <AppButton
-            v-if="overview?.antiPhishingEnabled"
-            variant="danger"
-            :disabled="phishingLoading"
-            @click="removePhishing"
-        >
-          حذف کد
-        </AppButton>
+          <AppButton
+              variant="secondary"
+              :disabled="
+              phishingLoading
+            "
+              @click="
+              phishingOpen = false
+            "
+          >
+            انصراف
+          </AppButton>
+        </template>
 
-        <AppButton
-            v-else
-            variant="secondary"
-            :disabled="phishingLoading"
-            @click="phishingOpen = false"
-        >
-          انصراف
-        </AppButton>
+        <template v-else>
+          <AppButton
+              block
+              variant="danger"
+              :loading="
+              phishingLoading
+            "
+              @click="
+              removePhishing
+            "
+          >
+            حذف کد
+          </AppButton>
+        </template>
       </template>
     </AppModal>
 
     <AppModal
-        :model-value="Boolean(confirmation)"
-        :title="confirmationCopy.title"
-        :description="confirmationCopy.description"
+        :model-value="
+        Boolean(confirmation)
+      "
+        :title="
+        confirmationCopy.title
+      "
+        :description="
+        confirmationCopy.description
+      "
         size="sm"
-        :dismissible="!confirming"
-        @update:model-value="(value) => {
-          if (!value && !confirming) {
+        :dismissible="
+        !confirming
+      "
+        @update:model-value="
+        (value) => {
+          if (
+            !value &&
+            !confirming
+          ) {
             closeConfirmation()
           }
-        }"
+        }
+      "
     >
-      <div class="confirmation-visual">
+      <div
+          class="confirmation-visual"
+      >
         <span>
-          <AppIcon name="warning" :size="25"/>
+          <AppIcon
+              name="warning"
+              :size="25"
+          />
         </span>
 
-        <div class="confirmation-copy">
+        <div
+            class="confirmation-copy"
+        >
           <p>
             این عملیات فوراً روی امنیت حساب اعمال می‌شود.
           </p>
 
-          <small v-if="confirmation?.kind === 'disable-2fa'">
-            پس از غیرفعال‌سازی، کلید جدیدی ساخته می‌شود؛
-            برای فعال‌سازی مجدد، QR جدید را دوباره اسکن کنید.
+          <small
+              v-if="
+              confirmation?.kind ===
+              'disable-2fa'
+            "
+          >
+            پس از غیرفعال‌سازی، کلید جدیدی ساخته
+            می‌شود؛ برای فعال‌سازی مجدد، QR جدید را
+            دوباره اسکن کنید.
           </small>
         </div>
       </div>
 
       <div
-          v-if="confirmation?.kind === 'disable-2fa'"
+          v-if="
+          confirmation?.kind ===
+          'disable-2fa'
+        "
           class="disable-2fa-form"
       >
         <AppInput
-            :model-value="disableTwoFactorCode"
+            :model-value="
+            disableTwoFactorCode
+          "
             label="کد برنامه Authenticator"
             inputmode="numeric"
             autocomplete="one-time-code"
             maxlength="6"
             ltr
             placeholder="••••••"
-            :error="disableTwoFactorError"
-            @update:model-value="updateDisableTwoFactorCode"
+            :error="
+            disableTwoFactorError
+          "
+            @update:model-value="
+            updateDisableTwoFactorCode
+          "
         />
 
-        <p class="disable-2fa-help">
-          برای غیرفعال‌کردن ورود دومرحله‌ای، کد ۶ رقمی فعلی
-          برنامه Authenticator را وارد کنید.
+        <p
+            class="disable-2fa-help"
+        >
+          برای غیرفعال‌کردن ورود دومرحله‌ای،
+          کد ۶ رقمی فعلی برنامه Authenticator
+          را وارد کنید.
         </p>
       </div>
 
@@ -1413,16 +1857,26 @@ onMounted(load)
         <AppButton
             variant="danger"
             block
-            :loading="confirming"
-            @click="runConfirmation"
+            :loading="
+            confirming
+          "
+            @click="
+            runConfirmation
+          "
         >
-          {{ confirmationCopy.confirm }}
+          {{
+            confirmationCopy.confirm
+          }}
         </AppButton>
 
         <AppButton
             variant="secondary"
-            :disabled="confirming"
-            @click="closeConfirmation"
+            :disabled="
+            confirming
+          "
+            @click="
+            closeConfirmation
+          "
         >
           انصراف
         </AppButton>
@@ -1432,6 +1886,29 @@ onMounted(load)
 </template>
 
 <style scoped>
+.phishing-feature {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.phishing-feature .feature-title {
+  grid-template-columns:
+    auto
+    minmax(0, 1fr);
+  align-items: center;
+}
+
+.phishing-status-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.phishing-action {
+  justify-self: center;
+  min-width: 10rem;
+}
+
 .security-page {
   display: grid;
   align-content: start;
@@ -1510,7 +1987,8 @@ onMounted(load)
 
 .score-skeleton > div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns:
+    minmax(0, 1fr);
   min-width: 0;
   flex: 1;
   gap: var(--space-3);
@@ -1605,7 +2083,8 @@ onMounted(load)
 
 .score-facts {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns:
+    repeat(3, 1fr);
   gap: var(--space-2);
 }
 
@@ -1637,7 +2116,9 @@ onMounted(load)
 
 .security-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, .75fr);
+  grid-template-columns:
+    minmax(0, 1.25fr)
+    minmax(20rem, .75fr);
   align-items: start;
   gap: var(--space-5);
 }
@@ -1677,7 +2158,11 @@ onMounted(load)
 
 .setting-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto
+    auto;
   align-items: center;
   gap: var(--space-3);
   padding-block: var(--space-4);
@@ -1708,7 +2193,8 @@ onMounted(load)
   place-items: center;
 }
 
-.setting-row.featured .setting-icon {
+.setting-row.featured
+.setting-icon {
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
@@ -1739,7 +2225,8 @@ onMounted(load)
 
 .feature-title {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns:
+    auto 1fr auto;
   align-items: start;
   gap: var(--space-3);
 }
@@ -1829,7 +2316,11 @@ onMounted(load)
 
 .session-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto
+    auto;
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-5);
@@ -1915,18 +2406,47 @@ onMounted(load)
 
 .event-list {
   display: grid;
+  max-height: 30.8rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
+  scroll-snap-type: y proximity;
 }
 
 .event-list article {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto;
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
+  scroll-snap-align: start;
 }
 
 .event-list article + article {
   border-top: 1px solid var(--color-border-soft);
+}
+
+.event-list::-webkit-scrollbar {
+  width: .4rem;
+}
+
+.event-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.event-list::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--color-border-hover);
+}
+
+@media (max-width: 767px) {
+  .event-list {
+    max-height: 20rem;
+  }
 }
 
 .event-icon {
@@ -2052,12 +2572,15 @@ onMounted(load)
 
 .two-factor-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
   gap: var(--space-3);
   width: 100%;
 }
 
-.two-factor-actions :deep(.app-button) {
+.two-factor-actions
+:deep(.app-button) {
   width: 100%;
   min-width: 0;
 }
@@ -2197,9 +2720,8 @@ onMounted(load)
 .feature-block,
 .session-row,
 .event-list article {
-  transition:
-      background var(--transition-fast),
-      border-color var(--transition-fast);
+  transition: background var(--transition-fast),
+  border-color var(--transition-fast);
 }
 
 @media (hover: hover) {
@@ -2264,28 +2786,36 @@ onMounted(load)
   }
 
   .setting-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns:
+      auto
+      minmax(0, 1fr)
+      auto;
   }
 
-  .setting-row > :deep(.status) {
+  .setting-row
+  > :deep(.status) {
     display: none;
   }
 
-  .setting-row :deep(.app-button),
+  .setting-row
+  :deep(.app-button),
   .setting-row .row-note {
     grid-column: 2 / -1;
     justify-self: start;
   }
 
-  .setting-row :deep(.app-button) {
+  .setting-row
+  :deep(.app-button) {
     min-height: 2.75rem;
   }
 
   .feature-title {
-    grid-template-columns: auto 1fr;
+    grid-template-columns:
+      auto 1fr;
   }
 
-  .feature-title :deep(.status) {
+  .feature-title
+  :deep(.status) {
     grid-column: 2;
   }
 
@@ -2294,13 +2824,16 @@ onMounted(load)
     flex-direction: column;
   }
 
-  .list-header :deep(.app-button) {
+  .list-header
+  :deep(.app-button) {
     width: 100%;
     min-height: 2.75rem;
   }
 
   .session-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns:
+      auto
+      minmax(0, 1fr);
     gap: var(--space-3);
     padding: var(--space-4);
   }
@@ -2311,14 +2844,17 @@ onMounted(load)
     text-align: start;
   }
 
-  .session-row :deep(.app-button) {
+  .session-row
+  :deep(.app-button) {
     grid-column: 2;
     justify-self: start;
     min-height: 2.75rem;
   }
 
   .event-list article {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns:
+      auto
+      minmax(0, 1fr);
     gap: var(--space-3);
     padding: var(--space-4);
   }
@@ -2363,22 +2899,27 @@ onMounted(load)
   }
 
   .setting-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns:
+      auto
+      minmax(0, 1fr);
   }
 
-  .setting-row > :deep(.status) {
+  .setting-row
+  > :deep(.status) {
     display: inline-flex;
     grid-column: 2;
     justify-self: start;
   }
 
-  .setting-row :deep(.app-button),
+  .setting-row
+  :deep(.app-button),
   .setting-row .row-note {
     grid-column: 1 / -1;
     width: 100%;
   }
 
-  .feature-title :deep(.status) {
+  .feature-title
+  :deep(.status) {
     grid-column: 1 / -1;
     justify-self: start;
     margin-inline-start: calc(2.5rem + var(--space-3));
@@ -2394,7 +2935,8 @@ onMounted(load)
     display: none;
   }
 
-  .session-row :deep(.app-button) {
+  .session-row
+  :deep(.app-button) {
     grid-column: 1 / -1;
     width: 100%;
   }

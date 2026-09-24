@@ -1,9 +1,15 @@
-import type {ISODateString, ThemePreference} from './common'
+import type {
+    ISODateString,
+    ThemePreference,
+} from './common'
 
 export interface ActiveSession {
     id: string
     deviceName: string
-    deviceType: 'desktop' | 'mobile' | 'tablet'
+    deviceType:
+        | 'desktop'
+        | 'mobile'
+        | 'tablet'
     browser: string
     os: string
     ipAddress: string
@@ -14,10 +20,22 @@ export interface ActiveSession {
 }
 
 export type SecurityEventType =
+    | 'otp_requested'
+    | 'otp_verified'
+    | 'otp_failed'
     | 'login_success'
-    | 'login_failed'
-    | 'password_changed'
+    | 'login_failure'
+    | 'registration_success'
+    | 'logout'
+    | 'password_change'
+    | 'password_reset_success'
+    | 'kyc_update'
+    | 'security_alert'
     | 'two_factor_enabled'
+    | 'two_factor_disabled'
+    | 'anti_phishing_created'
+    | 'anti_phishing_updated'
+    | 'anti_phishing_deleted'
     | 'session_revoked'
     | 'withdrawal_confirmed'
 
