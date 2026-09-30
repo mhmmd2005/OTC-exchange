@@ -39,6 +39,12 @@ class KycApplication(models.Model):
         default="",
     )
 
+    father_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
     national_id = models.CharField(
         max_length=50,
         blank=True,

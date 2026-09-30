@@ -56,6 +56,10 @@ import type {
     VerifyOtpInput,
     WalletAsset,
     WalletSummary,
+    WithdrawalAddress,
+    WithdrawalAddressConfirmInput,
+    WithdrawalAddressCreateInput,
+    WithdrawalAddressCreateResponse,
     WithdrawalEstimate,
     WithdrawalOtpChallenge,
 } from '@/types'
@@ -689,6 +693,61 @@ export const securityService: SecurityService = {
             {enabled},
         ),
 }
+
+export const withdrawalAddressService = {
+    list: async () => {
+        const response =
+            await api.get<{
+                count: number
+                next: string | null
+                previous: string | null
+                results: WithdrawalAddress[]
+            }>(
+                '/withdrawals/addresses',
+            )
+
+        return response.results
+    },
+
+    create: (
+        input: WithdrawalAddressCreateInput,
+    ) =>
+        api.post<WithdrawalAddressCreateResponse>(
+            '/withdrawals/addresses',
+            input,
+        ),
+
+    confirm: (
+        id: string,
+        input: WithdrawalAddressConfirmInput,
+    ) =>
+        api.post<WithdrawalAddress>(
+            `/withdrawals/addresses/${id}/confirm`,
+            input,
+        ),
+
+    resendConfirmation: (
+        id: string,
+    ) =>
+        api.post<WithdrawalAddressCreateResponse>(
+            `/withdrawals/addresses/${id}/resend-confirmation`,
+        ),
+
+    remove: (
+        id: string,
+    ) =>
+        api.delete<void>(
+            `/withdrawals/addresses/${id}`,
+        ),
+
+    setDefault: (
+        id: string,
+    ) =>
+        api.post<WithdrawalAddress>(
+            `/withdrawals/addresses/${id}/set-default`,
+        ),
+}
+
 
 export const supportService: SupportService = {
     listFaqs: (

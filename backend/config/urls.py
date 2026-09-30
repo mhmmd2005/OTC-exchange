@@ -29,6 +29,7 @@ def api_v1_root(request):
             "security": "/api/v1/security/",
             "notifications": "/api/v1/notifications/",
             "support": "/api/v1/support/",
+            "withdrawals": "/api/v1/withdrawals/",
         },
     })
 
@@ -41,6 +42,10 @@ urlpatterns = [
     path(
         "api/v1/admin/",
         include("apps.admin_panel.urls"),
+    ),
+    path(
+        "api/v1/withdrawals/",
+        include("apps.withdrawals.urls"),
     ),
     path("api/v1/assets/", include("apps.assets.urls")),
     path("api/v1/wallets/", include("apps.wallets.urls")),

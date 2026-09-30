@@ -106,6 +106,7 @@ class KycApplicationSerializer(serializers.ModelSerializer):
             "id",
             "first_name",
             "last_name",
+            "father_name",
             "national_id",
             "birth_date",
             "phone_number",
@@ -134,6 +135,7 @@ class KycApplicationSerializer(serializers.ModelSerializer):
             "phone_number",
             "status",
             "status_label",
+            "father_name",
             "basic_info_status",
             "basic_info_submitted_at",
             "basic_info_reviewed_at",
@@ -164,10 +166,10 @@ class KycApplicationSerializer(serializers.ModelSerializer):
         return obj.can_edit_identity
 
 
-
 class BasicInfoSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source="first_name", max_length=64)
     lastName = serializers.CharField(source="last_name", max_length=96)
+    fatherName = serializers.CharField(source="father_name", max_length=96)
     nationalId = serializers.CharField(source="national_id", max_length=10)
     birthDate = serializers.CharField(write_only=True)
 
@@ -176,6 +178,7 @@ class BasicInfoSerializer(serializers.ModelSerializer):
         fields = [
             "firstName",
             "lastName",
+            "fatherName",
             "nationalId",
             "birthDate",
         ]
@@ -191,6 +194,14 @@ class BasicInfoSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError(
                 "نام خانوادگی را وارد کنید."
+            )
+        return value
+
+    def validate_fatherName(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError(
+                "نام پدر را وارد کنید."
             )
         return value
 
@@ -254,4 +265,3 @@ class IdentityDocumentSerializer(serializers.Serializer):
             )
 
         return value
-

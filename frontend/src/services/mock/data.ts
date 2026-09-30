@@ -15,6 +15,7 @@ import type {
     UserProfile,
     VerificationSummary,
     WalletSummary,
+    WithdrawalAddress,
 } from '@/types'
 
 export const MOCK_NOW = '2026-08-31T09:42:00.000Z'
@@ -342,6 +343,34 @@ export const mockWallet: WalletSummary = {
         },
     ],
 }
+
+export const mockWithdrawalAddresses: WithdrawalAddress[] = [
+    {
+        id: 'waddr_usdt_trc20_1',
+        assetSymbol: 'USDT',
+        assetNameFa: 'تتر',
+        assetNameEn: 'Tether',
+        networkCode: 'TRC20',
+        networkName: 'Tron',
+        networkDisplayName: 'ترون (TRC20)',
+        address: 'TJ7P1mT3CwQHzhVFd9xKo2seB5Rg8nL4Ua',
+        memo: '',
+        label: 'کیف پول شخصی',
+        status: 'active',
+        verificationMethod: 'security_confirmation',
+        isDefault: true,
+        confirmationRequestedAt: '2026-08-20T08:30:00.000Z',
+        confirmedAt: '2026-08-20T08:32:00.000Z',
+        cooldownUntil: null,
+        activatedAt: '2026-08-21T08:32:00.000Z',
+        lastUsedAt: '2026-08-25T10:15:00.000Z',
+        revokedAt: null,
+        blockedReason: '',
+        createdAt: '2026-08-20T08:30:00.000Z',
+        updatedAt: '2026-08-25T10:15:00.000Z',
+    },
+]
+
 
 export const mockOrders: OtcOrder[] = [
     {
@@ -692,6 +721,7 @@ export const mockVerification: VerificationSummary = {
     reviewPending: false,
     basicInfo: {
         firstName: mockUser.firstName,
+        fatherName: 'محمد',
         lastName: mockUser.lastName,
         nationalId: mockUser.nationalId,
         birthDate: '2005-09-09',
@@ -993,7 +1023,7 @@ export const mockSecurityEvents: SecurityEvent[] = [
     },
     {
         id: 'sec_942',
-        type: 'password_changed',
+        type: 'password_change',
         title: 'رمز عبور تغییر کرد',
         description: 'رمز عبور حساب با موفقیت به‌روزرسانی شد.',
         ipAddress: '185.44.***.***',

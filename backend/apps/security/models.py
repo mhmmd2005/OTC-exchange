@@ -21,6 +21,13 @@ class SecurityEvent(models.Model):
         ("anti_phishing_created", "Anti-phishing created"),
         ("anti_phishing_updated", "Anti-phishing updated"),
         ("anti_phishing_deleted", "Anti-phishing deleted"),
+        ("withdrawal_whitelist_enabled", "Withdrawal whitelist enabled"),
+        ("withdrawal_whitelist_disabled", "Withdrawal whitelist disabled"),
+        ("withdrawal_addr_confirm_req", "Withdrawal address confirmation requested"),
+        ("withdrawal_addr_confirmed", "Withdrawal address confirmed"),
+        ("withdrawal_addr_activated", "Withdrawal address activated"),
+        ("withdrawal_addr_revoked", "Withdrawal address revoked"),
+        ("withdrawal_addr_default", "Withdrawal address default changed"),
     ]
 
     user = models.ForeignKey(
@@ -45,6 +52,11 @@ class SecurityEvent(models.Model):
     ip_address = models.GenericIPAddressField(
         blank=True,
         null=True,
+    )
+
+    user_agent = models.TextField(
+        blank=True,
+        default="",
     )
 
     created_at = models.DateTimeField(

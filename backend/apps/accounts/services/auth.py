@@ -606,7 +606,10 @@ class AuthService:
         )
 
         session_id = create_session(
-            user.id
+            user.id,
+            ip_address=request_ip,
+            user_agent=user_agent,
+
         )
 
         refresh["session_id"] = session_id
@@ -812,9 +815,10 @@ class AuthService:
         )
 
         session_id = create_session(
-            user.id
+            user.id,
+            ip_address=request_ip,
+            user_agent=user_agent,
         )
-
         refresh["session_id"] = session_id
 
         access = refresh.access_token
@@ -924,7 +928,9 @@ class AuthService:
         )
 
         session_id = create_session(
-            user.id
+            user.id,
+            ip_address=request_ip,
+            user_agent=user_agent,
         )
 
         refresh["session_id"] = session_id

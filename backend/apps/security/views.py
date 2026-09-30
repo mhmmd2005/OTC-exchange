@@ -4,8 +4,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.services.session import (
+    delete_other_sessions,
+    delete_session,
+    ensure_session_registered,
+    get_session,
+    get_user_sessions,
+)
 from .models import LoginHistory, SecurityEvent
 from .serializers import (
+    ActiveSessionSerializer,
     AntiPhishingSerializer,
     LoginHistorySerializer,
     SecurityEventSerializer,
@@ -20,8 +28,10 @@ def build_security_overview(user):
         "twoFactorEnabled": TwoFactorService.is_enabled(user),
         "antiPhishingEnabled": bool(user.anti_phishing_code),
         "antiPhishingCode": user.anti_phishing_code,
-        "withdrawalWhitelistEnabled": False,
-        "activeSessionsCount": 1,
+        "withdrawalWhitelistEnabled": user.withdrawal_whitelist_enabled,
+        "activeSessionsCount": len(
+            get_user_sessions(user.id)
+        ),
     }
 
 
@@ -29,8 +39,30 @@ class SecurityOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        current_session_id = None
+
+        if request.auth:
+            current_session_id = request.auth.get(
+                "session_id"
+            )
+
+        if current_session_id:
+            ensure_session_registered(
+                user_id=request.user.id,
+                session_id=current_session_id,
+                ip_address=request.META.get(
+                    "REMOTE_ADDR"
+                ),
+                user_agent=request.META.get(
+                    "HTTP_USER_AGENT",
+                    "",
+                ),
+            )
+
         return Response(
-            build_security_overview(request.user)
+            build_security_overview(
+                request.user
+            )
         )
 
 
@@ -38,36 +70,119 @@ class SecuritySessionsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        session_id = None
+        current_session_id = None
 
         if request.auth:
-            session_id = request.auth.get("session_id")
+            current_session_id = request.auth.get(
+                "session_id"
+            )
+
+        if current_session_id:
+            ensure_session_registered(
+                user_id=request.user.id,
+                session_id=current_session_id,
+                ip_address=request.META.get(
+                    "REMOTE_ADDR"
+                ),
+                user_agent=request.META.get(
+                    "HTTP_USER_AGENT",
+                    "",
+                ),
+            )
+
+        sessions = get_user_sessions(
+            request.user.id
+        )
+
+        result = []
+
+        for session in sessions:
+            session["current"] = (
+                    str(session["id"])
+                    == str(current_session_id)
+            )
+
+            result.append(
+                session
+            )
+
+        serializer = ActiveSessionSerializer(
+            result,
+            many=True,
+        )
 
         return Response(
-            [
-                {
-                    "id": str(session_id or "current"),
-                    "device": "مرورگر فعلی",
-                    "browser": "Browser",
-                    "os": "Linux",
-                    "ip_address": request.META.get("REMOTE_ADDR"),
-                    "is_current": True,
-                    "created_at": None,
-                    "last_activity": None,
-                }
-            ]
+            serializer.data,
+            status=status.HTTP_200_OK,
         )
 
 
 class SecuritySessionRevokeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, session_id):
+    def delete(
+            self,
+            request,
+            session_id,
+    ):
+        current_session_id = None
+
+        if request.auth:
+            current_session_id = request.auth.get(
+                "session_id"
+            )
+
+        if (
+                current_session_id
+                and str(session_id)
+                == str(current_session_id)
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "نشست فعلی را نمی‌توان قطع کرد."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session = get_session(
+            session_id
+        )
+
+        if not session:
+            return Response(
+                {
+                    "detail": (
+                        "این نشست پیدا نشد یا قبلاً پایان یافته است."
+                    )
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if int(
+                session.get(
+                    "user_id",
+                    0,
+                )
+        ) != int(request.user.id):
+            return Response(
+                {
+                    "detail": (
+                        "دسترسی به این نشست مجاز نیست."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        delete_session(
+            session_id
+        )
+
         return Response(
             {
                 "detail": (
-                    "این قابلیت در این مرحله هنوز به "
-                    "SessionService متصل نشده است."
+                    "دسترسی دستگاه با موفقیت قطع شد."
                 )
             },
             status=status.HTTP_200_OK,
@@ -78,11 +193,34 @@ class SecurityOtherSessionsRevokeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
+        current_session_id = None
+
+        if request.auth:
+            current_session_id = request.auth.get(
+                "session_id"
+            )
+
+        if not current_session_id:
+            return Response(
+                {
+                    "detail": (
+                        "نشست فعلی شناسایی نشد."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted_count = delete_other_sessions(
+            request.user.id,
+            current_session_id,
+        )
+
         return Response(
             {
                 "detail": (
-                    "تمام نشست‌های دیگر در این مرحله نمایشی هستند."
-                )
+                    "تمام نشست‌های دیگر پایان یافتند."
+                ),
+                "deleted_count": deleted_count,
             },
             status=status.HTTP_200_OK,
         )
@@ -317,6 +455,10 @@ class TwoFactorAPIView(APIView):
                     user=request.user,
                     code=code or "",
                     request_ip=request_ip,
+                    user_agent=request.META.get(
+                        "HTTP_USER_AGENT",
+                        "",
+                    ),
                 )
             except DjangoValidationError as exc:
                 return Response(
@@ -412,28 +554,81 @@ class WithdrawalWhitelistAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        enabled = bool(
-            request.data.get(
-                "enabled",
-                False,
+        enabled = request.data.get(
+            "enabled"
+        )
+
+        if not isinstance(enabled, bool):
+            return Response(
+                {
+                    "detail": (
+                        "مقدار enabled باید true یا false باشد."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if not request.user.is_phone_verified:
+            return Response(
+                {
+                    "detail": (
+                        "برای تغییر فهرست مجاز ابتدا شماره موبایل خود را تأیید کنید."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        old_value = (
+            request.user.withdrawal_whitelist_enabled
+        )
+
+        if old_value == enabled:
+            return Response(
+                build_security_overview(
+                    request.user
+                ),
+                status=status.HTTP_200_OK,
+            )
+
+        request.user.withdrawal_whitelist_enabled = (
+            enabled
+        )
+
+        request.user.save(
+            update_fields=[
+                "withdrawal_whitelist_enabled",
+                "updated_at",
+            ]
+        )
+
+        event_type = (
+            "withdrawal_whitelist_enabled"
+            if enabled
+            else "withdrawal_whitelist_disabled"
+        )
+
+        description = (
+            "فهرست مجاز آدرس برداشت فعال شد."
+            if enabled
+            else "فهرست مجاز آدرس برداشت غیرفعال شد."
+        )
+
+        SecurityEvent.objects.create(
+            user=request.user,
+            event_type=event_type,
+            description=description,
+            ip_address=request.META.get(
+                "REMOTE_ADDR"
+            ),
+            user_agent=request.META.get(
+                "HTTP_USER_AGENT",
+                "",
+            )[:500],
         )
 
         return Response(
-            {
-                "mobile_verified": (
-                    request.user.is_phone_verified
-                ),
-                "email_verified": (
-                        request.user.email_verified_at is not None
-                ),
-                "two_factor_enabled": (
-                    TwoFactorService.is_enabled(
-                        request.user
-                    )
-                ),
-                "anti_phishing_code_enabled": False,
-                "withdrawal_whitelist_enabled": enabled,
-                "active_sessions_count": 1,
-            }
+            build_security_overview(
+                request.user
+            ),
+            status=status.HTTP_200_OK,
         )

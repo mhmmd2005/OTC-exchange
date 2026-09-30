@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
@@ -13,6 +14,7 @@ from .serializers import (
     IdentityDocumentSerializer,
     KycApplicationSerializer,
 )
+from .services.ehraz import EhrazAPIError, EhrazService
 
 
 class GetOrCreateKycAPIView(APIView):
@@ -67,6 +69,59 @@ class SubmitBasicInfoAPIView(APIView):
             data=request.data,
         )
         serializer.is_valid(raise_exception=True)
+
+        if not settings.EHRAZ_API_TOKEN:
+            return Response(
+                {
+                    "detail": (
+                        "سرویس احراز هویت هنوز پیکربندی نشده است."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        data = serializer.validated_data
+
+        full_name = (
+            f"{data['first_name']} {data['last_name']}"
+        ).strip()
+
+        birth_date = data["birth_date"].strftime("%Y%m%d")
+
+        try:
+            mobile_result = (
+                EhrazService.match_national_with_mobile(
+                    national_code=data["national_id"],
+                    mobile_number=request.user.phone_number,
+                )
+            )
+
+            if mobile_result.get("matched") is not True:
+                return Response(
+                    {
+                        "detail": (
+                            "کد ملی با شماره موبایل ثبت‌شده "
+                            "مطابقت ندارد."
+                        )
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+            EhrazService.identity_similarity(
+                national_code=data["national_id"],
+                birth_date=birth_date,
+                first_name=data["first_name"],
+                last_name=data["last_name"],
+                full_name=full_name,
+                father_name=data["father_name"],
+            )
+
+        except EhrazAPIError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         serializer.save()
 
         kyc.basic_info_status = "pending"
@@ -75,14 +130,16 @@ class SubmitBasicInfoAPIView(APIView):
         kyc.basic_info_reviewed_by = None
         kyc.basic_info_rejection_reason = ""
 
-        kyc.save(update_fields=[
-            "basic_info_status",
-            "basic_info_submitted_at",
-            "basic_info_reviewed_at",
-            "basic_info_reviewed_by",
-            "basic_info_rejection_reason",
-            "updated_at",
-        ])
+        kyc.save(
+            update_fields=[
+                "basic_info_status",
+                "basic_info_submitted_at",
+                "basic_info_reviewed_at",
+                "basic_info_reviewed_by",
+                "basic_info_rejection_reason",
+                "updated_at",
+            ]
+        )
 
         kyc.sync_status()
 
@@ -261,7 +318,9 @@ class VerificationSummaryAPIView(APIView):
             {
                 "id": "basic_info",
                 "title": "اطلاعات هویتی",
-                "description": "نام، نام خانوادگی، کد ملی و تاریخ تولد را وارد کنید.",
+                "description": (
+                    "نام، نام خانوادگی، نام پدر، کد ملی و تاریخ تولد را وارد کنید."
+                ),
                 "status": basic_status,
                 "required": True,
                 "locked": not kyc.can_edit_basic_info,
@@ -401,4 +460,3 @@ class VerificationSummaryAPIView(APIView):
                 "usedCryptoWithdrawalTomanEquivalent": "0",
             },
         })
-

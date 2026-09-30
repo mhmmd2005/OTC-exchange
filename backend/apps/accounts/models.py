@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
-
+from django.core.exceptions import ValidationError
 from apps.accounts.services.phone import normalize_phone_number
 
 
@@ -51,7 +51,6 @@ class User(AbstractUser):
         blank=True,
     )
 
-
     pending_email = models.EmailField(
         blank=True,
         null=True,
@@ -60,6 +59,7 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     anti_phishing_code = models.CharField(max_length=20, blank=True, default="")
+    withdrawal_whitelist_enabled = models.BooleanField(default=False)
     USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = ["full_name"]
 
@@ -114,6 +114,7 @@ class OTPVerification(models.Model):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password Reset"
         PHONE_VERIFICATION = "phone_verification", "Phone Verification"
+        WITHDRAWAL_ADDRESS = "withdrawal_address", "Withdrawal Address"
 
     class DeliveryStatus(models.TextChoices):
         QUEUED = "queued", "Queued"

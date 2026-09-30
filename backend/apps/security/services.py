@@ -350,6 +350,7 @@ class TwoFactorService:
             user,
             code: str,
             request_ip=None,
+            user_agent="",
     ) -> None:
         credential = (
             TwoFactorCredential.objects
@@ -409,6 +410,7 @@ class TwoFactorService:
                 "ورود دومرحله‌ای غیرفعال شد."
             ),
             ip_address=request_ip,
+            user_agent=user_agent[:1000],
         )
 
     @classmethod

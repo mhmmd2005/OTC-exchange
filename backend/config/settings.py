@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.markets",
     "apps.admin_panel",
+    "apps.withdrawals",
 ]
 
 MIDDLEWARE = [
@@ -138,7 +140,12 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "apps.accounts.validators.PasswordComplexityValidator",
     },
 ]
-
+CELERY_BEAT_SCHEDULE = {
+    "activate-due-withdrawal-addresses": {
+        "task": "apps.withdrawals.tasks.activate_due_withdrawal_addresses",
+        "schedule": 60.0,
+    },
+}
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Tehran"
 USE_I18N = True
@@ -155,6 +162,7 @@ FRONTEND_URL = env(
     "FRONTEND_URL",
     default="http://localhost:5173",
 )
+
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "noreply@rosha.test"
 EMAIL_TIMEOUT = 30
@@ -170,7 +178,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     ],
 )
 
-CORS_ALLOW_CREDENTIALS = True  # <--- حل خطای CORS Missing Allow Credentials
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = [
     "accept",
@@ -287,3 +295,20 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+EHRAZ_API_BASE_URL = os.getenv(
+    "EHRAZ_API_BASE_URL",
+    "https://ehraz.io/api/v1",
+)
+
+EHRAZ_API_TOKEN = os.getenv(
+    "EHRAZ_API_TOKEN",
+    "",
+)
+
+WITHDRAWAL_ADDRESS_COOLDOWN_SECONDS = int(
+    os.getenv(
+        "WITHDRAWAL_ADDRESS_COOLDOWN_SECONDS",
+        "86400",
+    )
+)

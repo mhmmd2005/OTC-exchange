@@ -1,7 +1,4 @@
-import type {
-    ISODateString,
-    ThemePreference,
-} from './common'
+import type {ISODateString, ThemePreference,} from './common'
 
 export interface ActiveSession {
     id: string
@@ -38,6 +35,13 @@ export type SecurityEventType =
     | 'anti_phishing_deleted'
     | 'session_revoked'
     | 'withdrawal_confirmed'
+    | 'withdrawal_whitelist_enabled'
+    | 'withdrawal_whitelist_disabled'
+    | 'withdrawal_addr_confirm_req'
+    | 'withdrawal_addr_confirmed'
+    | 'withdrawal_addr_activated'
+    | 'withdrawal_addr_revoked'
+    | 'withdrawal_addr_default'
 
 export interface SecurityEvent {
     id: string

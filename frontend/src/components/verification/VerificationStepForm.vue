@@ -47,6 +47,7 @@ const selectedFileName = ref('')
 const basicForm = reactive<BasicIdentityInput>({
   firstName: '',
   lastName: '',
+  fatherName: '',
   nationalId: '',
   birthDate: '',
 })
@@ -103,6 +104,7 @@ function reset(): void {
   Object.assign(basicForm, {
     firstName: props.basicInfo?.firstName || '',
     lastName: props.basicInfo?.lastName || '',
+    fatherName: props.basicInfo?.fatherName || '',
     nationalId: props.basicInfo?.nationalId || '',
     birthDate: props.basicInfo?.birthDate
         ? isoToPersianDate(props.basicInfo.birthDate)
@@ -135,7 +137,9 @@ function validateBasic(): boolean {
   if (!basicForm.lastName.trim()) {
     basicErrors.lastName = 'نام خانوادگی را وارد کنید.'
   }
-
+  if (!basicForm.fatherName.trim()) {
+    basicErrors.fatherName = 'نام پدر را وارد کنید.'
+  }
   const nationalId = normalizeDigits(
       basicForm.nationalId,
   )
@@ -159,6 +163,7 @@ function validateBasic(): boolean {
   const firstInvalid = [
     'firstName',
     'lastName',
+    'fatherName',
     'nationalId',
     'birthDate',
   ].find((key) => basicErrors[key])
@@ -283,6 +288,7 @@ async function submit(): Promise<void> {
           await verificationService.submitBasicInfo({
             firstName: basicForm.firstName.trim(),
             lastName: basicForm.lastName.trim(),
+            fatherName: basicForm.fatherName.trim(),
             nationalId: normalizeDigits(
                 basicForm.nationalId,
             ),
@@ -423,6 +429,16 @@ async function submit(): Promise<void> {
             required
             maxlength="96"
             :error="basicErrors.lastName"
+        />
+
+        <AppInput
+            v-model="basicForm.fatherName"
+            name="fatherName"
+            label="نام پدر"
+            autocomplete="additional-name"
+            required
+            maxlength="96"
+            :error="basicErrors.fatherName"
         />
       </div>
 

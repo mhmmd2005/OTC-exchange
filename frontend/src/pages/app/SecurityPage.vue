@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import {computed, defineAsyncComponent, onMounted, reactive, ref, watch,} from 'vue'
+import {computed, defineAsyncComponent, onBeforeUnmount, onMounted, reactive, ref, watch,} from 'vue'
+
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -12,8 +13,22 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import QrCode from '@/components/wallet/QrCode.vue'
-import {ApiError, securityService} from '@/services'
-import type {ActiveSession, SecurityEvent, SecurityEventType, SecurityOverview, TwoFactorSetup,} from '@/types'
+import AssetSelect from '@/components/finance/AssetSelect.vue'
+import NetworkSelector from '@/components/wallet/NetworkSelector.vue'
+import OtpInput from '@/components/ui/OtpInput.vue'
+import {ApiError, securityService, walletService, withdrawalAddressService,} from '@/services'
+
+import type {
+  ActiveSession,
+  AssetNetwork,
+  SecurityEvent,
+  SecurityOverview,
+  TwoFactorSetup,
+  WalletAsset,
+  WithdrawalAddress,
+  WithdrawalAddressConfirmation,
+} from '@/types'
+
 import {formatPersianDateTime, formatRelativeTime, normalizeDigits, toPersianDigits,} from '@/utils/formatters'
 
 const DemoCodeHint =
@@ -39,15 +54,21 @@ type ConfirmationAction =
   kind: 'whitelist'
   enabled: boolean
 }
+    | {
+  kind: 'revoke-address'
+  address: WithdrawalAddress
+}
 
 type PhishingMode = 'create' | 'existing'
 
 const overview = ref<SecurityOverview | null>(null)
 const sessions = ref<ActiveSession[]>([])
 const events = ref<SecurityEvent[]>([])
+
 const loading = ref(true)
 const error = ref('')
 const feedback = ref('')
+
 const confirmation = ref<ConfirmationAction | null>(null)
 const confirming = ref(false)
 
@@ -55,6 +76,7 @@ const passwordOpen = ref(false)
 const changingPassword = ref(false)
 const passwordError = ref('')
 const passwordFields = reactive<Record<string, string>>({})
+
 const passwordForm = reactive({
   currentPassword: '',
   newPassword: '',
@@ -85,6 +107,211 @@ const phishingError = ref('')
 const phishingLoading = ref(false)
 const phishingMode =
     ref<PhishingMode>('create')
+
+const withdrawalAddresses =
+    ref<WithdrawalAddress[]>([])
+
+const withdrawalAddressesLoading =
+    ref(false)
+
+const withdrawalAddressActionLoading =
+    ref('')
+
+const withdrawalAddressModalOpen =
+    ref(false)
+
+const withdrawalAddressConfirmationOpen =
+    ref(false)
+
+const withdrawalAddressCreating =
+    ref(false)
+
+const withdrawalAddressConfirming =
+    ref(false)
+
+const withdrawalAddressResending =
+    ref(false)
+
+const withdrawalAddressConfirmation =
+    ref<WithdrawalAddressConfirmation | null>(null)
+
+const withdrawalAddressAsset =
+    ref('')
+
+const withdrawalAddressNetwork =
+    ref('')
+
+const withdrawalAddressValue =
+    ref('')
+
+const withdrawalAddressMemo =
+    ref('')
+
+const withdrawalAddressLabel =
+    ref('')
+
+const withdrawalAddressError =
+    ref('')
+
+const withdrawalAddressMemoError =
+    ref('')
+
+const withdrawalAddressLabelError =
+    ref('')
+
+const withdrawalAddressCreateError =
+    ref('')
+
+const withdrawalAddressOtp =
+    ref('')
+
+const withdrawalAddressTwoFactorCode =
+    ref('')
+
+const withdrawalAddressOtpError =
+    ref('')
+
+const withdrawalAddressTwoFactorError =
+    ref('')
+
+const withdrawalAddressSecurityMessage =
+    ref('')
+
+const withdrawalAddressExpiresAt =
+    ref('')
+
+const withdrawalAddressResendAt =
+    ref('')
+
+const pendingWithdrawalAddressId =
+    ref('')
+
+const pendingWithdrawalAddressPreview =
+    ref('')
+
+const walletAssets =
+    ref<WalletAsset[]>([])
+
+const withdrawalNetworks =
+    ref<AssetNetwork[]>([])
+
+const withdrawalNetworkLoading =
+    ref(false)
+
+const withdrawalAddressNowMs =
+    ref(Date.now())
+
+let withdrawalAddressClockTimer:
+    number | undefined
+
+const withdrawalAddressConfirmationExpired =
+    computed(() =>
+            !withdrawalAddressExpiresAt.value
+            || Date.parse(
+                withdrawalAddressExpiresAt.value,
+            ) <= withdrawalAddressNowMs.value,
+    )
+
+const withdrawalAddressConfirmationSecondsRemaining =
+    computed(() =>
+        withdrawalAddressExpiresAt.value
+            ? Math.max(
+                0,
+                Math.ceil(
+                    (
+                        Date.parse(
+                            withdrawalAddressExpiresAt.value,
+                        ) - withdrawalAddressNowMs.value
+                    ) / 1000,
+                ),
+            )
+            : 0,
+    )
+
+const withdrawalAddressResendDelay =
+    computed(() =>
+        withdrawalAddressResendAt.value
+            ? Math.max(
+                0,
+                Math.ceil(
+                    (
+                        Date.parse(
+                            withdrawalAddressResendAt.value,
+                        ) - withdrawalAddressNowMs.value
+                    ) / 1000,
+                ),
+            )
+            : 0,
+    )
+
+const visibleWithdrawalAddresses =
+    computed(() =>
+        withdrawalAddresses.value.filter(
+            (item) =>
+                item.status !== 'revoked',
+        ),
+    )
+
+const cryptoWalletAssets =
+    computed(() =>
+        walletAssets.value.filter(
+            (asset) => asset.symbol !== 'IRT',
+        ),
+    )
+
+const withdrawalAssetBalances =
+    computed<Record<string, string>>(() =>
+        Object.fromEntries(
+            cryptoWalletAssets.value.map(
+                (asset) => [
+                  asset.symbol,
+                  asset.available,
+                ],
+            ),
+        ),
+    )
+
+const disabledWithdrawalAssetSymbols =
+    computed(() =>
+        cryptoWalletAssets.value
+            .filter(
+                (asset) =>
+                    !asset.withdrawalEnabled,
+            )
+            .map(
+                (asset) => asset.symbol,
+            ),
+    )
+
+const disabledWithdrawalAssetDescriptions =
+    computed<Record<string, string>>(() =>
+        Object.fromEntries(
+            disabledWithdrawalAssetSymbols.value.map(
+                (symbol) => [
+                  symbol,
+                  'برداشت این ارز موقتاً غیرفعال است',
+                ],
+            ),
+        ),
+    )
+
+const selectedWithdrawalAsset =
+    computed(() =>
+        cryptoWalletAssets.value.find(
+            (asset) =>
+                asset.symbol ===
+                withdrawalAddressAsset.value,
+        ),
+    )
+
+const selectedWithdrawalNetwork =
+    computed(() =>
+        withdrawalNetworks.value.find(
+            (network) =>
+                network.code ===
+                withdrawalAddressNetwork.value,
+        ),
+    )
 
 const otherSessionCount = computed(() =>
     sessions.value.filter(
@@ -123,10 +350,10 @@ const confirmationCopy = computed(() => {
 
   if (action.kind === 'session') {
     return {
-      title: 'خروج این دستگاه؟',
+      title: 'قطع دسترسی این دستگاه؟',
       description:
-          `دسترسی ${action.session.deviceName} قطع می‌شود و برای ورود دوباره به رمز و کد تأیید نیاز دارد.`,
-      confirm: 'بله، خارج شود',
+          `دسترسی ${action.session.deviceName} فوراً قطع می‌شود و این نشست دیگر معتبر نخواهد بود.`,
+      confirm: 'قطع دسترسی',
     }
   }
 
@@ -148,16 +375,25 @@ const confirmationCopy = computed(() => {
     }
   }
 
+  if (action.kind === 'whitelist') {
+    return {
+      title: action.enabled
+          ? 'فعال‌کردن فهرست مجاز برداشت؟'
+          : 'غیرفعال‌کردن فهرست مجاز؟',
+      description: action.enabled
+          ? 'پس از فعال‌سازی، برداشت فقط به آدرس‌های تأییدشده انجام می‌شود.'
+          : 'پس از غیرفعال‌سازی، محدودیت فهرست مجاز روی برداشت اعمال نمی‌شود.',
+      confirm: action.enabled
+          ? 'فعال شود'
+          : 'غیرفعال شود',
+    }
+  }
+
   return {
-    title: action.enabled
-        ? 'فعال‌کردن فهرست مجاز برداشت؟'
-        : 'غیرفعال‌کردن فهرست مجاز؟',
-    description: action.enabled
-        ? 'پس از فعال‌سازی، برداشت فقط به آدرس‌های تأییدشده انجام می‌شود.'
-        : 'پس از غیرفعال‌سازی، امکان برداشت به آدرس‌های تازه نیز وجود خواهد داشت.',
-    confirm: action.enabled
-        ? 'فعال شود'
-        : 'غیرفعال شود',
+    title: 'غیرفعال‌کردن این آدرس؟',
+    description:
+        `آدرس ${action.address.label || action.address.address} غیرفعال خواهد شد و دیگر برای برداشت قابل استفاده نخواهد بود.`,
+    confirm: 'غیرفعال شود',
   }
 })
 
@@ -170,6 +406,52 @@ function readableError(
       : fallback
 }
 
+function formatSecurityEventTime(
+    value: string,
+): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return '—'
+  }
+
+  const now = new Date()
+
+  const today = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+  )
+
+  const eventDay = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+  )
+
+  const diffDays = Math.floor(
+      (
+          today.getTime()
+          - eventDay.getTime()
+      ) /
+      (24 * 60 * 60 * 1000),
+  )
+
+  if (diffDays === 0) {
+    return formatRelativeTime(value)
+  }
+
+  if (diffDays === 1) {
+    return 'دیروز'
+  }
+
+  if (diffDays >= 2) {
+    return `${toPersianDigits(diffDays)} روز پیش`
+  }
+
+  return formatRelativeTime(value)
+}
+
 function deviceIcon(
     type: ActiveSession['deviceType'],
 ): string {
@@ -180,66 +462,735 @@ function deviceIcon(
           : 'markets'
 }
 
-function eventIcon(
-    type: SecurityEventType,
-): string {
-  const icons: Record<
-      SecurityEventType,
-      string
-  > = {
+function eventIcon(type: string): string {
+  const icons: Record<string, string> = {
     otp_requested: 'shield',
     otp_verified: 'shield',
     otp_failed: 'warning',
+
     login_success: 'shield',
     login_failure: 'warning',
+
     registration_success: 'check',
     logout: 'logout',
+
     password_change: 'lock',
     password_reset_success: 'lock',
+
     kyc_update: 'verify',
     security_alert: 'warning',
+
     two_factor_enabled: 'shield',
     two_factor_disabled: 'shield',
+
     anti_phishing_created: 'mail',
     anti_phishing_updated: 'mail',
     anti_phishing_deleted: 'mail',
+
     session_revoked: 'logout',
+
     withdrawal_confirmed: 'wallet',
+
+    withdrawal_addr_confirm_req: 'shield',
+    withdrawal_addr_confirmed: 'check',
+    withdrawal_addr_activated: 'wallet',
+    withdrawal_addr_revoked: 'warning',
+    withdrawal_addr_default: 'wallet',
+
+    withdrawal_whitelist_enabled: 'check',
+    withdrawal_whitelist_disabled: 'warning',
   }
 
   return icons[type] ?? 'clock'
 }
 
-function eventTone(
-    type: SecurityEventType,
-): string {
+function eventTone(type: string): string {
   if (
-      type === 'login_failure' ||
-      type === 'otp_failed'
+      type === 'login_failure'
+      || type === 'otp_failed'
+      || type === 'withdrawal_addr_revoked'
+      || type === 'withdrawal_whitelist_disabled'
   ) {
     return 'danger'
   }
 
   if (
-      type === 'two_factor_disabled' ||
-      type === 'anti_phishing_deleted' ||
-      type === 'logout'
+      type === 'two_factor_disabled'
+      || type === 'anti_phishing_deleted'
+      || type === 'logout'
   ) {
     return 'warning'
   }
 
   if (
-      type === 'two_factor_enabled' ||
-      type === 'password_change' ||
-      type === 'password_reset_success' ||
-      type === 'anti_phishing_created' ||
-      type === 'anti_phishing_updated' ||
-      type === 'registration_success'
+      type === 'two_factor_enabled'
+      || type === 'password_change'
+      || type === 'password_reset_success'
+      || type === 'anti_phishing_created'
+      || type === 'anti_phishing_updated'
+      || type === 'registration_success'
+      || type === 'withdrawal_addr_confirmed'
+      || type === 'withdrawal_addr_activated'
+      || type === 'withdrawal_addr_default'
+      || type === 'withdrawal_whitelist_enabled'
   ) {
     return 'success'
   }
 
   return 'info'
+}
+
+function withdrawalAddressStatusLabel(
+    status: WithdrawalAddress['status'],
+): string {
+  switch (status) {
+    case 'active':
+      return 'فعال'
+
+    case 'pending_confirmation':
+      return 'در انتظار تأیید'
+
+    case 'cooling_down':
+      return 'دوره امنیتی'
+
+    case 'disabled':
+      return 'غیرفعال'
+
+    case 'blocked':
+      return 'مسدود'
+
+    case 'revoked':
+      return 'لغوشده'
+
+    default:
+      return 'نامشخص'
+  }
+}
+
+function withdrawalAddressStatusTone(
+    status: WithdrawalAddress['status'],
+): string {
+  switch (status) {
+    case 'active':
+      return 'success'
+
+    case 'pending_confirmation':
+    case 'cooling_down':
+      return 'warning'
+
+    case 'blocked':
+    case 'revoked':
+    case 'disabled':
+      return 'danger'
+
+    default:
+      return 'info'
+  }
+}
+
+function cooldownSecondsRemaining(
+    address: WithdrawalAddress,
+): number {
+  if (
+      address.status !== 'cooling_down'
+      || !address.cooldownUntil
+  ) {
+    return 0
+  }
+
+  return Math.max(
+      0,
+      Math.ceil(
+          (
+              Date.parse(
+                  address.cooldownUntil,
+              )
+              - withdrawalAddressNowMs.value
+          ) / 1000,
+      ),
+  )
+}
+
+function resetWithdrawalAddressForm(): void {
+  withdrawalAddressAsset.value = ''
+  withdrawalAddressNetwork.value = ''
+  withdrawalAddressValue.value = ''
+  withdrawalAddressMemo.value = ''
+  withdrawalAddressLabel.value = ''
+
+  withdrawalAddressError.value = ''
+  withdrawalAddressMemoError.value = ''
+  withdrawalAddressLabelError.value = ''
+  withdrawalAddressCreateError.value = ''
+
+  withdrawalNetworks.value = []
+}
+
+async function loadWithdrawalAddresses(): Promise<void> {
+  withdrawalAddressesLoading.value = true
+  withdrawalAddressCreateError.value = ''
+
+  try {
+    withdrawalAddresses.value =
+        await withdrawalAddressService.list()
+  } catch (caught) {
+    withdrawalAddressCreateError.value =
+        readableError(
+            caught,
+            'فهرست آدرس‌های برداشت دریافت نشد.',
+        )
+  } finally {
+    withdrawalAddressesLoading.value = false
+  }
+}
+
+async function loadWithdrawalAssets(): Promise<void> {
+  try {
+    const wallet =
+        await walletService.getSummary()
+
+    walletAssets.value =
+        wallet.assets
+  } catch {
+    walletAssets.value = []
+  }
+}
+
+async function loadWithdrawalNetworks(
+    symbol: string,
+): Promise<void> {
+  withdrawalNetworks.value = []
+  withdrawalAddressNetwork.value = ''
+
+  withdrawalAddressValue.value = ''
+  withdrawalAddressMemo.value = ''
+
+  withdrawalAddressError.value = ''
+  withdrawalAddressMemoError.value = ''
+
+  if (!symbol) {
+    return
+  }
+
+  withdrawalNetworkLoading.value = true
+
+  try {
+    const networks =
+        await walletService.getNetworks(
+            symbol as WalletAsset['symbol'],
+        )
+
+    withdrawalNetworks.value =
+        networks.filter(
+            (network) =>
+                network.withdrawalEnabled
+                && network.status !== 'disabled'
+                && network.status !== 'maintenance',
+        )
+
+    withdrawalAddressNetwork.value =
+        withdrawalNetworks.value[0]?.code || ''
+  } catch (caught) {
+    withdrawalAddressCreateError.value =
+        readableError(
+            caught,
+            'شبکه‌های این ارز دریافت نشدند.',
+        )
+  } finally {
+    withdrawalNetworkLoading.value = false
+  }
+}
+
+function openWithdrawalAddressModal(): void {
+  resetWithdrawalAddressForm()
+  withdrawalAddressModalOpen.value = true
+}
+
+function closeWithdrawalAddressModal(): void {
+  if (withdrawalAddressCreating.value) {
+    return
+  }
+
+  withdrawalAddressModalOpen.value = false
+}
+
+function validateWithdrawalAddressForm(): boolean {
+  withdrawalAddressError.value = ''
+  withdrawalAddressMemoError.value = ''
+  withdrawalAddressLabelError.value = ''
+  withdrawalAddressCreateError.value = ''
+
+  if (
+      !overview.value?.mobileVerified
+  ) {
+    withdrawalAddressCreateError.value =
+        'برای افزودن آدرس برداشت ابتدا شماره موبایل خود را تأیید کنید.'
+    return false
+  }
+
+  if (!withdrawalAddressAsset.value) {
+    withdrawalAddressCreateError.value =
+        'ارز را انتخاب کنید.'
+    return false
+  }
+
+  if (!withdrawalAddressNetwork.value) {
+    withdrawalAddressCreateError.value =
+        'شبکه را انتخاب کنید.'
+    return false
+  }
+
+  const network =
+      selectedWithdrawalNetwork.value
+
+  if (!network) {
+    withdrawalAddressCreateError.value =
+        'شبکه انتخاب‌شده معتبر نیست.'
+    return false
+  }
+
+  const address =
+      withdrawalAddressValue.value.trim()
+
+  if (!address) {
+    withdrawalAddressError.value =
+        'آدرس برداشت را وارد کنید.'
+    return false
+  }
+
+  if (/\s/.test(address)) {
+    withdrawalAddressError.value =
+        'آدرس برداشت نباید فاصله داشته باشد.'
+    return false
+  }
+
+  if (network.addressRegex) {
+    try {
+      if (
+          !new RegExp(
+              network.addressRegex,
+          ).test(address)
+      ) {
+        withdrawalAddressError.value =
+            `ساختار آدرس با شبکه ${network.code} هم‌خوانی ندارد.`
+        return false
+      }
+    } catch {
+      return false
+    }
+  } else if (address.length < 12) {
+    withdrawalAddressError.value =
+        'طول آدرس معتبر نیست.'
+    return false
+  }
+
+  if (
+      network.memoRequired
+      && !withdrawalAddressMemo.value.trim()
+  ) {
+    withdrawalAddressMemoError.value =
+        'ممو یا تگ این شبکه الزامی است.'
+    return false
+  }
+
+  return true
+}
+
+async function createWithdrawalAddress(): Promise<void> {
+  if (
+      withdrawalAddressCreating.value
+  ) {
+    return
+  }
+
+  if (!validateWithdrawalAddressForm()) {
+    return
+  }
+
+  withdrawalAddressCreating.value = true
+  withdrawalAddressCreateError.value = ''
+
+  try {
+    const response =
+        await withdrawalAddressService.create({
+          asset:
+          withdrawalAddressAsset.value,
+          network:
+          withdrawalAddressNetwork.value,
+          address:
+              withdrawalAddressValue.value.trim(),
+          memo:
+              withdrawalAddressMemo.value.trim()
+              || undefined,
+          label:
+              withdrawalAddressLabel.value.trim()
+              || undefined,
+        })
+
+    withdrawalAddresses.value = [
+      response.address,
+      ...withdrawalAddresses.value.filter(
+          (item) =>
+              String(item.id)
+              !== String(
+                  response.address.id,
+              ),
+      ),
+    ]
+
+    pendingWithdrawalAddressId.value =
+        String(response.address.id)
+
+    pendingWithdrawalAddressPreview.value =
+        response.address.address
+
+    withdrawalAddressConfirmation.value =
+        response.confirmation
+
+    withdrawalAddressOtp.value = ''
+    withdrawalAddressTwoFactorCode.value = ''
+    withdrawalAddressOtpError.value = ''
+    withdrawalAddressTwoFactorError.value = ''
+    withdrawalAddressSecurityMessage.value = ''
+
+    withdrawalAddressExpiresAt.value =
+        new Date(
+            Date.now()
+            + response.confirmation.expiresIn
+            * 1_000,
+        ).toISOString()
+
+    withdrawalAddressResendAt.value =
+        new Date(
+            Date.now()
+            + response.confirmation.resendAvailableIn
+            * 1_000,
+        ).toISOString()
+
+    withdrawalAddressModalOpen.value = false
+    withdrawalAddressConfirmationOpen.value = true
+
+    withdrawalAddressNowMs.value =
+        Date.now()
+  } catch (caught) {
+    if (caught instanceof ApiError) {
+      withdrawalAddressError.value =
+          caught.details?.fields?.address
+          || ''
+
+      withdrawalAddressMemoError.value =
+          caught.details?.fields?.memo
+          || ''
+
+      withdrawalAddressLabelError.value =
+          caught.details?.fields?.label
+          || ''
+    }
+
+    withdrawalAddressCreateError.value =
+        readableError(
+            caught,
+            'ثبت آدرس برداشت انجام نشد.',
+        )
+  } finally {
+    withdrawalAddressCreating.value = false
+  }
+}
+
+async function confirmWithdrawalAddress(): Promise<void> {
+  if (
+      withdrawalAddressConfirming.value
+      || !pendingWithdrawalAddressId.value
+      || !withdrawalAddressConfirmation.value
+  ) {
+    return
+  }
+
+  withdrawalAddressOtpError.value = ''
+  withdrawalAddressTwoFactorError.value = ''
+
+  const otp =
+      normalizeDigits(
+          withdrawalAddressOtp.value,
+      )
+          .replace(/\D/g, '')
+          .slice(0, 6)
+
+  if (otp.length !== 6) {
+    withdrawalAddressOtpError.value =
+        'کد تأیید شش‌رقمی را کامل وارد کنید.'
+    return
+  }
+
+  const twoFactorCode =
+      normalizeDigits(
+          withdrawalAddressTwoFactorCode.value,
+      )
+          .replace(/\D/g, '')
+          .slice(0, 6)
+
+  if (
+      overview.value?.twoFactorEnabled
+      && twoFactorCode.length !== 6
+  ) {
+    withdrawalAddressTwoFactorError.value =
+        'کد Authenticator را کامل وارد کنید.'
+    return
+  }
+
+  if (
+      withdrawalAddressConfirmationExpired.value
+  ) {
+    withdrawalAddressOtpError.value =
+        'مهلت کد تأیید تمام شده است.'
+    return
+  }
+
+  withdrawalAddressConfirming.value = true
+
+  try {
+    const confirmed =
+        await withdrawalAddressService.confirm(
+            pendingWithdrawalAddressId.value,
+            {
+              challengeId:
+              withdrawalAddressConfirmation.value
+                  .challengeId,
+              otp,
+              twoFactorCode:
+                  overview.value?.twoFactorEnabled
+                      ? twoFactorCode
+                      : undefined,
+            },
+        )
+
+    withdrawalAddresses.value = [
+      confirmed,
+      ...withdrawalAddresses.value.filter(
+          (item) =>
+              String(item.id)
+              !== String(confirmed.id),
+      ),
+    ]
+
+    withdrawalAddressConfirmationOpen.value =
+        false
+
+    withdrawalAddressOtp.value = ''
+    withdrawalAddressTwoFactorCode.value = ''
+
+    pendingWithdrawalAddressId.value = ''
+    pendingWithdrawalAddressPreview.value = ''
+
+    withdrawalAddressConfirmation.value = null
+    withdrawalAddressExpiresAt.value = ''
+    withdrawalAddressResendAt.value = ''
+
+    withdrawalAddressSecurityMessage.value =
+        confirmed.status === 'active'
+            ? 'آدرس برداشت با موفقیت فعال شد.'
+            : 'آدرس برداشت تأیید شد و وارد دوره امنیتی شد.'
+
+    feedback.value =
+        withdrawalAddressSecurityMessage.value
+
+    await loadWithdrawalAddresses()
+    events.value =
+        await securityService.listEvents()
+  } catch (caught) {
+    if (caught instanceof ApiError) {
+      withdrawalAddressOtpError.value =
+          caught.details?.fields?.otp
+          || ''
+
+      withdrawalAddressTwoFactorError.value =
+          caught.details?.fields?.twoFactorCode
+          || ''
+    }
+
+    if (
+        !withdrawalAddressOtpError.value
+        && !withdrawalAddressTwoFactorError.value
+    ) {
+      withdrawalAddressOtpError.value =
+          readableError(
+              caught,
+              'تأیید آدرس انجام نشد.',
+          )
+    }
+  } finally {
+    withdrawalAddressConfirming.value = false
+  }
+}
+
+async function resendWithdrawalAddressConfirmation(): Promise<void> {
+  if (
+      withdrawalAddressResending.value
+      || !pendingWithdrawalAddressId.value
+  ) {
+    return
+  }
+
+  if (
+      withdrawalAddressResendDelay.value > 0
+  ) {
+    return
+  }
+
+  withdrawalAddressResending.value = true
+  withdrawalAddressOtpError.value = ''
+  withdrawalAddressSecurityMessage.value = ''
+
+  try {
+    const response =
+        await withdrawalAddressService
+            .resendConfirmation(
+                pendingWithdrawalAddressId.value,
+            )
+
+    withdrawalAddresses.value = [
+      response.address,
+      ...withdrawalAddresses.value.filter(
+          (item) =>
+              String(item.id)
+              !== String(
+                  response.address.id,
+              ),
+      ),
+    ]
+
+    withdrawalAddressConfirmation.value =
+        response.confirmation
+
+    withdrawalAddressExpiresAt.value =
+        new Date(
+            Date.now()
+            + response.confirmation.expiresIn
+            * 1_000,
+        ).toISOString()
+
+    withdrawalAddressResendAt.value =
+        new Date(
+            Date.now()
+            + response.confirmation.resendAvailableIn
+            * 1_000,
+        ).toISOString()
+
+    withdrawalAddressOtp.value = ''
+    withdrawalAddressNowMs.value =
+        Date.now()
+
+    withdrawalAddressSecurityMessage.value =
+        'کد تأیید دوباره ارسال شد.'
+  } catch (caught) {
+    withdrawalAddressOtpError.value =
+        readableError(
+            caught,
+            'ارسال دوباره کد انجام نشد.',
+        )
+  } finally {
+    withdrawalAddressResending.value = false
+  }
+}
+
+async function setWithdrawalAddressDefault(
+    address: WithdrawalAddress,
+): Promise<void> {
+  if (
+      withdrawalAddressActionLoading.value
+  ) {
+    return
+  }
+
+  if (address.status !== 'active') {
+    return
+  }
+
+  withdrawalAddressActionLoading.value =
+      `default:${address.id}`
+
+  try {
+    const updated =
+        await withdrawalAddressService.setDefault(
+            String(address.id),
+        )
+
+    withdrawalAddresses.value =
+        withdrawalAddresses.value.map(
+            (item) => ({
+              ...item,
+              isDefault:
+                  String(item.id)
+                  === String(updated.id),
+            }),
+        )
+
+    feedback.value =
+        'آدرس پیش‌فرض برداشت تغییر کرد.'
+
+    events.value =
+        await securityService.listEvents()
+  } catch (caught) {
+    error.value = readableError(
+        caught,
+        'تغییر آدرس پیش‌فرض انجام نشد.',
+    )
+  } finally {
+    withdrawalAddressActionLoading.value = ''
+  }
+}
+
+function askRevokeWithdrawalAddress(
+    address: WithdrawalAddress,
+): void {
+  confirmation.value = {
+    kind: 'revoke-address',
+    address,
+  }
+}
+
+async function revokeWithdrawalAddress(
+    address: WithdrawalAddress,
+): Promise<void> {
+  if (
+      withdrawalAddressActionLoading.value
+  ) {
+    return
+  }
+
+  withdrawalAddressActionLoading.value =
+      `revoke:${address.id}`
+
+  try {
+    await withdrawalAddressService.remove(
+        String(address.id),
+    )
+
+    withdrawalAddresses.value =
+        withdrawalAddresses.value.filter(
+            (item) =>
+                String(item.id)
+                !== String(address.id),
+        )
+
+    feedback.value =
+        address.status ===
+        'pending_confirmation'
+            ? 'آدرس در انتظار تأیید حذف شد.'
+            : 'آدرس برداشت با موفقیت غیرفعال شد.'
+
+    events.value =
+        await securityService.listEvents()
+
+    confirmation.value = null
+  } catch (caught) {
+    error.value = readableError(
+        caught,
+        'غیرفعال‌سازی آدرس انجام نشد.',
+    )
+  } finally {
+    withdrawalAddressActionLoading.value = ''
+  }
 }
 
 async function load(): Promise<void> {
@@ -255,6 +1206,8 @@ async function load(): Promise<void> {
       securityService.getOverview(),
       securityService.listSessions(),
       securityService.listEvents(),
+      loadWithdrawalAssets(),
+      loadWithdrawalAddresses(),
     ])
 
     overview.value = securityOverview
@@ -277,7 +1230,8 @@ function resetPasswordForm(): void {
   passwordError.value = ''
 
   Object.keys(passwordFields).forEach(
-      (key) => delete passwordFields[key],
+      (key) =>
+          delete passwordFields[key],
   )
 }
 
@@ -288,30 +1242,35 @@ function openPassword(): void {
 
 function validatePassword(): boolean {
   Object.keys(passwordFields).forEach(
-      (key) => delete passwordFields[key],
+      (key) =>
+          delete passwordFields[key],
   )
 
-  if (passwordForm.currentPassword.length < 8) {
+  if (
+      passwordForm.currentPassword.length < 8
+  ) {
     passwordFields.currentPassword =
         'رمز عبور فعلی را کامل وارد کنید.'
   }
 
-  if (passwordForm.newPassword.length < 8) {
+  if (
+      passwordForm.newPassword.length < 8
+  ) {
     passwordFields.newPassword =
         'رمز جدید باید حداقل ۸ کاراکتر باشد.'
   }
 
   if (
-      passwordForm.newPassword !==
-      passwordForm.newPasswordConfirmation
+      passwordForm.newPassword
+      !== passwordForm.newPasswordConfirmation
   ) {
     passwordFields.newPasswordConfirmation =
         'تکرار رمز با رمز جدید یکسان نیست.'
   }
 
   if (
-      passwordForm.currentPassword ===
-      passwordForm.newPassword
+      passwordForm.currentPassword
+      === passwordForm.newPassword
   ) {
     passwordFields.newPassword =
         'رمز جدید باید با رمز فعلی متفاوت باشد.'
@@ -343,8 +1302,8 @@ async function changePassword(): Promise<void> {
         await securityService.listEvents()
   } catch (caught) {
     if (
-        caught instanceof ApiError &&
-        caught.details?.fields
+        caught instanceof ApiError
+        && caught.details?.fields
     ) {
       Object.assign(
           passwordFields,
@@ -352,10 +1311,11 @@ async function changePassword(): Promise<void> {
       )
     }
 
-    passwordError.value = readableError(
-        caught,
-        'تغییر رمز عبور انجام نشد.',
-    )
+    passwordError.value =
+        readableError(
+            caught,
+            'تغییر رمز عبور انجام نشد.',
+        )
   } finally {
     changingPassword.value = false
   }
@@ -417,7 +1377,9 @@ function updateDisableTwoFactorCode(
 async function enableTwoFactor(): Promise<void> {
   const code = normalizeDigits(
       twoFactorCode.value,
-  ).replace(/\D/g, '')
+  )
+      .replace(/\D/g, '')
+      .slice(0, 6)
 
   if (!twoFactorSetup.value) {
     twoFactorError.value =
@@ -452,10 +1414,11 @@ async function enableTwoFactor(): Promise<void> {
     feedback.value =
         'ورود دومرحله‌ای فعال شد.'
   } catch (caught) {
-    twoFactorError.value = readableError(
-        caught,
-        'فعال‌سازی ورود دومرحله‌ای انجام نشد.',
-    )
+    twoFactorError.value =
+        readableError(
+            caught,
+            'فعال‌سازی ورود دومرحله‌ای انجام نشد.',
+        )
   } finally {
     twoFactorLoading.value = false
   }
@@ -473,7 +1436,8 @@ async function openPhishing(): Promise<void> {
 
     const existingCode =
         String(
-            latestOverview.antiPhishingCode ?? '',
+            latestOverview.antiPhishingCode
+            ?? '',
         ).trim()
 
     phishingCode.value = existingCode
@@ -497,7 +1461,9 @@ async function openPhishing(): Promise<void> {
 function updatePhishingCode(
     value: string,
 ): void {
-  if (phishingMode.value === 'existing') {
+  if (
+      phishingMode.value === 'existing'
+  ) {
     return
   }
 
@@ -508,7 +1474,9 @@ function updatePhishingCode(
 }
 
 async function savePhishing(): Promise<void> {
-  if (phishingMode.value !== 'create') {
+  if (
+      phishingMode.value !== 'create'
+  ) {
     return
   }
 
@@ -516,10 +1484,10 @@ async function savePhishing(): Promise<void> {
       phishingCode.value.trim()
 
   if (
-      code &&
-      (
-          code.length < 4 ||
-          code.length > 20
+      code
+      && (
+          code.length < 4
+          || code.length > 20
       )
   ) {
     phishingError.value =
@@ -532,11 +1500,13 @@ async function savePhishing(): Promise<void> {
 
   try {
     const updatedOverview =
-        await securityService.setAntiPhishingCode(
-            code || null,
-        )
+        await securityService
+            .setAntiPhishingCode(
+                code || null,
+            )
 
-    overview.value = updatedOverview
+    overview.value =
+        updatedOverview
 
     events.value =
         await securityService.listEvents()
@@ -555,10 +1525,11 @@ async function savePhishing(): Promise<void> {
         ? 'کد ضد فیشینگ ذخیره شد.'
         : 'کد ضد فیشینگ حذف شد.'
   } catch (caught) {
-    phishingError.value = readableError(
-        caught,
-        'ذخیره کد ضد فیشینگ انجام نشد.',
-    )
+    phishingError.value =
+        readableError(
+            caught,
+            'ذخیره کد ضد فیشینگ انجام نشد.',
+        )
   } finally {
     phishingLoading.value = false
   }
@@ -570,11 +1541,13 @@ async function removePhishing(): Promise<void> {
 
   try {
     const updatedOverview =
-        await securityService.setAntiPhishingCode(
-            null,
-        )
+        await securityService
+            .setAntiPhishingCode(
+                null,
+            )
 
-    overview.value = updatedOverview
+    overview.value =
+        updatedOverview
 
     events.value =
         await securityService.listEvents()
@@ -585,17 +1558,20 @@ async function removePhishing(): Promise<void> {
     feedback.value =
         'کد ضد فیشینگ حذف شد.'
   } catch (caught) {
-    phishingError.value = readableError(
-        caught,
-        'حذف کد ضد فیشینگ انجام نشد.',
-    )
+    phishingError.value =
+        readableError(
+            caught,
+            'حذف کد ضد فیشینگ انجام نشد.',
+        )
   } finally {
     phishingLoading.value = false
   }
 }
 
 function closeConfirmation(): void {
-  if (confirming.value) return
+  if (confirming.value) {
+    return
+  }
 
   confirmation.value = null
   disableTwoFactorCode.value = ''
@@ -605,14 +1581,21 @@ function closeConfirmation(): void {
 async function runConfirmation(): Promise<void> {
   const action = confirmation.value
 
-  if (!action) return
+  if (!action) {
+    return
+  }
 
   let disableCode = ''
 
-  if (action.kind === 'disable-2fa') {
-    disableCode = normalizeDigits(
-        disableTwoFactorCode.value,
-    ).replace(/\D/g, '')
+  if (
+      action.kind === 'disable-2fa'
+  ) {
+    disableCode =
+        normalizeDigits(
+            disableTwoFactorCode.value,
+        )
+            .replace(/\D/g, '')
+            .slice(0, 6)
 
     if (!/^\d{6}$/.test(disableCode)) {
       disableTwoFactorError.value =
@@ -633,7 +1616,8 @@ async function runConfirmation(): Promise<void> {
       sessions.value =
           sessions.value.filter(
               (session) =>
-                  session.id !== action.session.id,
+                  session.id
+                  !== action.session.id,
           )
 
       feedback.value =
@@ -641,11 +1625,13 @@ async function runConfirmation(): Promise<void> {
     } else if (
         action.kind === 'other-sessions'
     ) {
-      await securityService.revokeOtherSessions()
+      await securityService
+          .revokeOtherSessions()
 
       sessions.value =
           sessions.value.filter(
-              (session) => session.current,
+              (session) =>
+                  session.current,
           )
 
       feedback.value =
@@ -667,29 +1653,48 @@ async function runConfirmation(): Promise<void> {
 
       feedback.value =
           'ورود دومرحله‌ای غیرفعال شد.'
-    } else {
-      overview.value =
-          await securityService.setWithdrawalWhitelist(
-              action.enabled,
-          )
-
-      feedback.value = action.enabled
-          ? 'فهرست مجاز برداشت فعال شد.'
-          : 'فهرست مجاز برداشت غیرفعال شد.'
-    }
-
-    if (
-        action.kind === 'session' ||
-        action.kind === 'other-sessions'
+    } else if (
+        action.kind === 'whitelist'
     ) {
       overview.value =
-          await securityService.getOverview()
+          await securityService
+              .setWithdrawalWhitelist(
+                  action.enabled,
+              )
 
       events.value =
           await securityService.listEvents()
+
+      feedback.value =
+          action.enabled
+              ? 'فهرست مجاز برداشت فعال شد.'
+              : 'فهرست مجاز برداشت غیرفعال شد.'
+    } else if (
+        action.kind === 'revoke-address'
+    ) {
+      await revokeWithdrawalAddress(
+          action.address,
+      )
     }
 
-    confirmation.value = null
+    if (
+        action.kind === 'session'
+        || action.kind === 'other-sessions'
+    ) {
+      overview.value =
+          await securityService
+              .getOverview()
+
+      events.value =
+          await securityService
+              .listEvents()
+    }
+
+    if (
+        action.kind !== 'revoke-address'
+    ) {
+      confirmation.value = null
+    }
   } catch (caught) {
     if (
         action.kind === 'disable-2fa'
@@ -700,10 +1705,11 @@ async function runConfirmation(): Promise<void> {
               'کد Authenticator صحیح نیست یا منقضی شده است.',
           )
     } else {
-      error.value = readableError(
-          caught,
-          'تغییر امنیتی انجام نشد.',
-      )
+      error.value =
+          readableError(
+              caught,
+              'تغییر امنیتی انجام نشد.',
+          )
 
       confirmation.value = null
     }
@@ -716,9 +1722,10 @@ function onWhitelistInput(
     enabled: boolean,
 ): void {
   if (
-      !overview.value ||
-      enabled ===
-      overview.value.withdrawalWhitelistEnabled
+      !overview.value
+      || enabled ===
+      overview.value
+          .withdrawalWhitelistEnabled
   ) {
     return
   }
@@ -729,7 +1736,35 @@ function onWhitelistInput(
   }
 }
 
-onMounted(load)
+watch(
+    withdrawalAddressAsset,
+    (symbol) => {
+      void loadWithdrawalNetworks(
+          symbol,
+      )
+    },
+)
+
+onMounted(() => {
+  withdrawalAddressClockTimer =
+      window.setInterval(() => {
+        withdrawalAddressNowMs.value =
+            Date.now()
+      }, 1_000)
+
+  void load()
+})
+
+onBeforeUnmount(() => {
+  if (
+      withdrawalAddressClockTimer
+      !== undefined
+  ) {
+    window.clearInterval(
+        withdrawalAddressClockTimer,
+    )
+  }
+})
 </script>
 
 <template>
@@ -948,6 +1983,7 @@ onMounted(load)
 
             <div>
               <h2>ورود و بازیابی</h2>
+
               <p>
                 راه‌های ورود و تأیید هویت حساب
               </p>
@@ -965,6 +2001,7 @@ onMounted(load)
 
               <div>
                 <strong>رمز عبور</strong>
+
                 <small>
                   برای حساب شما تنظیم شده است
                 </small>
@@ -1167,7 +2204,6 @@ onMounted(load)
               />
             </div>
 
-
             <AppButton
                 class="phishing-action"
                 variant="secondary"
@@ -1184,41 +2220,359 @@ onMounted(load)
             </AppButton>
           </div>
 
-          <div class="feature-block">
-            <div class="feature-title">
-              <span>
-                <AppIcon
-                    name="check"
-                    :size="21"
-                />
-              </span>
+          <div class="feature-block whitelist-feature">
+            <div class="feature-header">
+              <div class="feature-title">
+                <span>
+                  <AppIcon
+                      name="check"
+                      :size="21"
+                  />
+                </span>
 
+                <div>
+                  <strong>
+                    فهرست مجاز آدرس برداشت
+                  </strong>
+
+                  <small>
+                    آدرس‌های مورد تأیید شما برای برداشت
+                  </small>
+                </div>
+              </div>
+
+              <AppSwitch
+                  :model-value="
+                  overview.withdrawalWhitelistEnabled
+                "
+                  :label="
+                  overview.withdrawalWhitelistEnabled
+                    ? 'فعال'
+                    : 'غیرفعال'
+                "
+                  description="تغییر این گزینه نیازمند تأیید شماست."
+                  @update:model-value="
+                  onWhitelistInput
+                "
+              />
+            </div>
+
+            <div class="whitelist-description">
+              <AppIcon
+                  name="shield"
+                  :size="17"
+              />
+
+              <span>
+                هنگام افزودن آدرس، ابتدا ارز و شبکه را انتخاب می‌کنید و سپس
+                آدرس را وارد می‌کنید. تطابق ارز، شبکه، ساختار آدرس و شرایط
+                Memo/Tag در سرور بررسی می‌شود و پس از OTP و در صورت نیاز
+                Authenticator، آدرس وارد دوره امنیتی می‌شود.
+              </span>
+            </div>
+
+            <div class="address-management-header">
               <div>
                 <strong>
-                  فهرست مجاز آدرس برداشت
+                  آدرس‌های ثبت‌شده
                 </strong>
 
                 <small>
-                  برداشت فقط به آدرس‌هایی که از قبل
-                  تأیید کرده‌اید
+                  {{
+                    toPersianDigits(
+                        visibleWithdrawalAddresses.length,
+                    )
+                  }}
+                  آدرس
                 </small>
               </div>
+
+              <AppButton
+                  variant="secondary"
+                  size="sm"
+                  icon="plus"
+                  :disabled="
+                  !overview.mobileVerified
+                "
+                  @click="
+                  openWithdrawalAddressModal
+                "
+              >
+                افزودن آدرس
+              </AppButton>
             </div>
 
-            <AppSwitch
-                :model-value="
-                overview.withdrawalWhitelistEnabled
+            <div
+                v-if="
+                !overview.mobileVerified
               "
-                :label="
-                overview.withdrawalWhitelistEnabled
-                  ? 'فهرست مجاز فعال است'
-                  : 'فهرست مجاز غیرفعال است'
+                class="address-warning"
+            >
+              <AppIcon
+                  name="warning"
+                  :size="17"
+              />
+
+              <span>
+                برای افزودن آدرس برداشت ابتدا شماره موبایل خود را تأیید کنید.
+              </span>
+            </div>
+
+            <div
+                v-if="withdrawalAddressesLoading"
+                class="address-loading"
+            >
+              <AppSkeleton
+                  v-for="i in 2"
+                  :key="i"
+                  height="5.8rem"
+                  radius="var(--radius-lg)"
+              />
+            </div>
+
+            <div
+                v-else-if="
+                visibleWithdrawalAddresses.length
               "
-                description="تغییر این گزینه نیازمند تأیید شماست."
-                @update:model-value="
-                onWhitelistInput
+                class="withdrawal-address-list"
+            >
+              <article
+                  v-for="
+                  address in visibleWithdrawalAddresses
+                "
+                  :key="address.id"
+                  class="withdrawal-address-card"
+                  :class="{
+                  'is-default':
+                    address.isDefault,
+                  'is-blocked':
+                    address.status === 'blocked',
+                }"
+              >
+                <div class="withdrawal-address-top">
+                  <div class="withdrawal-address-identity">
+                    <span
+                        class="address-icon"
+                    >
+                      <AppIcon
+                          name="wallet"
+                          :size="19"
+                      />
+                    </span>
+
+                    <div>
+                      <strong>
+                        {{
+                          address.label
+                          || 'آدرس برداشت'
+                        }}
+                      </strong>
+
+                      <small>
+                        {{
+                          address.assetNameFa
+                        }}
+                        ·
+                        {{
+                          address.networkDisplayName
+                        }}
+                      </small>
+                    </div>
+                  </div>
+
+                  <span
+                      class="address-status"
+                      :class="
+                      `tone-${withdrawalAddressStatusTone(
+                        address.status,
+                      )}`
+                    "
+                  >
+                    {{
+                      withdrawalAddressStatusLabel(
+                          address.status,
+                      )
+                    }}
+                  </span>
+                </div>
+
+                <div
+                    class="withdrawal-address-value"
+                >
+                  <bdi dir="ltr">
+                    {{ address.address }}
+                  </bdi>
+
+                  <small
+                      v-if="address.memo"
+                      dir="ltr"
+                  >
+                    Memo: {{ address.memo }}
+                  </small>
+                </div>
+
+                <div
+                    v-if="
+                    address.status ===
+                    'cooling_down'
+                    && address.cooldownUntil
+                  "
+                    class="cooldown-note"
+                >
+                  <AppIcon
+                      name="clock"
+                      :size="16"
+                  />
+
+                  <span>
+                    آدرس تأیید شده است و پس از پایان دوره امنیتی فعال می‌شود.
+
+                    <strong>
+                      {{
+                        toPersianDigits(
+                            cooldownSecondsRemaining(
+                                address,
+                            ),
+                        )
+                      }}
+                      ثانیه باقی‌مانده
+                    </strong>
+
+                    <small>
+                      پایان دوره:
+                      {{
+                        formatPersianDateTime(
+                            address.cooldownUntil,
+                        )
+                      }}
+                    </small>
+                  </span>
+                </div>
+
+                <div
+                    v-if="
+                    address.status ===
+                    'pending_confirmation'
+                  "
+                    class="pending-note"
+                >
+                  <AppIcon
+                      name="shield"
+                      :size="16"
+                  />
+
+                  <span>
+                    این آدرس هنوز تأیید نشده است.
+                  </span>
+                </div>
+
+                <div
+                    v-if="
+                    address.blockedReason
+                  "
+                    class="address-warning"
+                >
+                  <AppIcon
+                      name="warning"
+                      :size="16"
+                  />
+
+                  <span>
+                    {{ address.blockedReason }}
+                  </span>
+                </div>
+
+                <div
+                    class="withdrawal-address-actions"
+                >
+                  <span
+                      v-if="
+                      address.isDefault
+                    "
+                      class="default-badge"
+                  >
+                    آدرس پیش‌فرض
+                  </span>
+
+                  <AppButton
+                      v-if="
+                      address.status ===
+                      'active'
+                      && !address.isDefault
+                    "
+                      variant="ghost"
+                      size="sm"
+                      :loading="
+                      withdrawalAddressActionLoading
+                      === `default:${address.id}`
+                    "
+                      @click="
+                      setWithdrawalAddressDefault(
+                        address,
+                      )
+                    "
+                  >
+                    انتخاب به‌عنوان پیش‌فرض
+                  </AppButton>
+
+                  <AppButton
+                      v-if="
+                      address.status !==
+                      'blocked'
+                    "
+                      variant="danger"
+                      size="sm"
+                      :loading="
+                      withdrawalAddressActionLoading
+                      === `revoke:${address.id}`
+                    "
+                      @click="
+                      askRevokeWithdrawalAddress(
+                        address,
+                      )
+                    "
+                  >
+                    {{
+                      address.status ===
+                      'pending_confirmation'
+                          ? 'حذف'
+                          : 'غیرفعال‌سازی'
+                    }}
+                  </AppButton>
+                </div>
+              </article>
+            </div>
+
+            <EmptyState
+                v-else
+                icon="wallet"
+                title="آدرسی ثبت نشده است"
+                description="برای استفاده از فهرست مجاز، یک آدرس برداشت معتبر ثبت و تأیید کنید."
+            >
+              <AppButton
+                  variant="secondary"
+                  :disabled="
+                  !overview.mobileVerified
+                "
+                  @click="
+                  openWithdrawalAddressModal
+                "
+              >
+                افزودن اولین آدرس
+              </AppButton>
+            </EmptyState>
+
+            <p
+                v-if="
+                withdrawalAddressCreateError
               "
-            />
+                class="modal-error"
+                role="alert"
+            >
+              {{
+                withdrawalAddressCreateError
+              }}
+            </p>
           </div>
         </AppCard>
       </div>
@@ -1284,9 +2638,10 @@ onMounted(load)
             </span>
 
             <div class="session-copy">
-              <div>
+              <div class="session-device-line">
                 <h3>
-                  {{ session.deviceName }}
+                  {{ session.browser }} روی
+                  {{ session.os }}
                 </h3>
 
                 <StatusBadge
@@ -1295,11 +2650,6 @@ onMounted(load)
                     status="current"
                 />
               </div>
-
-              <p>
-                {{ session.browser }} روی
-                {{ session.os }}
-              </p>
 
               <span>
                 <bdi dir="ltr">
@@ -1340,7 +2690,7 @@ onMounted(load)
 
             <AppButton
                 v-if="!session.current"
-                variant="ghost"
+                variant="danger"
                 size="sm"
                 icon="logout"
                 @click="
@@ -1350,7 +2700,7 @@ onMounted(load)
                 }
               "
             >
-              خروج دستگاه
+              قطع دسترسی
             </AppButton>
           </article>
         </div>
@@ -1422,18 +2772,24 @@ onMounted(load)
             </div>
 
             <time
+                class="event-time"
                 :datetime="event.createdAt"
-                :title="
-                formatPersianDateTime(
-                  event.createdAt,
-                )
-              "
             >
-              {{
-                formatRelativeTime(
-                    event.createdAt,
-                )
-              }}
+              <strong>
+                {{
+                  formatSecurityEventTime(
+                      event.createdAt,
+                  )
+                }}
+              </strong>
+
+              <small>
+                {{
+                  formatPersianDateTime(
+                      event.createdAt,
+                  )
+                }}
+              </small>
             </time>
           </article>
         </div>
@@ -1448,6 +2804,340 @@ onMounted(load)
     </template>
 
     <AppModal
+        v-model="withdrawalAddressModalOpen"
+        title="افزودن آدرس برداشت"
+        description="ابتدا ارز و شبکه را انتخاب کنید، سپس آدرس مقصد را وارد کنید."
+        size="sm"
+        :dismissible="
+        !withdrawalAddressCreating
+      "
+    >
+      <form
+          class="modal-form"
+          @submit.prevent="
+          createWithdrawalAddress
+        "
+      >
+        <div
+            class="address-create-network"
+        >
+          <span>
+            روند ثبت
+          </span>
+
+          <strong>
+            ارز ← شبکه ← آدرس ← تأیید امنیتی
+          </strong>
+
+          <small>
+            تطابق آدرس با ارز و شبکه در سمت سرور بررسی می‌شود.
+          </small>
+        </div>
+
+        <AssetSelect
+            v-model="withdrawalAddressAsset"
+            :assets="cryptoWalletAssets"
+            :balances="
+            withdrawalAssetBalances
+          "
+            :disabled-symbols="
+            disabledWithdrawalAssetSymbols
+          "
+            :disabled-descriptions="
+            disabledWithdrawalAssetDescriptions
+          "
+            label="ارز"
+            balance-label="قابل برداشت"
+            show-balance
+            required
+        />
+
+        <NetworkSelector
+            :model-value="
+            withdrawalAddressNetwork
+          "
+            :networks="
+            withdrawalNetworks
+          "
+            mode="withdrawal"
+            label="شبکه"
+            :error="
+            withdrawalAddressCreateError
+          "
+            :disabled="
+            !withdrawalAddressAsset
+            || withdrawalNetworkLoading
+          "
+            @update:model-value="
+            (value) => {
+              withdrawalAddressNetwork = value
+              withdrawalAddressValue = ''
+              withdrawalAddressMemo = ''
+              withdrawalAddressError = ''
+              withdrawalAddressMemoError = ''
+            }
+          "
+        />
+
+        <AppInput
+            v-model="
+            withdrawalAddressValue
+          "
+            label="آدرس کیف پول مقصد"
+            placeholder="آدرس را وارد یا جای‌گذاری کنید"
+            :error="
+            withdrawalAddressError
+          "
+            ltr
+            autocomplete="off"
+            icon="wallet"
+        />
+
+        <AppInput
+            v-if="
+            selectedWithdrawalNetwork?.memoRequired
+          "
+            v-model="
+            withdrawalAddressMemo
+          "
+            label="ممو / تگ مقصد"
+            placeholder="ممو یا تگ را دقیقاً وارد کنید"
+            :error="
+            withdrawalAddressMemoError
+          "
+            ltr
+            autocomplete="off"
+        />
+
+        <AppInput
+            v-model="
+            withdrawalAddressLabel
+          "
+            label="عنوان آدرس"
+            placeholder="مثلاً کیف پول شخصی"
+            :error="
+            withdrawalAddressLabelError
+          "
+        />
+
+        <div
+            class="address-create-hint"
+        >
+          <AppIcon
+              name="shield"
+              :size="17"
+          />
+
+          <span>
+            آدرس پس از اعتبارسنجی سرور با کد پیامکی تأیید می‌شود.
+            اگر Authenticator فعال باشد، کد آن نیز لازم خواهد بود.
+          </span>
+        </div>
+
+        <div
+            v-if="
+            withdrawalAddressCreateError
+          "
+            class="modal-error"
+            role="alert"
+        >
+          {{
+            withdrawalAddressCreateError
+          }}
+        </div>
+      </form>
+
+      <template #footer>
+        <AppButton
+            block
+            :loading="
+            withdrawalAddressCreating
+          "
+            @click="
+            createWithdrawalAddress
+          "
+        >
+          ثبت آدرس و ارسال کد تأیید
+        </AppButton>
+
+        <AppButton
+            variant="secondary"
+            :disabled="
+            withdrawalAddressCreating
+          "
+            @click="
+            closeWithdrawalAddressModal
+          "
+        >
+          انصراف
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal
+        v-model="
+        withdrawalAddressConfirmationOpen
+      "
+        title="تأیید آدرس برداشت"
+        description="کد ارسال‌شده را وارد کنید تا آدرس وارد مرحله امنیتی شود."
+        size="sm"
+        :dismissible="
+        !withdrawalAddressConfirming
+      "
+    >
+      <div
+          class="address-confirmation-step"
+      >
+        <div class="phone-mark">
+          <AppIcon
+              name="phone"
+              :size="25"
+          />
+        </div>
+
+        <p>
+          کد تأیید به شماره
+          {{
+            withdrawalAddressConfirmation
+                ?.destinationHint
+            || 'ثبت‌شده شما'
+          }}
+          ارسال شد.
+        </p>
+
+        <div
+            class="review-address"
+        >
+          <span>
+            آدرس مقصد
+          </span>
+
+          <bdi dir="ltr">
+            {{
+              pendingWithdrawalAddressPreview
+            }}
+          </bdi>
+        </div>
+
+        <OtpInput
+            :model-value="
+            withdrawalAddressOtp
+          "
+            label="کد تأیید آدرس"
+            :error="
+            withdrawalAddressOtpError
+          "
+            :loading="
+            withdrawalAddressConfirming
+          "
+            :resend-loading="
+            withdrawalAddressResending
+          "
+            :countdown-seconds="
+            withdrawalAddressResendDelay
+          "
+            @update:model-value="
+            (value: string) => {
+              withdrawalAddressOtp =
+                normalizeDigits(value)
+                  .replace(/\D/g, '')
+                  .slice(0, 6)
+              withdrawalAddressOtpError = ''
+            }
+          "
+            @resend="
+            resendWithdrawalAddressConfirmation
+          "
+        />
+
+        <DemoCodeHint
+            v-if="DemoCodeHint"
+            context="withdrawal"
+        />
+
+        <p
+            v-if="
+            withdrawalAddressConfirmationExpired
+          "
+            class="challenge-expiry expired"
+        >
+          مهلت کد تأیید تمام شده است؛ ارسال مجدد را بزنید.
+        </p>
+
+        <p
+            v-else-if="
+            withdrawalAddressConfirmation
+          "
+            class="challenge-expiry"
+        >
+          اعتبار کد:
+          {{
+            toPersianDigits(
+                withdrawalAddressConfirmationSecondsRemaining,
+            )
+          }}
+          ثانیه
+        </p>
+
+        <AppInput
+            v-if="
+  overview?.twoFactorEnabled
+"
+            :model-value="
+            withdrawalAddressTwoFactorCode
+          "
+            label="کد برنامه Authenticator"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="••••••"
+            ltr
+            :error="
+            withdrawalAddressTwoFactorError
+          "
+            @update:model-value="
+            (value: string) => {
+              withdrawalAddressTwoFactorCode =
+                normalizeDigits(value)
+                  .replace(/\D/g, '')
+                  .slice(0, 6)
+              withdrawalAddressTwoFactorError = ''
+            }
+          "
+        />
+
+        <p
+            v-if="
+            withdrawalAddressSecurityMessage
+          "
+            class="security-message"
+            role="status"
+        >
+          {{
+            withdrawalAddressSecurityMessage
+          }}
+        </p>
+      </div>
+
+      <template #footer>
+        <AppButton
+            block
+            :loading="
+            withdrawalAddressConfirming
+          "
+            :disabled="
+            withdrawalAddressConfirmationExpired
+          "
+            @click="
+            confirmWithdrawalAddress
+          "
+        >
+          تأیید آدرس
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal
         v-model="passwordOpen"
         title="تغییر رمز عبور"
         description="رمزی انتخاب کنید که در سرویس دیگری استفاده نمی‌کنید."
@@ -1458,7 +3148,9 @@ onMounted(load)
     >
       <form
           class="modal-form"
-          @submit.prevent="changePassword"
+          @submit.prevent="
+          changePassword
+        "
       >
         <div
             v-if="passwordError"
@@ -1513,7 +3205,9 @@ onMounted(load)
             :loading="
             changingPassword
           "
-            @click="changePassword"
+            @click="
+            changePassword
+          "
         >
           تغییر رمز عبور
         </AppButton>
@@ -1543,7 +3237,9 @@ onMounted(load)
     >
       <form
           class="modal-form"
-          @submit.prevent="enableTwoFactor"
+          @submit.prevent="
+          enableTwoFactor
+        "
       >
         <div
             v-if="twoFactorSetup"
@@ -1781,17 +3477,15 @@ onMounted(load)
         @update:model-value="
         (value) => {
           if (
-            !value &&
-            !confirming
+            !value
+            && !confirming
           ) {
             closeConfirmation()
           }
         }
       "
     >
-      <div
-          class="confirmation-visual"
-      >
+      <div class="confirmation-visual">
         <span>
           <AppIcon
               name="warning"
@@ -1815,6 +3509,16 @@ onMounted(load)
             پس از غیرفعال‌سازی، کلید جدیدی ساخته
             می‌شود؛ برای فعال‌سازی مجدد، QR جدید را
             دوباره اسکن کنید.
+          </small>
+
+          <small
+              v-if="
+              confirmation?.kind ===
+              'revoke-address'
+            "
+          >
+            پس از غیرفعال‌سازی، این آدرس دیگر برای
+            برداشت قابل استفاده نخواهد بود.
           </small>
         </div>
       </div>
@@ -1853,12 +3557,42 @@ onMounted(load)
         </p>
       </div>
 
+      <div
+          v-if="
+          confirmation?.kind ===
+          'revoke-address'
+        "
+          class="confirmation-address"
+      >
+        <span>
+          آدرس مقصد
+        </span>
+
+        <bdi dir="ltr">
+          {{
+            confirmation.address.address
+          }}
+        </bdi>
+
+        <small>
+          {{
+            confirmation.address.assetNameFa
+          }}
+          ·
+          {{
+            confirmation.address.networkDisplayName
+          }}
+        </small>
+      </div>
+
       <template #footer>
         <AppButton
             variant="danger"
             block
             :loading="
             confirming
+            || withdrawalAddressActionLoading
+              === `revoke:${confirmation?.kind === 'revoke-address' ? confirmation.address.id : ''}`
           "
             @click="
             runConfirmation
@@ -1886,29 +3620,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.phishing-feature {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.phishing-feature .feature-title {
-  grid-template-columns:
-    auto
-    minmax(0, 1fr);
-  align-items: center;
-}
-
-.phishing-status-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.phishing-action {
-  justify-self: center;
-  min-width: 10rem;
-}
-
 .security-page {
   display: grid;
   align-content: start;
@@ -1917,33 +3628,6 @@ onMounted(load)
 
 .security-page :deep(.page-header) {
   margin-bottom: 0;
-}
-
-.confirmation-copy {
-  display: grid;
-  min-width: 0;
-  gap: var(--space-1);
-}
-
-.confirmation-visual small {
-  display: block;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.8;
-}
-
-.disable-2fa-form {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
-.disable-2fa-help {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.8;
 }
 
 .notice {
@@ -1979,6 +3663,20 @@ onMounted(load)
   color: var(--color-danger);
 }
 
+.notice button {
+  display: inline-grid;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  place-items: center;
+}
+
+.notice button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .score-skeleton {
   display: flex;
   align-items: center;
@@ -1987,8 +3685,7 @@ onMounted(load)
 
 .score-skeleton > div {
   display: grid;
-  grid-template-columns:
-    minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   flex: 1;
   gap: var(--space-3);
@@ -1999,14 +3696,37 @@ onMounted(load)
 }
 
 .score-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-6);
+  overflow: hidden;
   background: linear-gradient(
       120deg,
       var(--color-surface-1),
       var(--color-primary-soft)
   );
+}
+
+.score-card::after {
+  position: absolute;
+  inset-block: 16%;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+      180deg,
+      transparent,
+      var(--score-color),
+      transparent
+  );
+  content: '';
+  opacity: .8;
+}
+
+.score-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .score-ring {
@@ -2083,8 +3803,7 @@ onMounted(load)
 
 .score-facts {
   display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
 }
 
@@ -2193,8 +3912,7 @@ onMounted(load)
   place-items: center;
 }
 
-.setting-row.featured
-.setting-icon {
+.setting-row.featured .setting-icon {
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
@@ -2221,12 +3939,13 @@ onMounted(load)
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
+  transition: background var(--transition-fast),
+  border-color var(--transition-fast);
 }
 
 .feature-title {
   display: grid;
-  grid-template-columns:
-    auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: start;
   gap: var(--space-3);
 }
@@ -2243,6 +3962,7 @@ onMounted(load)
 
 .feature-title > div {
   display: grid;
+  gap: .12rem;
 }
 
 .feature-title small {
@@ -2250,23 +3970,363 @@ onMounted(load)
   font-size: var(--font-size-xs);
 }
 
-.phishing-preview {
+.feature-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.phishing-feature {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.phishing-feature .feature-title {
+  grid-template-columns:
+    auto
+    minmax(0, 1fr);
+  align-items: center;
+}
+
+.phishing-status-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.phishing-action {
+  justify-self: center;
+  min-width: 10rem;
+}
+
+.whitelist-feature {
+  gap: var(--space-4);
+}
+
+.whitelist-description {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.8;
+}
+
+.whitelist-description :deep(svg) {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+
+.address-management-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-3);
 }
 
-.phishing-preview small {
+.address-management-header > div {
+  display: grid;
+  gap: .15rem;
+}
+
+.address-management-header strong {
+  font-size: var(--font-size-sm);
+}
+
+.address-management-header small {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+}
+
+.address-warning,
+.pending-note,
+.cooldown-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  line-height: 1.7;
+}
+
+.address-warning {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.pending-note {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.cooldown-note {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.cooldown-note span {
+  display: grid;
+  gap: .15rem;
+}
+
+.cooldown-note strong {
+  color: var(--color-text-primary);
+}
+
+.cooldown-note small {
   color: var(--color-text-muted);
 }
 
-.phishing-preview strong {
+.withdrawal-address-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.address-loading {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.withdrawal-address-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-1);
+  transition: background var(--transition-fast),
+  border-color var(--transition-fast);
+}
+
+.withdrawal-address-card.is-default {
+  border-color: var(--color-primary);
+  background: linear-gradient(
+      120deg,
+      var(--color-primary-soft),
+      var(--color-surface-1)
+  );
+}
+
+.withdrawal-address-card.is-blocked {
+  border-color: rgba(240, 108, 117, .28);
+}
+
+.withdrawal-address-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.withdrawal-address-identity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.address-icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  border-radius: .85rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  place-items: center;
+}
+
+.withdrawal-address-identity > div {
+  display: grid;
+  min-width: 0;
+  gap: .15rem;
+}
+
+.withdrawal-address-identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.withdrawal-address-identity small {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+}
+
+.address-status {
+  flex: 0 0 auto;
+  padding: .25rem .55rem;
+  border-radius: var(--radius-pill);
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.tone-success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.tone-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.tone-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.tone-info {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.withdrawal-address-value {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.withdrawal-address-value bdi {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, monospace;
+  font-size: var(--font-size-xs);
+}
+
+.withdrawal-address-value small {
+  color: var(--color-text-muted);
+  font-family: ui-monospace, monospace;
+  font-size: .68rem;
+}
+
+.withdrawal-address-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.default-badge {
+  margin-inline-end: auto;
+  padding: .3rem .65rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-gold-soft);
   color: var(--color-gold);
-  direction: ltr;
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.address-create-network {
+  display: grid;
+  gap: .2rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.address-create-network span {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+}
+
+.address-create-network strong {
+  font-size: var(--font-size-sm);
+}
+
+.address-create-network small {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+  line-height: 1.7;
+}
+
+.address-create-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.8;
+}
+
+.address-create-hint :deep(svg) {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+
+.address-confirmation-step {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.review-address {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.review-address span {
+  color: var(--color-text-muted);
+  font-size: .7rem;
+}
+
+.review-address bdi {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, monospace;
+  font-size: var(--font-size-xs);
+}
+
+.review-address small {
+  color: var(--color-text-muted);
+  font-size: .68rem;
+}
+
+.security-message {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+}
+
+.challenge-expiry {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.challenge-expiry.expired {
+  color: var(--color-danger);
+}
+
+.modal-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.modal-error {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
 }
 
 .sessions-card,
@@ -2363,15 +4423,16 @@ onMounted(load)
   gap: var(--space-2);
 }
 
-.session-copy h3 {
-  margin: 0;
-  font-size: var(--font-size-md);
+.session-device-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.session-copy p {
-  margin: .1rem 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+.session-device-line h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
 }
 
 .session-copy > span {
@@ -2443,10 +4504,39 @@ onMounted(load)
   background: var(--color-border-hover);
 }
 
-@media (max-width: 767px) {
-  .event-list {
-    max-height: 20rem;
-  }
+.event-list h3 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.event-list p {
+  margin: .05rem 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.event-list small {
+  color: var(--color-text-muted);
+  font-size: .68rem;
+}
+
+.event-time {
+  display: grid;
+  justify-items: end;
+  gap: .15rem;
+  min-width: max-content;
+}
+
+.event-time strong {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.event-time small {
+  color: var(--color-text-muted);
+  font-size: .66rem;
+  white-space: nowrap;
+  opacity: .8;
 }
 
 .event-icon {
@@ -2455,6 +4545,15 @@ onMounted(load)
   height: 2.75rem;
   border-radius: .85rem;
   place-items: center;
+}
+
+.event-list article:hover,
+.setting-row:hover {
+  background: color-mix(
+      in srgb,
+      var(--color-primary-soft) 45%,
+      transparent
+  );
 }
 
 .tone-info {
@@ -2475,40 +4574,6 @@ onMounted(load)
 .tone-danger {
   background: var(--color-danger-soft);
   color: var(--color-danger);
-}
-
-.event-list h3 {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-.event-list p {
-  margin: .05rem 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.event-list small {
-  color: var(--color-text-muted);
-  font-size: .68rem;
-}
-
-.event-list time {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-}
-
-.modal-form {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.modal-error {
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--font-size-sm);
 }
 
 .two-factor-setup {
@@ -2579,8 +4644,7 @@ onMounted(load)
   width: 100%;
 }
 
-.two-factor-actions
-:deep(.app-button) {
+.two-factor-actions :deep(.app-button) {
   width: 100%;
   min-width: 0;
 }
@@ -2664,80 +4728,43 @@ onMounted(load)
   line-height: 1.8;
 }
 
-.notice button {
-  display: inline-grid;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding-inline: var(--space-2);
-  border-radius: var(--radius-sm);
-  place-items: center;
+.confirmation-address {
+  display: grid;
+  gap: .2rem;
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
 }
 
-.notice button:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+.confirmation-address span {
+  color: var(--color-text-muted);
+  font-size: .7rem;
 }
 
-.score-card {
-  position: relative;
-  overflow: hidden;
+.confirmation-address bdi {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, monospace;
+  font-size: var(--font-size-xs);
 }
 
-.score-card::after {
-  position: absolute;
-  inset-block: 16%;
-  inset-inline-start: 0;
-  width: 2px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(
-      180deg,
-      transparent,
-      var(--score-color),
-      transparent
-  );
-  content: '';
-  opacity: .8;
+.confirmation-address small {
+  color: var(--color-text-muted);
+  font-size: .68rem;
 }
 
-.score-card > * {
-  position: relative;
-  z-index: 1;
+.disable-2fa-form {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
-.score-facts > div:nth-child(1) {
-  color: var(--color-success);
-}
-
-.score-facts > div:nth-child(2) {
-  color: var(--color-primary);
-}
-
-.score-facts > div:nth-child(3) {
-  color: var(--color-gold);
-}
-
-.setting-row,
-.feature-block,
-.session-row,
-.event-list article {
-  transition: background var(--transition-fast),
-  border-color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .setting-row:hover,
-  .session-row:hover,
-  .event-list article:hover {
-    background: color-mix(
-        in srgb,
-        var(--color-primary-soft) 45%,
-        transparent
-    );
-  }
-
-  .feature-block:hover {
-    border-color: var(--color-border-hover);
-  }
+.disable-2fa-help {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.8;
 }
 
 @media (max-width: 1150px) {
@@ -2792,31 +4819,48 @@ onMounted(load)
       auto;
   }
 
-  .setting-row
-  > :deep(.status) {
+  .setting-row > :deep(.status) {
     display: none;
   }
 
-  .setting-row
-  :deep(.app-button),
+  .setting-row :deep(.app-button),
   .setting-row .row-note {
     grid-column: 2 / -1;
     justify-self: start;
   }
 
-  .setting-row
-  :deep(.app-button) {
+  .setting-row :deep(.app-button) {
     min-height: 2.75rem;
   }
 
-  .feature-title {
-    grid-template-columns:
-      auto 1fr;
+  .feature-header {
+    grid-template-columns: 1fr;
   }
 
-  .feature-title
-  :deep(.status) {
-    grid-column: 2;
+  .feature-header :deep(.app-switch) {
+    width: 100%;
+  }
+
+  .address-management-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .address-management-header :deep(.app-button) {
+    width: 100%;
+  }
+
+  .withdrawal-address-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .withdrawal-address-actions {
+    justify-content: flex-start;
+  }
+
+  .default-badge {
+    margin-inline-end: 0;
   }
 
   .list-header {
@@ -2824,8 +4868,7 @@ onMounted(load)
     flex-direction: column;
   }
 
-  .list-header
-  :deep(.app-button) {
+  .list-header :deep(.app-button) {
     width: 100%;
     min-height: 2.75rem;
   }
@@ -2844,11 +4887,14 @@ onMounted(load)
     text-align: start;
   }
 
-  .session-row
-  :deep(.app-button) {
+  .session-row :deep(.app-button) {
     grid-column: 2;
     justify-self: start;
     min-height: 2.75rem;
+  }
+
+  .event-list {
+    max-height: 20rem;
   }
 
   .event-list article {
@@ -2861,6 +4907,7 @@ onMounted(load)
 
   .event-list time {
     grid-column: 2;
+    justify-items: start;
   }
 
   .event-list p {
@@ -2894,56 +4941,40 @@ onMounted(load)
     font-size: var(--font-size-lg);
   }
 
-  .score-facts {
-    gap: var(--space-2);
-  }
-
   .setting-row {
     grid-template-columns:
       auto
       minmax(0, 1fr);
   }
 
-  .setting-row
-  > :deep(.status) {
+  .setting-row > :deep(.status) {
     display: inline-flex;
     grid-column: 2;
     justify-self: start;
   }
 
-  .setting-row
-  :deep(.app-button),
+  .setting-row :deep(.app-button),
   .setting-row .row-note {
     grid-column: 1 / -1;
     width: 100%;
   }
 
-  .feature-title
-  :deep(.status) {
-    grid-column: 1 / -1;
-    justify-self: start;
-    margin-inline-start: calc(2.5rem + var(--space-3));
+  .feature-title {
+    grid-template-columns:
+      auto 1fr;
   }
 
-  .session-copy > span {
-    align-items: flex-start;
+  .address-status {
+    align-self: flex-start;
+  }
+
+  .withdrawal-address-actions {
     flex-direction: column;
-    gap: 0;
+    align-items: stretch;
   }
 
-  .session-copy > span i {
-    display: none;
-  }
-
-  .session-row
-  :deep(.app-button) {
-    grid-column: 1 / -1;
+  .withdrawal-address-actions :deep(.app-button) {
     width: 100%;
-  }
-
-  .event-icon {
-    width: 2.5rem;
-    height: 2.5rem;
   }
 
   .two-factor-actions {
