@@ -4,12 +4,12 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-
+from ..validators.base import AddressValidationError
 from apps.accounts.models import OTPVerification
 from apps.accounts.services.auth import AuthService
 from apps.security.models import SecurityEvent
 from apps.security.services import TwoFactorService
-
+from .address_service import WithdrawalAddressService
 from ..models import WithdrawalAddress
 
 
@@ -18,10 +18,10 @@ class WithdrawalAddressConfirmationService:
     @staticmethod
     @transaction.atomic
     def request_confirmation(
-        address,
-        user,
-        request_ip=None,
-        user_agent="",
+            address,
+            user,
+            request_ip=None,
+            user_agent="",
     ):
         address = (
             WithdrawalAddress.objects
@@ -39,7 +39,7 @@ class WithdrawalAddressConfirmationService:
             )
 
         if address.status != (
-            WithdrawalAddress.Status.PENDING_CONFIRMATION
+                WithdrawalAddress.Status.PENDING_CONFIRMATION
         ):
             raise ValidationError(
                 "این آدرس در وضعیت قابل تأیید نیست."
@@ -91,21 +91,21 @@ class WithdrawalAddressConfirmationService:
                 result["resend_available_in"]
             ),
             "destinationHint": (
-                user.phone_number[:4]
-                + "***"
-                + user.phone_number[-4:]
+                    user.phone_number[:4]
+                    + "***"
+                    + user.phone_number[-4:]
             ),
         }
 
     @staticmethod
     @transaction.atomic
     def confirm(
-        address_id,
-        user,
-        challenge_id,
-        otp,
-        two_factor_code=None,
-        request_ip=None,
+            address_id,
+            user,
+            challenge_id,
+            otp,
+            two_factor_code=None,
+            request_ip=None,
     ):
         address = (
             WithdrawalAddress.objects
@@ -123,20 +123,33 @@ class WithdrawalAddressConfirmationService:
             )
 
         if address.status != (
-            WithdrawalAddress.Status.PENDING_CONFIRMATION
+                WithdrawalAddress.Status.PENDING_CONFIRMATION
         ):
             raise ValidationError(
                 "این آدرس در وضعیت قابل تأیید نیست."
             )
+        try:
+            validation = WithdrawalAddressService.validate(
+                network=address.network,
+                address=address.address,
+            )
+        except AddressValidationError as exc:
+            raise ValidationError(
+                f"آدرس برداشت دیگر معتبر نیست: {exc}"
+            ) from exc
 
+        if validation.normalized_address != address.normalized_address:
+            raise ValidationError(
+                "اطلاعات آدرس برداشت با وضعیت فعلی شبکه سازگار نیست."
+            )
         challenge_id = str(
             challenge_id or ""
         ).strip()
 
         if (
-            not challenge_id
-            or challenge_id
-            != address.confirmation_challenge_id
+                not challenge_id
+                or challenge_id
+                != address.confirmation_challenge_id
         ):
             raise ValidationError(
                 "کد تأیید به این آدرس برداشت تعلق ندارد."
@@ -189,10 +202,10 @@ class WithdrawalAddressConfirmationService:
         )
 
         cooldown_until = (
-            now
-            + timedelta(
-                seconds=cooldown_seconds
-            )
+                now
+                + timedelta(
+            seconds=cooldown_seconds
+        )
         )
 
         address.confirmed_at = now
@@ -236,7 +249,7 @@ class WithdrawalAddressConfirmationService:
         )
 
         if address.status == (
-            WithdrawalAddress.Status.ACTIVE
+                WithdrawalAddress.Status.ACTIVE
         ):
             SecurityEvent.objects.create(
                 user=user,
@@ -252,9 +265,9 @@ class WithdrawalAddressConfirmationService:
     @staticmethod
     @transaction.atomic
     def activate_if_ready(
-        address_id,
-        user,
-        request_ip=None,
+            address_id,
+            user,
+            request_ip=None,
     ):
         address = (
             WithdrawalAddress.objects
@@ -270,7 +283,7 @@ class WithdrawalAddressConfirmationService:
             return None
 
         if address.status != (
-            WithdrawalAddress.Status.COOLING_DOWN
+                WithdrawalAddress.Status.COOLING_DOWN
         ):
             return address
 

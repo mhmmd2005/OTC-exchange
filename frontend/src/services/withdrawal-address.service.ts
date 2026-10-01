@@ -81,7 +81,10 @@ export const withdrawalAddressService: WithdrawalAddressService = {
     remove(id) {
         return resolveApi(
             () => mockWithdrawalAddressService.remove(id),
-            () => api.delete<void>(`/withdrawals/addresses/${id}`),
+            () =>
+                api.delete<void>(
+                    `/withdrawals/addresses/${id}`,
+                ),
         )
     },
 

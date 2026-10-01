@@ -11,34 +11,51 @@ import {ApiError} from '../api'
 
 const DEV_OTP = '123456'
 const MOCK_COOLDOWN_SECONDS = 60
+const MOCK_CONFIRMATION_SECONDS = 120
+const MOCK_RESEND_SECONDS = 60
 
 interface MockConfirmationState {
     addressId: string
     confirmation: WithdrawalAddressConfirmation
     otp: string
+    expiresAt: number
+    resendAvailableAt: number
 }
 
-const confirmationState = new Map<string, MockConfirmationState>()
+const confirmationState =
+    new Map<string, MockConfirmationState>()
 
-function normalizeAddress(address: string): string {
-    const value = String(address || '').trim()
+function normalizeAddress(
+    address: string,
+): string {
+    const value =
+        String(address || '').trim()
 
     if (value.startsWith('0x')) {
         return `0x${value.slice(2).toLowerCase()}`
     }
 
-    if (value.toLowerCase().startsWith('bc1')) {
+    if (
+        value
+            .toLowerCase()
+            .startsWith('bc1')
+    ) {
         return value.toLowerCase()
     }
 
     return value
 }
 
-function findNetwork(asset: string, networkCode: string) {
-    const walletAsset = mockDb.wallet.assets.find(
-        (item) =>
-            item.symbol.toUpperCase() === asset.toUpperCase(),
-    )
+function findNetwork(
+    asset: string,
+    networkCode: string,
+) {
+    const walletAsset =
+        mockDb.wallet.assets.find(
+            (item) =>
+                item.symbol.toUpperCase() ===
+                asset.toUpperCase(),
+        )
 
     if (!walletAsset) {
         throw new ApiError(
@@ -48,10 +65,12 @@ function findNetwork(asset: string, networkCode: string) {
         )
     }
 
-    const network = walletAsset.networks.find(
-        (item) =>
-            item.code.toUpperCase() === networkCode.toUpperCase(),
-    )
+    const network =
+        walletAsset.networks.find(
+            (item) =>
+                item.code.toUpperCase() ===
+                networkCode.toUpperCase(),
+        )
 
     if (!network) {
         throw new ApiError(
@@ -60,7 +79,8 @@ function findNetwork(asset: string, networkCode: string) {
             422,
             {
                 fields: {
-                    network: 'شبکه انتخاب‌شده برای این ارز معتبر نیست.',
+                    network:
+                        'شبکه انتخاب‌شده برای این ارز معتبر نیست.',
                 },
             },
         )
@@ -83,8 +103,8 @@ function findNetwork(asset: string, networkCode: string) {
     }
 
     if (
-        network.status === 'disabled'
-        || network.status === 'maintenance'
+        network.status === 'disabled' ||
+        network.status === 'maintenance'
     ) {
         throw new ApiError(
             'این شبکه در حال حاضر در دسترس نیست.',
@@ -110,7 +130,8 @@ function validateAddress(
             422,
             {
                 fields: {
-                    address: 'آدرس برداشت را وارد کنید.',
+                    address:
+                        'آدرس برداشت را وارد کنید.',
                 },
             },
         )
@@ -123,29 +144,40 @@ function validateAddress(
             422,
             {
                 fields: {
-                    address: 'آدرس برداشت نباید فاصله داشته باشد.',
+                    address:
+                        'آدرس برداشت نباید فاصله داشته باشد.',
                 },
             },
         )
     }
 
     if (network.addressRegex) {
+        let pattern: RegExp
+
         try {
-            if (!new RegExp(network.addressRegex).test(address)) {
-                throw new ApiError(
-                    'ساختار آدرس با شبکه انتخاب‌شده سازگار نیست.',
-                    'VALIDATION_ERROR',
-                    422,
-                    {
-                        fields: {
-                            address:
-                                'ساختار آدرس با شبکه انتخاب‌شده سازگار نیست.',
-                        },
+            pattern = new RegExp(
+                `^(?:${network.addressRegex})$`,
+            )
+        } catch {
+            throw new ApiError(
+                `الگوی اعتبارسنجی شبکه ${network.code} نامعتبر است.`,
+                'SERVER_ERROR',
+                500,
+            )
+        }
+
+        if (!pattern.test(address)) {
+            throw new ApiError(
+                'ساختار آدرس با شبکه انتخاب‌شده سازگار نیست.',
+                'VALIDATION_ERROR',
+                422,
+                {
+                    fields: {
+                        address:
+                            'ساختار آدرس با شبکه انتخاب‌شده سازگار نیست.',
                     },
-                )
-            }
-        } catch (error) {
-            if (error instanceof ApiError) throw error
+                },
+            )
         }
 
         return
@@ -158,7 +190,8 @@ function validateAddress(
             422,
             {
                 fields: {
-                    address: 'طول آدرس معتبر نیست.',
+                    address:
+                        'طول آدرس معتبر نیست.',
                 },
             },
         )
@@ -168,11 +201,16 @@ function validateAddress(
 function activateDueAddresses(): void {
     const now = Date.now()
 
-    for (const item of mockDb.withdrawalAddresses) {
+    for (
+        const item of
+        mockDb.withdrawalAddresses
+    ) {
         if (
-            item.status === 'cooling_down'
-            && item.cooldownUntil
-            && Date.parse(item.cooldownUntil) <= now
+            item.status === 'cooling_down' &&
+            item.cooldownUntil &&
+            Date.parse(
+                item.cooldownUntil,
+            ) <= now
         ) {
             item.status = 'active'
             item.activatedAt = nowIso()
@@ -183,19 +221,59 @@ function activateDueAddresses(): void {
 }
 
 function createConfirmation(
-  addressId: string,
+    addressId: string,
 ): WithdrawalAddressConfirmation {
-  return {
-    challengeId: String(
-      100000000
-      + Math.floor(
-        Math.random() * 900000000,
-      ),
-    ),
-    expiresIn: 120,
-    resendAvailableIn: 60,
-    destinationHint: '0912***1234',
-  }
+    return {
+        challengeId: String(
+            100000000 +
+            Math.floor(
+                Math.random() *
+                900000000,
+            ),
+        ),
+        expiresIn:
+            MOCK_CONFIRMATION_SECONDS,
+        resendAvailableIn:
+            MOCK_RESEND_SECONDS,
+        destinationHint:
+            '0912***1234',
+    }
+}
+
+function ensureConfirmationState(
+    id: string,
+): MockConfirmationState {
+    const state =
+        confirmationState.get(id)
+
+    if (!state) {
+        throw new ApiError(
+            'درخواست تأیید آدرس معتبر نیست.',
+            'BAD_REQUEST',
+            422,
+        )
+    }
+
+    if (
+        state.expiresAt <=
+        Date.now()
+    ) {
+        confirmationState.delete(id)
+
+        throw new ApiError(
+            'مهلت کد تأیید تمام شده است.',
+            'VALIDATION_ERROR',
+            422,
+            {
+                fields: {
+                    otp:
+                        'مهلت کد تأیید تمام شده است.',
+                },
+            },
+        )
+    }
+
+    return state
 }
 
 export const mockWithdrawalAddressService = {
@@ -208,15 +286,45 @@ export const mockWithdrawalAddressService = {
     create(
         input: WithdrawalAddressCreateInput,
     ): WithdrawalAddressCreateResponse {
-        const asset = String(input.asset || '').trim().toUpperCase()
-        const networkCode = String(input.network || '').trim().toUpperCase()
-        const address = String(input.address || '').trim()
-        const memo = String(input.memo || '').trim()
-        const label = String(input.label || '').trim()
+        const asset =
+            String(
+                input.asset || '',
+            )
+                .trim()
+                .toUpperCase()
 
-        const network = findNetwork(asset, networkCode)
+        const networkCode =
+            String(
+                input.network || '',
+            )
+                .trim()
+                .toUpperCase()
 
-        if (network.memoRequired && !memo) {
+        const address =
+            String(
+                input.address || '',
+            ).trim()
+
+        const memo =
+            String(
+                input.memo || '',
+            ).trim()
+
+        const label =
+            String(
+                input.label || '',
+            ).trim()
+
+        const network =
+            findNetwork(
+                asset,
+                networkCode,
+            )
+
+        if (
+            network.memoRequired &&
+            !memo
+        ) {
             throw new ApiError(
                 'برای این شبکه وارد کردن ممو یا تگ الزامی است.',
                 'VALIDATION_ERROR',
@@ -230,17 +338,29 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        validateAddress(address, network)
-
-        const normalizedAddress = normalizeAddress(address)
-
-        const duplicate = mockDb.withdrawalAddresses.find(
-            (item) =>
-                item.assetSymbol.toUpperCase() === asset
-                && item.networkCode.toUpperCase() === networkCode
-                && normalizeAddress(item.address) === normalizedAddress
-                && item.memo === memo,
+        validateAddress(
+            address,
+            network,
         )
+
+        const normalizedAddress =
+            normalizeAddress(address)
+
+        const duplicate =
+            mockDb.withdrawalAddresses.find(
+                (item) =>
+                    item.assetSymbol
+                        .toUpperCase() ===
+                        asset &&
+                    item.networkCode
+                        .toUpperCase() ===
+                        networkCode &&
+                    normalizeAddress(
+                        item.address,
+                    ) ===
+                        normalizedAddress &&
+                    item.memo === memo,
+            )
 
         if (duplicate) {
             throw new ApiError(
@@ -249,7 +369,8 @@ export const mockWithdrawalAddressService = {
                 409,
                 {
                     fields: {
-                        address: 'این آدرس قبلاً ثبت شده است.',
+                        address:
+                            'این آدرس قبلاً ثبت شده است.',
                     },
                 },
             )
@@ -257,38 +378,59 @@ export const mockWithdrawalAddressService = {
 
         const now = nowIso()
 
-        const created: WithdrawalAddress = {
-            id: createMockId('waddr'),
-            assetSymbol: asset,
-            assetNameFa: mockDb.wallet.assets.find(
-                (item) => item.symbol.toUpperCase() === asset,
-            )?.nameFa || asset,
-            assetNameEn: mockDb.wallet.assets.find(
-                (item) => item.symbol.toUpperCase() === asset,
-            )?.nameEn || asset,
-            networkCode,
-            networkName: network.name,
-            networkDisplayName: network.displayName,
-            address,
-            memo,
-            label,
-            status: 'pending_confirmation',
-            verificationMethod: 'security_confirmation',
-            isDefault: false,
-            confirmationRequestedAt: now,
-            confirmedAt: null,
-            cooldownUntil: null,
-            activatedAt: null,
-            lastUsedAt: null,
-            revokedAt: null,
-            blockedReason: '',
-            createdAt: now,
-            updatedAt: now,
-        }
+        const sourceAsset =
+            mockDb.wallet.assets.find(
+                (item) =>
+                    item.symbol
+                        .toUpperCase() ===
+                    asset,
+            )
 
-        mockDb.withdrawalAddresses.unshift(created)
+        const created: WithdrawalAddress =
+            {
+                id: createMockId(
+                    'waddr',
+                ),
+                assetSymbol: asset,
+                assetNameFa:
+                    sourceAsset?.nameFa ||
+                    asset,
+                assetNameEn:
+                    sourceAsset?.nameEn ||
+                    asset,
+                networkCode,
+                networkName:
+                    network.name,
+                networkDisplayName:
+                    network.displayName,
+                address,
+                memo,
+                label,
+                status:
+                    'pending_confirmation',
+                verificationMethod:
+                    'security_confirmation',
+                isDefault: false,
+                confirmationRequestedAt:
+                    now,
+                confirmedAt: null,
+                cooldownUntil: null,
+                activatedAt: null,
+                lastUsedAt: null,
+                revokedAt: null,
+                blockedReason: '',
+                createdAt: now,
+                updatedAt: now,
+            }
 
-        const confirmation = createConfirmation(created.id)
+        mockDb.withdrawalAddresses.unshift(
+            created,
+        )
+
+        const confirmation =
+            createConfirmation(
+                created.id,
+            )
 
         confirmationState.set(
             created.id,
@@ -296,6 +438,14 @@ export const mockWithdrawalAddressService = {
                 addressId: created.id,
                 confirmation,
                 otp: DEV_OTP,
+                expiresAt:
+                    Date.now() +
+                    MOCK_CONFIRMATION_SECONDS *
+                    1000,
+                resendAvailableAt:
+                    Date.now() +
+                    MOCK_RESEND_SECONDS *
+                    1000,
             },
         )
 
@@ -311,9 +461,11 @@ export const mockWithdrawalAddressService = {
     ): WithdrawalAddress {
         activateDueAddresses()
 
-        const address = mockDb.withdrawalAddresses.find(
-            (item) => item.id === id,
-        )
+        const address =
+            mockDb.withdrawalAddresses.find(
+                (item) =>
+                    item.id === id,
+            )
 
         if (!address) {
             throw new ApiError(
@@ -323,7 +475,10 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        if (address.status !== 'pending_confirmation') {
+        if (
+            address.status !==
+            'pending_confirmation'
+        ) {
             throw new ApiError(
                 'این آدرس در وضعیت قابل تأیید نیست.',
                 'BAD_REQUEST',
@@ -331,17 +486,13 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        const state = confirmationState.get(id)
+        const state =
+            ensureConfirmationState(id)
 
-        if (!state) {
-            throw new ApiError(
-                'درخواست تأیید آدرس معتبر نیست.',
-                'BAD_REQUEST',
-                422,
-            )
-        }
-
-        if (state.confirmation.challengeId !== input.challengeId) {
+        if (
+            state.confirmation.challengeId !==
+            input.challengeId
+        ) {
             throw new ApiError(
                 'کد تأیید به این آدرس برداشت تعلق ندارد.',
                 'VALIDATION_ERROR',
@@ -356,15 +507,17 @@ export const mockWithdrawalAddressService = {
                 422,
                 {
                     fields: {
-                        otp: 'کد تأیید صحیح نیست.',
+                        otp:
+                            'کد تأیید صحیح نیست.',
                     },
                 },
             )
         }
 
         if (
-            input.twoFactorCode
-            && input.twoFactorCode !== DEV_OTP
+            input.twoFactorCode &&
+            input.twoFactorCode !==
+                DEV_OTP
         ) {
             throw new ApiError(
                 'کد Authenticator صحیح نیست.',
@@ -379,11 +532,41 @@ export const mockWithdrawalAddressService = {
             )
         }
 
+        const network =
+            findNetwork(
+                address.assetSymbol,
+                address.networkCode,
+            )
+
+        validateAddress(
+            address.address,
+            network,
+        )
+
+        if (
+            normalizeAddress(
+                address.address,
+            ) !==
+            normalizeAddress(
+                address.address,
+            )
+        ) {
+            throw new ApiError(
+                'اطلاعات آدرس برداشت با وضعیت فعلی شبکه سازگار نیست.',
+                'VALIDATION_ERROR',
+                422,
+            )
+        }
+
         const now = nowIso()
 
         address.confirmedAt = now
-        address.status = 'cooling_down'
-        address.cooldownUntil = futureIso(MOCK_COOLDOWN_SECONDS)
+        address.status =
+            'cooling_down'
+        address.cooldownUntil =
+            futureIso(
+                MOCK_COOLDOWN_SECONDS,
+            )
         address.activatedAt = null
         address.revokedAt = null
         address.blockedReason = ''
@@ -397,9 +580,11 @@ export const mockWithdrawalAddressService = {
     resendConfirmation(
         id: string,
     ): WithdrawalAddressCreateResponse {
-        const address = mockDb.withdrawalAddresses.find(
-            (item) => item.id === id,
-        )
+        const address =
+            mockDb.withdrawalAddresses.find(
+                (item) =>
+                    item.id === id,
+            )
 
         if (!address) {
             throw new ApiError(
@@ -409,7 +594,10 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        if (address.status !== 'pending_confirmation') {
+        if (
+            address.status !==
+            'pending_confirmation'
+        ) {
             throw new ApiError(
                 'این آدرس در وضعیت قابل تأیید نیست.',
                 'BAD_REQUEST',
@@ -417,7 +605,23 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        const confirmation = createConfirmation(id)
+        const existing =
+            confirmationState.get(id)
+
+        if (
+            existing &&
+            existing.resendAvailableAt >
+                Date.now()
+        ) {
+            throw new ApiError(
+                'هنوز امکان ارسال مجدد کد وجود ندارد.',
+                'RATE_LIMITED',
+                429,
+            )
+        }
+
+        const confirmation =
+            createConfirmation(id)
 
         confirmationState.set(
             id,
@@ -425,11 +629,22 @@ export const mockWithdrawalAddressService = {
                 addressId: id,
                 confirmation,
                 otp: DEV_OTP,
+                expiresAt:
+                    Date.now() +
+                    MOCK_CONFIRMATION_SECONDS *
+                    1000,
+                resendAvailableAt:
+                    Date.now() +
+                    MOCK_RESEND_SECONDS *
+                    1000,
             },
         )
 
-        address.confirmationRequestedAt = nowIso()
-        address.updatedAt = nowIso()
+        address.confirmationRequestedAt =
+            nowIso()
+
+        address.updatedAt =
+            nowIso()
 
         return {
             address,
@@ -438,9 +653,11 @@ export const mockWithdrawalAddressService = {
     },
 
     remove(id: string): void {
-        const index = mockDb.withdrawalAddresses.findIndex(
-            (item) => item.id === id,
-        )
+        const index =
+            mockDb.withdrawalAddresses.findIndex(
+                (item) =>
+                    item.id === id,
+            )
 
         if (index === -1) {
             throw new ApiError(
@@ -450,9 +667,15 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        const address = mockDb.withdrawalAddresses[index]
+        const address =
+            mockDb.withdrawalAddresses[
+                index
+            ]
 
-        if (address.status === 'blocked') {
+        if (
+            address.status ===
+            'blocked'
+        ) {
             throw new ApiError(
                 'آدرس مسدودشده را نمی‌توان حذف کرد.',
                 'BAD_REQUEST',
@@ -460,9 +683,19 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        if (address.status === 'pending_confirmation') {
-            mockDb.withdrawalAddresses.splice(index, 1)
-            confirmationState.delete(id)
+        if (
+            address.status ===
+            'pending_confirmation'
+        ) {
+            mockDb.withdrawalAddresses.splice(
+                index,
+                1,
+            )
+
+            confirmationState.delete(
+                id,
+            )
+
             return
         }
 
@@ -472,12 +705,16 @@ export const mockWithdrawalAddressService = {
         address.updatedAt = nowIso()
     },
 
-    setDefault(id: string): WithdrawalAddress {
+    setDefault(
+        id: string,
+    ): WithdrawalAddress {
         activateDueAddresses()
 
-        const address = mockDb.withdrawalAddresses.find(
-            (item) => item.id === id,
-        )
+        const address =
+            mockDb.withdrawalAddresses.find(
+                (item) =>
+                    item.id === id,
+            )
 
         if (!address) {
             throw new ApiError(
@@ -487,7 +724,10 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        if (address.status !== 'active') {
+        if (
+            address.status !==
+            'active'
+        ) {
             throw new ApiError(
                 'فقط آدرس فعال می‌تواند به‌عنوان آدرس پیش‌فرض انتخاب شود.',
                 'BAD_REQUEST',
@@ -495,7 +735,10 @@ export const mockWithdrawalAddressService = {
             )
         }
 
-        for (const item of mockDb.withdrawalAddresses) {
+        for (
+            const item of
+            mockDb.withdrawalAddresses
+        ) {
             item.isDefault = false
         }
 
