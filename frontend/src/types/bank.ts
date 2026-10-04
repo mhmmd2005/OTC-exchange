@@ -9,6 +9,8 @@ export interface IranianBank {
   cardPrefixes: string[]
   color: string
   logoUrl?: string
+  isActive?: boolean
+  shebaCode?: string
 }
 
 export interface BankAccount {

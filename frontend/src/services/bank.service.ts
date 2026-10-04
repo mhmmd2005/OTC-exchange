@@ -25,7 +25,18 @@ function cleanIban(value: string): string {
 
 function detectBankSync(cardNumber: string): IranianBank | null {
   const digits = cleanCardNumber(cardNumber)
-  return mockBanks.find((bank) => bank.cardPrefixes.some((prefix) => digits.startsWith(prefix))) ?? null
+  let best: IranianBank | null = null
+  let bestLength = 0
+  for (const bank of mockBanks) {
+    for (const prefix of bank.cardPrefixes) {
+      const cleanPrefix = cleanCardNumber(prefix)
+      if (cleanPrefix.length >= 6 && digits.startsWith(cleanPrefix) && cleanPrefix.length > bestLength) {
+        best = bank
+        bestLength = cleanPrefix.length
+      }
+    }
+  }
+  return best
 }
 
 function findAccount(id: string): BankAccount {
@@ -44,8 +55,9 @@ export const bankService: BankService = {
   },
 
   detectBank(cardNumber) {
-    const bin = cleanCardNumber(cardNumber).slice(0, 6)
-    return resolveApi(() => detectBankSync(bin), () => api.post<IranianBank | null>('/banks/detect', { bin }))
+    const digits = cleanCardNumber(cardNumber)
+    const payload = digits.length >= 6 ? digits : ''
+    return resolveApi(() => detectBankSync(payload), () => api.post<IranianBank | null>('/banks/detect', { bin: payload }))
   },
 
   addAccount(input) {

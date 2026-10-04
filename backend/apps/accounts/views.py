@@ -1,5 +1,8 @@
+import jdatetime
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import generics
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -9,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.accounts.models import BankAccount, IranianBank
+from apps.accounts.models import BankAccount, BankCardPrefix, BankVerificationObservation, IranianBank
 from apps.accounts.serializers import (
     BankAccountSerializer,
     DashboardSummarySerializer,
@@ -30,11 +33,22 @@ from apps.accounts.serializers import (
     EmailVerificationService
 )
 from apps.accounts.services.auth import AuthService
+from apps.accounts.services.bank_registry import (
+    create_bank_verification_observation,
+    find_bank_by_card,
+    find_bank_by_iban,
+    get_iban_bank_code,
+    is_valid_card_number,
+    is_valid_iranian_iban,
+    normalize_card,
+    normalize_iban,
+)
 from apps.accounts.services.session import (
     delete_session,
     update_session,
 )
 from apps.kyc.models import KycApplication
+from apps.kyc.services.ehraz import EhrazAPIError, EhrazService
 
 User = get_user_model()
 
@@ -570,7 +584,7 @@ class IranianBankListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        banks = IranianBank.objects.all()
+        banks = IranianBank.objects.filter(is_active=True)
         serializer = IranianBankSerializer(banks, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -579,9 +593,13 @@ class BankAccountListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        accounts = BankAccount.objects.filter(
-            user=request.user,
-        ).select_related("bank")
+        accounts = (
+            BankAccount.objects
+            .filter(
+                user=request.user,
+            )
+            .select_related("bank")
+        )
 
         serializer = BankAccountSerializer(
             accounts,
@@ -595,15 +613,32 @@ class BankAccountListCreateAPIView(APIView):
 
     def post(self, request):
         card_number = str(
-            request.data.get("cardNumber", ""),
+            request.data.get(
+                "cardNumber",
+                "",
+            ),
         )
 
         iban = str(
-            request.data.get("iban", ""),
+            request.data.get(
+                "iban",
+                "",
+            ),
         )
 
         account_number = str(
-            request.data.get("accountNumber", ""),
+            request.data.get(
+                "accountNumber",
+                "",
+            ),
+        )
+
+        card_digits = normalize_card(
+            card_number,
+        )
+
+        iban_value = normalize_iban(
+            iban,
         )
 
         try:
@@ -631,6 +666,26 @@ class BankAccountListCreateAPIView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        if not settings.EHRAZ_API_TOKEN:
+            return Response(
+                {
+                    "detail": (
+                        "سرویس احراز هویت هنوز پیکربندی نشده است."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not kyc.national_id or not kyc.birth_date:
+            return Response(
+                {
+                    "detail": (
+                        "اطلاعات هویتی لازم برای بررسی حساب بانکی کامل نیست."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         owner_name = (
             f"{kyc.first_name} {kyc.last_name}"
         ).strip()
@@ -646,116 +701,390 @@ class BankAccountListCreateAPIView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        card_digits = "".join(
-            char
-            for char in card_number
-            if char.isdigit()
-        )
+        card_luhn_valid = is_valid_card_number(card_digits)
+        iban_valid = is_valid_iranian_iban(iban_value)
+        card_bank = find_bank_by_card(card_digits)
+        iban_bank = find_bank_by_iban(iban_value)
 
-        iban_value = (
-            iban
-            .replace(" ", "")
-            .replace("-", "")
-            .upper()
-        )
-
-        if len(card_digits) != 16:
+        if not card_luhn_valid:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=False,
+                iban_checksum_valid=iban_valid,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=iban_bank is not None,
+                banks_match=bool(card_bank and iban_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_INVALID_CARD,
+                failure_reason="card_luhn_invalid",
+            )
             return Response(
                 {
                     "fields": {
                         "cardNumber": (
-                            "شماره کارت باید ۱۶ رقم باشد."
+                            "شماره کارت معتبر نیست."
                         )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        if not iban_value.startswith("IR") or len(iban_value) != 26:
+        if not iban_valid:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=False,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=iban_bank is not None,
+                banks_match=bool(card_bank and iban_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_INVALID_IBAN,
+                failure_reason="iban_checksum_invalid",
+            )
             return Response(
                 {
                     "fields": {
                         "iban": (
-                            "شماره شبا باید با IR شروع شود و "
-                            "۲۴ رقم بعد از آن داشته باشد."
+                            "شماره شبا معتبر نیست."
                         )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        try:
-            bank = None
-            card_bin = card_digits[:6]
-
-            for item in IranianBank.objects.all():
-                prefixes = item.card_prefixes or []
-
-                if card_bin in prefixes:
-                    bank = item
-                    break
-
-            if bank is None:
-                return Response(
-                    {
-                        "fields": {
-                            "cardNumber": (
-                                "بانک صادرکننده این کارت شناسایی نشد."
-                            )
-                        }
-                    },
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                )
-
-            if BankAccount.objects.filter(
-                    card_number=card_digits,
-            ).exists():
-                return Response(
-                    {
-                        "fields": {
-                            "cardNumber": (
-                                "این شماره کارت قبلاً ثبت شده است."
-                            )
-                        }
-                    },
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                )
-
-            if BankAccount.objects.filter(
-                    iban=iban_value,
-            ).exists():
-                return Response(
-                    {
-                        "fields": {
-                            "iban": (
-                                "این شماره شبا قبلاً ثبت شده است."
-                            )
-                        }
-                    },
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                )
-
-            account = BankAccount.objects.create(
+        if card_bank is None and card_digits:
+            create_bank_verification_observation(
                 user=request.user,
-                bank=bank,
-                owner_name=owner_name,
                 card_number=card_digits,
                 iban=iban_value,
-                account_number=account_number,
-                status="pending",
-                preferred=False,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=False,
+                iban_bank_known=iban_bank is not None,
+                banks_match=bool(iban_bank and card_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_UNKNOWN_CARD_PREFIX,
+                failure_reason="card_prefix_unknown",
+                observed_card_prefix=card_digits[:10],
             )
-            kyc.sync_status()
 
-        except Exception:
+        if iban_bank is None:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=False,
+                banks_match=False,
+                result=BankVerificationObservation.RESULT_UNKNOWN_IBAN_BANK,
+                failure_reason="iban_bank_unknown",
+            )
             return Response(
                 {
-                    "detail": "ثبت حساب بانکی انجام نشد."
+                    "fields": {
+                        "iban": (
+                            "بانک مربوط به شماره شبا "
+                            "شناسایی نشد."
+                        )
+                    }
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        serializer = BankAccountSerializer(account)
+        if card_bank is not None and iban_bank.pk != card_bank.pk:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=True,
+                iban_bank_known=True,
+                banks_match=False,
+                result=BankVerificationObservation.RESULT_BANK_MISMATCH,
+                failure_reason="card_iban_bank_mismatch",
+            )
+            return Response(
+                {
+                    "fields": {
+                        "iban": (
+                            "بانک شماره کارت و شماره شبا "
+                            "با یکدیگر مطابقت ندارند."
+                        )
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        bank = card_bank if card_bank is not None else iban_bank
+
+        # ---------------------------------------------------------
+        # Duplicate card
+        # ---------------------------------------------------------
+        if BankAccount.objects.filter(
+                card_number=card_digits,
+        ).exists():
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_DUPLICATE_CARD,
+                failure_reason="duplicate_card",
+            )
+            return Response(
+                {
+                    "fields": {
+                        "cardNumber": (
+                            "این شماره کارت قبلاً ثبت شده است."
+                        )
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # ---------------------------------------------------------
+        # Duplicate IBAN
+        # ---------------------------------------------------------
+        if BankAccount.objects.filter(
+                iban=iban_value,
+        ).exists():
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_DUPLICATE_IBAN,
+                failure_reason="duplicate_iban",
+            )
+            return Response(
+                {
+                    "fields": {
+                        "iban": (
+                            "این شماره شبا قبلاً ثبت شده است."
+                        )
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # ---------------------------------------------------------
+        # Gregorian → Jalali YYYYMMDD
+        # ---------------------------------------------------------
+        birth_date = (
+            jdatetime.date
+            .fromgregorian(
+                date=kyc.birth_date,
+            )
+            .strftime("%Y%m%d")
+        )
+
+        # ---------------------------------------------------------
+        # Ehraz: IBAN ownership
+        # ---------------------------------------------------------
+        try:
+            ehraz_result = (
+                EhrazService.match_iban_with_national(
+                    iban=iban_value,
+                    national_code=kyc.national_id,
+                    birth_date=birth_date,
+                )
+            )
+        except EhrazAPIError as exc:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
+                failure_reason="ehraz_iban_unavailable",
+            )
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if "matched" not in ehraz_result:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
+                failure_reason="ehraz_iban_response_incomplete",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "پاسخ سرویس احراز مالکیت حساب بانکی کامل نیست."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if ehraz_result["matched"] is not True:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                card_ownership_verified=False,
+                iban_ownership_verified=False,
+                result=BankVerificationObservation.RESULT_OWNERSHIP_FAILED,
+                failure_reason="ehraz_iban_mismatch",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "اطلاعات حساب بانکی با اطلاعات هویتی "
+                        "شما مطابقت ندارد."
+                    )
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # ---------------------------------------------------------
+        # Ehraz: Card ownership
+        # ---------------------------------------------------------
+        try:
+            card_result = (
+                EhrazService.match_card_with_national(
+                    card_number=card_digits,
+                    national_code=kyc.national_id,
+                    birth_date=birth_date,
+                )
+            )
+        except EhrazAPIError as exc:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                card_ownership_verified=False,
+                iban_ownership_verified=True,
+                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
+                failure_reason="ehraz_card_unavailable",
+            )
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if "matched" not in card_result:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                card_ownership_verified=False,
+                iban_ownership_verified=True,
+                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
+                failure_reason="ehraz_card_response_incomplete",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "پاسخ سرویس احراز مالکیت کارت کامل نیست."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if card_result["matched"] is not True:
+            create_bank_verification_observation(
+                user=request.user,
+                card_number=card_digits,
+                iban=iban_value,
+                card_luhn_valid=True,
+                iban_checksum_valid=True,
+                card_bank_known=card_bank is not None,
+                iban_bank_known=True,
+                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+                card_ownership_verified=False,
+                iban_ownership_verified=True,
+                result=BankVerificationObservation.RESULT_OWNERSHIP_FAILED,
+                failure_reason="ehraz_card_mismatch",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "اطلاعات کارت با اطلاعات هویتی "
+                        "شما مطابقت ندارد."
+                    )
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # ---------------------------------------------------------
+        # Create verified bank account
+        # ---------------------------------------------------------
+        account = BankAccount.objects.create(
+            user=request.user,
+            bank=bank,
+            owner_name=owner_name,
+            card_number=card_digits,
+            iban=iban_value,
+            account_number=account_number,
+            status="verified",
+            preferred=False,
+            verified_at=timezone.now(),
+        )
+
+        create_bank_verification_observation(
+            user=request.user,
+            card_number=card_digits,
+            iban=iban_value,
+            card_luhn_valid=True,
+            iban_checksum_valid=True,
+            card_bank_known=card_bank is not None,
+            iban_bank_known=True,
+            banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
+            card_ownership_verified=True,
+            iban_ownership_verified=True,
+            result=BankVerificationObservation.RESULT_VERIFIED,
+            failure_reason="",
+        )
+
+        kyc.sync_status()
+
+        serializer = BankAccountSerializer(
+            account,
+        )
 
         return Response(
             serializer.data,
@@ -811,26 +1140,24 @@ class BankDetectAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        card_bin = str(request.data.get("bin", ""))[:6]
+        value = str(
+            request.data.get("bin", "")
+        )
 
-        if len(card_bin) != 6 or not card_bin.isdigit():
+        bank = find_bank_by_card(value)
+
+        if bank is None:
             return Response(
                 None,
                 status=status.HTTP_200_OK,
             )
 
-        for bank in IranianBank.objects.all():
-            prefixes = bank.card_prefixes or []
-
-            if card_bin in prefixes:
-                serializer = IranianBankSerializer(bank)
-                return Response(
-                    serializer.data,
-                    status=status.HTTP_200_OK,
-                )
+        serializer = IranianBankSerializer(
+            bank,
+        )
 
         return Response(
-            None,
+            serializer.data,
             status=status.HTTP_200_OK,
         )
 

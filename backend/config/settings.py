@@ -296,14 +296,25 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
+BANK_REGISTRY_SOURCE_URL = env(
+   "BANK_REGISTRY_SOURCE_URL",
+   default="",
+)
+
 EHRAZ_API_BASE_URL = os.getenv(
-    "EHRAZ_API_BASE_URL",
-    "https://ehraz.io/api/v1",
+   "EHRAZ_API_BASE_URL",
+   "https://ehraz.io/api/v1",
 )
 
 EHRAZ_API_TOKEN = os.getenv(
-    "EHRAZ_API_TOKEN",
-    "",
+   "EHRAZ_API_TOKEN",
+   "",
+)
+EHRAZ_IDENTITY_SIMILARITY_THRESHOLD = int(
+    os.getenv(
+        "EHRAZ_IDENTITY_SIMILARITY_THRESHOLD",
+        "100",
+    )
 )
 
 WITHDRAWAL_ADDRESS_COOLDOWN_SECONDS = int(

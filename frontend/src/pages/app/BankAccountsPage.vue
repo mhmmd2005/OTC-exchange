@@ -79,7 +79,7 @@ watch(() => form.cardNumber, async (value) => {
   const sequence = ++detectionSequence
   detectingBank.value = true
   try {
-    const bank = await bankService.detectBank(digits.slice(0, 6))
+    const bank = await bankService.detectBank(digits)
     if (sequence === detectionSequence) detectedBank.value = bank
   } catch {
     if (sequence === detectionSequence) detectedBank.value = null
@@ -128,7 +128,7 @@ async function addAccount(): Promise<void> {
     })
     await loadAccounts()
     addOpen.value = false
-    feedback.value = 'حساب بانکی ثبت شد و برای بررسی ارسال شد.'
+    feedback.value = 'حساب بانکی با موفقیت تأیید و ثبت شد.'
   } catch (error) {
     if (error instanceof ApiError && error.details?.fields) Object.assign(formErrors, error.details.fields)
     formErrors.form = errorMessage(error, 'ثبت حساب بانکی انجام نشد.')
@@ -300,7 +300,7 @@ onMounted(loadAccounts)
           <span>به‌دلیل الزامات مالی، حساب مشترک یا حساب متعلق به شخص دیگر تأیید نمی‌شود.</span></div>
       </form>
       <template #footer>
-        <AppButton block :loading="submitting" @click="addAccount">ثبت و ارسال برای بررسی</AppButton>
+        <AppButton block :loading="submitting" @click="addAccount">ثبت و تأیید مالکیت</AppButton>
         <AppButton variant="secondary" :disabled="submitting" @click="addOpen = false">انصراف</AppButton>
       </template>
     </AppModal>
