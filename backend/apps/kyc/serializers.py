@@ -111,7 +111,8 @@ class KycApplicationSerializer(serializers.ModelSerializer):
             "birth_date",
             "phone_number",
             "email",
-            "identity_document",
+            "identity_document_front",
+            "identity_document_back",
             "status",
             "status_label",
             "basic_info_status",
@@ -242,9 +243,11 @@ class BasicInfoSerializer(serializers.ModelSerializer):
 
 
 class IdentityDocumentSerializer(serializers.Serializer):
-    document = serializers.FileField()
+    front = serializers.FileField()
+    back = serializers.FileField()
 
-    def validate_document(self, value):
+    @staticmethod
+    def validate_file(value):
         if value.content_type not in {
             "image/jpeg",
             "image/png",
@@ -261,7 +264,13 @@ class IdentityDocumentSerializer(serializers.Serializer):
 
         if value.size > 5 * 1024 * 1024:
             raise serializers.ValidationError(
-                "حجم مدرک نباید بیشتر از ۵ مگابایت باشد."
+                "حجم هر فایل نباید بیشتر از ۵ مگابایت باشد."
             )
 
         return value
+
+    def validate_front(self, value):
+        return self.validate_file(value)
+
+    def validate_back(self, value):
+        return self.validate_file(value)

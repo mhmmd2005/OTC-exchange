@@ -1,4 +1,4 @@
-import {adminApi} from '@/services/admin/adminApi'
+import {adminApi, resolveAdminMediaUrl,} from '@/services/admin/adminApi'
 
 export interface AdminBankAccount {
     id: string
@@ -30,7 +30,8 @@ export interface AdminKycApplication {
     birthDate: string
     phoneNumber: string
     email?: string
-    identityDocument?: string | null
+    identityDocumentFront?: string | null
+    identityDocumentBack?: string | null
 
     status: string
     statusLabel?: string
@@ -146,8 +147,15 @@ function mapApplication(
         email:
             data.email ?? '',
 
-        identityDocument:
-            data.identity_document ?? null,
+        identityDocumentFront:
+            resolveAdminMediaUrl(
+                data.identity_document_front as string | null,
+            ) || null,
+
+        identityDocumentBack:
+            resolveAdminMediaUrl(
+                data.identity_document_back as string | null,
+            ) || null,
 
         status:
             data.status ?? 'not_started',
@@ -255,26 +263,6 @@ export const kycAdminService = {
             )
 
         return mapApplication(data)
-    },
-
-    async approveBasicInfo(
-        id: number,
-    ): Promise<void> {
-        await adminApi.post(
-            `/admin/kyc/${id}/approve/basic-info/`,
-        )
-    },
-
-    async rejectBasicInfo(
-        id: number,
-        reason: string,
-    ): Promise<void> {
-        await adminApi.post(
-            `/admin/kyc/${id}/reject/basic-info/`,
-            {
-                reason,
-            },
-        )
     },
 
     async approveIdentity(

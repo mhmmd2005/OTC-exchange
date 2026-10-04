@@ -70,7 +70,6 @@ const pendingCount = computed(
         applications.value.filter(
             (item) =>
                 item.status === 'pending' ||
-                item.basicInfoStatus === 'pending' ||
                 item.identityStatus === 'pending' ||
                 getBankStatus(item) === 'pending',
         ).length,

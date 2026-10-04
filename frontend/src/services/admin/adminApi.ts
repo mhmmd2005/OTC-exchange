@@ -1,8 +1,4 @@
-import {
-    ApiError,
-    type ApiErrorCode,
-    type ApiErrorDetails,
-} from '@/services/api'
+import {ApiError, type ApiErrorCode, type ApiErrorDetails,} from '@/services/api'
 
 const configuredBaseUrl =
     String(
@@ -27,6 +23,45 @@ function buildUrl(path: string): string {
 
     return `${configuredBaseUrl}${normalizedPath}`
 }
+
+export function resolveAdminMediaUrl(
+    value: string | null | undefined,
+): string {
+    if (!value) {
+        return ''
+    }
+
+    if (/^https?:\/\//i.test(value)) {
+        return value
+    }
+
+    const baseUrl =
+        configuredBaseUrl
+        || (
+            typeof window !== 'undefined'
+                ? window.location.origin
+                : ''
+        )
+
+    if (!baseUrl) {
+        return value
+    }
+
+    try {
+        const origin =
+            new URL(baseUrl).origin
+
+        const normalizedPath =
+            value.startsWith('/')
+                ? value
+                : `/${value}`
+
+        return `${origin}${normalizedPath}`
+    } catch {
+        return value
+    }
+}
+
 
 function getAdminAccessToken(): string | null {
     if (
@@ -167,7 +202,7 @@ function extractErrorMessage(
     for (
         const [key, value]
         of Object.entries(data)
-    ) {
+        ) {
         if (
             key === 'code'
             || key === 'details'

@@ -67,7 +67,8 @@ class AdminKycApplicationSerializer(serializers.ModelSerializer):
             "birth_date",
             "phone_number",
             "email",
-            "identity_document",
+            "identity_document_front",
+"identity_document_back",
             "status",
             "status_label",
 

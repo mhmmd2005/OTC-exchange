@@ -1,3 +1,4 @@
+import jdatetime
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -86,7 +87,9 @@ class SubmitBasicInfoAPIView(APIView):
             f"{data['first_name']} {data['last_name']}"
         ).strip()
 
-        birth_date = data["birth_date"].strftime("%Y%m%d")
+        birth_date = jdatetime.date.fromgregorian(
+            date=data["birth_date"]
+        ).strftime("%Y%m%d")
 
         try:
             mobile_result = (
@@ -96,25 +99,151 @@ class SubmitBasicInfoAPIView(APIView):
                 )
             )
 
-            if mobile_result.get("matched") is not True:
-                return Response(
-                    {
-                        "detail": (
-                            "کد ملی با شماره موبایل ثبت‌شده "
-                            "مطابقت ندارد."
-                        )
-                    },
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            if "matched" not in mobile_result:
+                raise EhrazAPIError(
+                    "پاسخ تطبیق کد ملی و موبایل ناقص است."
                 )
 
-            EhrazService.identity_similarity(
-                national_code=data["national_id"],
-                birth_date=birth_date,
-                first_name=data["first_name"],
-                last_name=data["last_name"],
-                full_name=full_name,
-                father_name=data["father_name"],
+            if mobile_result["matched"] is not True:
+                serializer.save()
+
+                now = timezone.now()
+
+                kyc.basic_info_status = "rejected"
+                kyc.basic_info_submitted_at = now
+                kyc.basic_info_reviewed_at = now
+                kyc.basic_info_reviewed_by = None
+                kyc.basic_info_rejection_reason = (
+                    "کد ملی با شماره موبایل ثبت‌شده مطابقت ندارد."
+                )
+                kyc.rejection_reason = (
+                    kyc.basic_info_rejection_reason
+                )
+
+                kyc.save(
+                    update_fields=[
+                        "basic_info_status",
+                        "basic_info_submitted_at",
+                        "basic_info_reviewed_at",
+                        "basic_info_reviewed_by",
+                        "basic_info_rejection_reason",
+                        "rejection_reason",
+                        "updated_at",
+                    ]
+                )
+
+                kyc.sync_status()
+
+                return Response(
+                    {
+                        "id": str(kyc.id),
+                        "stepId": "basic_info",
+                        "status": "rejected",
+                        "submittedAt": kyc.basic_info_submitted_at,
+                        "nextStep": "basic_info",
+                        "reviewPending": False,
+                        "rejectionReason": (
+                            kyc.basic_info_rejection_reason
+                        ),
+                        "message": (
+                            "کد ملی و شماره موبایل شما توسط "
+                            "سرویس احراز با یکدیگر مطابقت ندارند."
+                        ),
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            identity_result = (
+                EhrazService.identity_similarity(
+                    national_code=data["national_id"],
+                    birth_date=birth_date,
+                    first_name=data["first_name"],
+                    last_name=data["last_name"],
+                    full_name=full_name,
+                    father_name=data["father_name"],
+                )
             )
+
+            identity_matched = (
+                EhrazService.identity_similarity_matches(
+                    identity_result,
+                    threshold=(
+                        settings.EHRAZ_IDENTITY_SIMILARITY_THRESHOLD
+                    ),
+                )
+            )
+
+            serializer.save()
+
+            now = timezone.now()
+
+            if not identity_matched:
+                kyc.basic_info_status = "rejected"
+                kyc.basic_info_submitted_at = now
+                kyc.basic_info_reviewed_at = now
+                kyc.basic_info_reviewed_by = None
+                kyc.basic_info_rejection_reason = (
+                    "اطلاعات هویتی واردشده با اطلاعات ثبت‌شده مطابقت ندارد. "
+                    "لطفاً نام، نام خانوادگی، نام پدر، کد ملی و تاریخ تولد را "
+                    "دقیقاً مطابق مدارک رسمی وارد کنید."
+                )
+                kyc.rejection_reason = (
+                    kyc.basic_info_rejection_reason
+                )
+
+                kyc.save(
+                    update_fields=[
+                        "basic_info_status",
+                        "basic_info_submitted_at",
+                        "basic_info_reviewed_at",
+                        "basic_info_reviewed_by",
+                        "basic_info_rejection_reason",
+                        "rejection_reason",
+                        "updated_at",
+                    ]
+                )
+
+                kyc.sync_status()
+
+                return Response(
+                    {
+                        "id": str(kyc.id),
+                        "stepId": "basic_info",
+                        "status": "rejected",
+                        "submittedAt": kyc.basic_info_submitted_at,
+                        "nextStep": "basic_info",
+                        "reviewPending": False,
+                        "rejectionReason": (
+                            kyc.basic_info_rejection_reason
+                        ),
+                        "message": (
+                            "اطلاعات هویتی واردشده با اطلاعات ثبت‌شده مطابقت ندارد. "
+                            "لطفاً در ارسال اطلاعات دقت فرمایید."
+                        ),
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            kyc.basic_info_status = "approved"
+            kyc.basic_info_submitted_at = now
+            kyc.basic_info_reviewed_at = now
+            kyc.basic_info_reviewed_by = None
+            kyc.basic_info_rejection_reason = ""
+            kyc.rejection_reason = ""
+
+            kyc.save(
+                update_fields=[
+                    "basic_info_status",
+                    "basic_info_submitted_at",
+                    "basic_info_reviewed_at",
+                    "basic_info_reviewed_by",
+                    "basic_info_rejection_reason",
+                    "rejection_reason",
+                    "updated_at",
+                ]
+            )
+
+            kyc.sync_status()
 
         except EhrazAPIError as exc:
             return Response(
@@ -122,36 +251,16 @@ class SubmitBasicInfoAPIView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        serializer.save()
-
-        kyc.basic_info_status = "pending"
-        kyc.basic_info_submitted_at = timezone.now()
-        kyc.basic_info_reviewed_at = None
-        kyc.basic_info_reviewed_by = None
-        kyc.basic_info_rejection_reason = ""
-
-        kyc.save(
-            update_fields=[
-                "basic_info_status",
-                "basic_info_submitted_at",
-                "basic_info_reviewed_at",
-                "basic_info_reviewed_by",
-                "basic_info_rejection_reason",
-                "updated_at",
-            ]
-        )
-
-        kyc.sync_status()
-
         return Response(
             {
                 "id": str(kyc.id),
                 "stepId": "basic_info",
-                "status": "pending",
+                "status": "approved",
                 "submittedAt": kyc.basic_info_submitted_at,
                 "nextStep": "identity",
+                "reviewPending": False,
                 "message": (
-                    "اطلاعات هویتی با موفقیت ثبت شد. "
+                    "اطلاعات هویتی شما تأیید شد. "
                     "حالا مدرک شناسایی خود را ارسال کنید."
                 ),
             },
@@ -175,7 +284,7 @@ class SubmitIdentityDocumentAPIView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        if kyc.basic_info_status not in {"pending", "approved"}:
+        if kyc.basic_info_status != "approved":
             return Response(
                 {"detail": "ابتدا اطلاعات هویتی را ثبت کنید."},
                 status=status.HTTP_409_CONFLICT,
@@ -192,7 +301,9 @@ class SubmitIdentityDocumentAPIView(APIView):
         )
         serializer.is_valid(raise_exception=True)
 
-        kyc.identity_document = serializer.validated_data["document"]
+        kyc.identity_document_front = serializer.validated_data["front"]
+        kyc.identity_document_back = serializer.validated_data["back"]
+
         kyc.identity_status = "pending"
         kyc.identity_submitted_at = timezone.now()
         kyc.identity_reviewed_at = None
@@ -200,7 +311,8 @@ class SubmitIdentityDocumentAPIView(APIView):
         kyc.identity_rejection_reason = ""
 
         kyc.save(update_fields=[
-            "identity_document",
+            "identity_document_front",
+            "identity_document_back",
             "identity_status",
             "identity_submitted_at",
             "identity_reviewed_at",
@@ -412,10 +524,14 @@ class VerificationSummaryAPIView(APIView):
 
         if verification_status == "verified":
             message = "احراز هویت شما با موفقیت تکمیل شده است."
-        elif review_pending:
+        elif review_pending and kyc.identity_status == "pending":
             message = (
-                "اطلاعات هویتی و مدرک شناسایی شما "
-                "برای بررسی ادمین ارسال شده است. "
+                "مدرک شناسایی شما برای بررسی ادمین ارسال شده است. "
+                "نتیجه پس از بررسی در حساب شما اعلام می‌شود."
+            )
+        elif review_pending and bank_status == "pending":
+            message = (
+                "حساب بانکی شما برای بررسی ادمین ارسال شده است. "
                 "نتیجه پس از بررسی در حساب شما اعلام می‌شود."
             )
         elif verification_status == "rejected":
@@ -437,6 +553,7 @@ class VerificationSummaryAPIView(APIView):
             "basicInfo": {
                 "firstName": kyc.first_name,
                 "lastName": kyc.last_name,
+                "fatherName": kyc.father_name,
                 "nationalId": kyc.national_id,
                 "birthDate": (
                     kyc.birth_date.isoformat()

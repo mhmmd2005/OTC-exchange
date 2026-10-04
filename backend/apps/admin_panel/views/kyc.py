@@ -6,13 +6,12 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import BankAccount
 from apps.kyc.models import KycApplication
+from ..authentication import AdminJWTAuthentication
+from ..permissions import IsAdminAuthenticated
 from ..serializers import (
     AdminKycApplicationSerializer,
     KycRejectSerializer,
 )
-from ..authentication import AdminJWTAuthentication
-from ..permissions import IsAdminAuthenticated
-
 
 
 class AdminKycListAPIView(APIView):
@@ -139,15 +138,20 @@ class AdminKycApproveStepAPIView(APIView):
 
         try:
             if step == "basic-info":
-                kyc.approve_basic_info(
-                    request.user,
+                return Response(
+                    {
+                        "detail": (
+                            "اطلاعات هویتی توسط سرویس احراز بررسی "
+                            "می‌شود و قابل تأیید دستی نیست."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
                 )
 
-            elif step == "identity":
+            if step == "identity":
                 kyc.approve_identity(
                     request.user,
                 )
-
             else:
                 return Response(
                     {
@@ -182,6 +186,25 @@ class AdminKycRejectStepAPIView(APIView):
 
     @transaction.atomic
     def post(self, request, pk, step):
+        if step == "basic-info":
+            return Response(
+                {
+                    "detail": (
+                        "اطلاعات هویتی توسط سرویس احراز بررسی می‌شود "
+                        "و قابل رد دستی نیست."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if step != "identity":
+            return Response(
+                {
+                    "detail": "مرحله معتبر نیست."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = KycRejectSerializer(
             data=request.data,
         )
@@ -207,26 +230,10 @@ class AdminKycRejectStepAPIView(APIView):
             )
 
         try:
-            if step == "basic-info":
-                kyc.reject_basic_info(
-                    serializer.validated_data["reason"],
-                    request.user,
-                )
-
-            elif step == "identity":
-                kyc.reject_identity(
-                    serializer.validated_data["reason"],
-                    request.user,
-                )
-
-            else:
-                return Response(
-                    {
-                        "detail": "مرحله معتبر نیست."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
+            kyc.reject_identity(
+                serializer.validated_data["reason"],
+                request.user,
+            )
         except DjangoValidationError as exc:
             return Response(
                 {

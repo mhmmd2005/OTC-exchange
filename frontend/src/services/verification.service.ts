@@ -9,7 +9,10 @@ export interface VerificationService {
 
     submitBasicInfo(input: BasicIdentityInput): Promise<VerificationSubmission>
 
-    submitIdentityDocument(file: File): Promise<VerificationSubmission>
+    submitIdentityDocument(
+        frontFile: File,
+        backFile: File,
+    ): Promise<VerificationSubmission>
 }
 
 function createSubmission(
@@ -84,7 +87,7 @@ export const verificationService: VerificationService = {
         )
     },
 
-    submitIdentityDocument(file) {
+    submitIdentityDocument(frontFile, backFile) {
         return resolveApi(
             () => ({
                 ...createSubmission('identity'),
@@ -93,7 +96,16 @@ export const verificationService: VerificationService = {
             }),
             () => {
                 const payload = new FormData()
-                payload.append('document', file)
+
+                payload.append(
+                    'front',
+                    frontFile,
+                )
+
+                payload.append(
+                    'back',
+                    backFile,
+                )
 
                 return api.post<VerificationSubmission>(
                     '/verification/identity',

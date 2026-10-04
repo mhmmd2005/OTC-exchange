@@ -61,7 +61,13 @@ class KycApplication(models.Model):
         default="",
     )
 
-    identity_document = models.FileField(
+    identity_document_front = models.FileField(
+        upload_to="kyc/identity/%Y/%m/%d/",
+        blank=True,
+        null=True,
+    )
+
+    identity_document_back = models.FileField(
         upload_to="kyc/identity/%Y/%m/%d/",
         blank=True,
         null=True,

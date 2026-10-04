@@ -21,14 +21,20 @@ const loading = ref(false)
 const error = ref('')
 
 const rejectStep = ref<
-    'basic_info' | 'identity' | 'bank' | null
+    'identity' | 'bank' | null
 >(null)
 
 const rejectReason = ref('')
 const selectedBank = ref<AdminBankAccount | null>(null)
 
-const basicInfo = computed(() => props.application)
-const identity = computed(() => props.application)
+const basicInfo = computed(
+    () => props.application,
+)
+
+const identity = computed(
+    () => props.application,
+)
+
 const bankAccounts = computed(
     () => props.application.bankAccounts ?? [],
 )
@@ -47,7 +53,7 @@ function readableError(
 }
 
 function openReject(
-    step: 'basic_info' | 'identity',
+    step: 'identity',
 ): void {
   clearError()
   rejectStep.value = step
@@ -70,30 +76,22 @@ function closeReject(): void {
   rejectReason.value = ''
 }
 
-async function approve(
-    step: 'basic_info' | 'identity',
-): Promise<void> {
+async function approveIdentity(): Promise<void> {
   if (loading.value) return
 
   loading.value = true
   error.value = ''
 
   try {
-    if (step === 'basic_info') {
-      await kycAdminService.approveBasicInfo(
-          props.application.id,
-      )
-    } else {
-      await kycAdminService.approveIdentity(
-          props.application.id,
-      )
-    }
+    await kycAdminService.approveIdentity(
+        props.application.id,
+    )
 
     emit('updated')
   } catch (caught) {
     error.value = readableError(
         caught,
-        'عملیات تأیید انجام نشد.',
+        'تأیید مدرک شناسایی انجام نشد.',
     )
   } finally {
     loading.value = false
@@ -126,7 +124,9 @@ async function approveBank(
 }
 
 async function reject(): Promise<void> {
-  if (!rejectStep.value || loading.value) return
+  if (!rejectStep.value || loading.value) {
+    return
+  }
 
   const reason = rejectReason.value.trim()
 
@@ -139,12 +139,7 @@ async function reject(): Promise<void> {
   error.value = ''
 
   try {
-    if (rejectStep.value === 'basic_info') {
-      await kycAdminService.rejectBasicInfo(
-          props.application.id,
-          reason,
-      )
-    } else if (rejectStep.value === 'identity') {
+    if (rejectStep.value === 'identity') {
       await kycAdminService.rejectIdentity(
           props.application.id,
           reason,
@@ -174,31 +169,55 @@ async function reject(): Promise<void> {
   }
 }
 
-function documentUrl(): string {
-  return props.application.identityDocument || ''
+function identityDocumentFrontUrl(): string {
+  return (
+      props.application.identityDocumentFront
+      || ''
+  )
 }
 
-function formatCardNumber(cardNumber: string): string {
-  const digits = cardNumber.replace(/\D/g, '')
+function identityDocumentBackUrl(): string {
+  return (
+      props.application.identityDocumentBack
+      || ''
+  )
+}
+
+function formatCardNumber(
+    cardNumber: string,
+): string {
+  const digits = cardNumber.replace(
+      /\D/g,
+      '',
+  )
 
   if (digits.length !== 16) {
     return cardNumber || '—'
   }
 
-  return digits.replace(/(\d{4})(?=\d)/g, '$1-')
+  return digits.replace(
+      /(\d{4})(?=\d)/g,
+      '$1-',
+  )
 }
 
-function formatIban(iban: string): string {
+function formatIban(
+    iban: string,
+): string {
   const normalized = iban
       .replace(/\s+/g, '')
       .toUpperCase()
 
   if (!normalized) return '—'
 
-  return normalized.replace(/(.{4})/g, '$1 ').trim()
+  return normalized
+      .replace(/(.{4})/g, '$1 ')
+      .trim()
 }
 
-function bankName(account: AdminBankAccount): string {
+function bankName(
+    account: AdminBankAccount,
+): string {
   return (
       account.bank?.nameFa ||
       account.bank?.nameEn ||
@@ -209,8 +228,9 @@ function bankName(account: AdminBankAccount): string {
 function bankOwnerMatchesKyc(
     account: AdminBankAccount,
 ): boolean {
-  const kycName = `${props.application.firstName} ${props.application.lastName}`
-      .trim()
+  const kycName =
+      `${props.application.firstName} ${props.application.lastName}`
+          .trim()
 
   return (
       account.ownerName.trim() === kycName &&
@@ -258,28 +278,43 @@ function bankOwnerMatchesKyc(
         class="detail-error"
         role="alert"
     >
-      <AppIcon name="warning" :size="18"/>
+      <AppIcon
+          name="warning"
+          :size="18"
+      />
+
       <span>{{ error }}</span>
 
       <button
           type="button"
           @click="clearError"
       >
-        <AppIcon name="close" :size="16"/>
+        <AppIcon
+            name="close"
+            :size="16"
+        />
       </button>
     </div>
 
     <div class="review-grid">
-      <AppCard padding="lg" class="review-card">
+      <AppCard
+          padding="lg"
+          class="review-card"
+      >
         <header class="review-card__header">
           <div>
             <span class="review-card__icon">
-              <AppIcon name="user" :size="21"/>
+              <AppIcon
+                  name="user"
+                  :size="21"
+              />
             </span>
 
             <div>
               <h3>اطلاعات هویتی</h3>
-              <p>بررسی اطلاعات پایه کاربر</p>
+              <p>
+                نتیجه بررسی اطلاعات پایه کاربر
+              </p>
             </div>
           </div>
 
@@ -332,7 +367,7 @@ function bankOwnerMatchesKyc(
           </div>
 
           <div>
-            <span>بررسی شده</span>
+            <span>نتیجه بررسی</span>
             <strong>
               {{
                 basicInfo.basicInfoReviewedAt
@@ -356,54 +391,76 @@ function bankOwnerMatchesKyc(
               class="full rejection"
           >
             <span>علت رد</span>
+
             <strong>
-              {{ basicInfo.basicInfoRejectionReason }}
+              {{
+                basicInfo.basicInfoRejectionReason
+              }}
             </strong>
           </div>
         </div>
 
         <div
-            v-if="basicInfo.basicInfoStatus === 'pending'"
-            class="review-actions"
+            v-if="
+              basicInfo.basicInfoStatus === 'approved'
+            "
+            class="review-result approved"
         >
-          <AppButton
-              variant="primary"
-              icon="check"
-              :loading="loading"
-              @click="approve('basic_info')"
-          >
-            تأیید اطلاعات هویتی
-          </AppButton>
+          <AppIcon
+              name="check"
+              :size="18"
+          />
 
-          <AppButton
-              variant="secondary"
-              icon="close"
-              :disabled="loading"
-              @click="openReject('basic_info')"
-          >
-            رد اطلاعات هویتی
-          </AppButton>
+          اطلاعات هویتی توسط سرویس احراز تأیید شده است.
         </div>
 
         <div
-            v-else-if="basicInfo.basicInfoStatus === 'approved'"
-            class="review-result approved"
+            v-else-if="
+              basicInfo.basicInfoStatus === 'rejected'
+            "
+            class="review-result rejected-result"
         >
-          <AppIcon name="check" :size="18"/>
-          اطلاعات هویتی تأیید شده است.
+          <AppIcon
+              name="close"
+              :size="18"
+          />
+
+          اطلاعات هویتی توسط سرویس احراز تأیید نشده است.
+        </div>
+
+        <div
+            v-else-if="
+              basicInfo.basicInfoStatus === 'pending'
+            "
+            class="review-result"
+        >
+          <AppIcon
+              name="loader"
+              :size="18"
+          />
+
+          در انتظار نتیجه سرویس احراز.
         </div>
       </AppCard>
 
-      <AppCard padding="lg" class="review-card">
+      <AppCard
+          padding="lg"
+          class="review-card"
+      >
         <header class="review-card__header">
           <div>
             <span class="review-card__icon">
-              <AppIcon name="verify" :size="21"/>
+              <AppIcon
+                  name="verify"
+                  :size="21"
+              />
             </span>
 
             <div>
               <h3>مدرک شناسایی</h3>
-              <p>بررسی مدرک ارسال‌شده</p>
+              <p>
+                بررسی مدرک ارسال‌شده
+              </p>
             </div>
           </div>
 
@@ -416,6 +473,7 @@ function bankOwnerMatchesKyc(
         <div class="review-fields">
           <div>
             <span>ارسال شده</span>
+
             <strong>
               {{
                 identity.identitySubmittedAt
@@ -429,6 +487,7 @@ function bankOwnerMatchesKyc(
 
           <div>
             <span>بررسی شده</span>
+
             <strong>
               {{
                 identity.identityReviewedAt
@@ -442,6 +501,7 @@ function bankOwnerMatchesKyc(
 
           <div class="full">
             <span>بررسی‌کننده</span>
+
             <strong>
               {{ identity.identityReviewedBy || '—' }}
             </strong>
@@ -452,41 +512,69 @@ function bankOwnerMatchesKyc(
               class="full rejection"
           >
             <span>علت رد</span>
+
             <strong>
               {{ identity.identityRejectionReason }}
             </strong>
           </div>
 
           <div class="full">
-            <span>مدرک</span>
+            <span>مدرک شناسایی</span>
 
-            <a
-                v-if="documentUrl()"
-                :href="documentUrl()"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="document-link"
-            >
-              <AppIcon
-                  name="externalLink"
-                  :size="16"
-              />
-              مشاهده مدرک شناسایی
-            </a>
+            <div class="identity-documents">
+              <a
+                  v-if="identityDocumentFrontUrl()"
+                  :href="identityDocumentFrontUrl()"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="document-link"
+              >
+                <AppIcon
+                    name="externalLink"
+                    :size="16"
+                />
 
-            <strong v-else>—</strong>
+                روی کارت
+              </a>
+
+              <a
+                  v-if="identityDocumentBackUrl()"
+                  :href="identityDocumentBackUrl()"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="document-link"
+              >
+                <AppIcon
+                    name="externalLink"
+                    :size="16"
+                />
+
+                پشت کارت
+              </a>
+
+              <strong
+                  v-if="
+                !identityDocumentFrontUrl()
+                && !identityDocumentBackUrl()
+            "
+              >
+                —
+              </strong>
+            </div>
           </div>
         </div>
 
         <div
-            v-if="identity.identityStatus === 'pending'"
+            v-if="
+              identity.identityStatus === 'pending'
+            "
             class="review-actions"
         >
           <AppButton
               variant="primary"
               icon="check"
               :loading="loading"
-              @click="approve('identity')"
+              @click="approveIdentity"
           >
             تأیید مدرک شناسایی
           </AppButton>
@@ -502,11 +590,31 @@ function bankOwnerMatchesKyc(
         </div>
 
         <div
-            v-else-if="identity.identityStatus === 'approved'"
+            v-else-if="
+              identity.identityStatus === 'approved'
+            "
             class="review-result approved"
         >
-          <AppIcon name="check" :size="18"/>
+          <AppIcon
+              name="check"
+              :size="18"
+          />
+
           مدرک شناسایی تأیید شده است.
+        </div>
+
+        <div
+            v-else-if="
+              identity.identityStatus === 'rejected'
+            "
+            class="review-result rejected-result"
+        >
+          <AppIcon
+              name="close"
+              :size="18"
+          />
+
+          مدرک شناسایی رد شده است.
         </div>
       </AppCard>
 
@@ -517,11 +625,15 @@ function bankOwnerMatchesKyc(
         <header class="review-card__header">
           <div>
             <span class="review-card__icon">
-              <AppIcon name="bank" :size="21"/>
+              <AppIcon
+                  name="bank"
+                  :size="21"
+              />
             </span>
 
             <div>
               <h3>حساب‌های بانکی</h3>
+
               <p>
                 بررسی مستقل حساب‌های ثبت‌شده کاربر
               </p>
@@ -537,7 +649,11 @@ function bankOwnerMatchesKyc(
             v-if="!bankAccounts.length"
             class="bank-empty"
         >
-          <AppIcon name="bank" :size="24"/>
+          <AppIcon
+              name="bank"
+              :size="24"
+          />
+
           <span>
             هنوز حساب بانکی برای این کاربر ثبت نشده است.
           </span>
@@ -576,6 +692,7 @@ function bankOwnerMatchesKyc(
             <div class="review-fields">
               <div>
                 <span>نام صاحب حساب</span>
+
                 <strong>
                   {{ account.ownerName || '—' }}
                 </strong>
@@ -586,11 +703,11 @@ function bankOwnerMatchesKyc(
 
                 <strong
                     :class="{
-                    'match-success':
-                      bankOwnerMatchesKyc(account),
-                    'match-danger':
-                      !bankOwnerMatchesKyc(account),
-                  }"
+                      'match-success':
+                        bankOwnerMatchesKyc(account),
+                      'match-danger':
+                        !bankOwnerMatchesKyc(account),
+                    }"
                 >
                   {{
                     bankOwnerMatchesKyc(account)
@@ -602,31 +719,47 @@ function bankOwnerMatchesKyc(
 
               <div>
                 <span>شماره کارت</span>
+
                 <strong dir="ltr">
-                  {{ formatCardNumber(account.cardNumber) }}
+                  {{
+                    formatCardNumber(
+                        account.cardNumber,
+                    )
+                  }}
                 </strong>
               </div>
 
               <div>
                 <span>شماره شبا</span>
+
                 <strong dir="ltr">
-                  {{ formatIban(account.iban) }}
+                  {{
+                    formatIban(
+                        account.iban,
+                    )
+                  }}
                 </strong>
               </div>
 
               <div>
                 <span>شماره حساب</span>
+
                 <strong dir="ltr">
-                  {{ account.accountNumber || '—' }}
+                  {{
+                    account.accountNumber || '—'
+                  }}
                 </strong>
               </div>
 
               <div>
                 <span>تاریخ ثبت</span>
+
                 <strong>
                   {{
                     account.createdAt
-                        ? formatPersianDate(account.createdAt)
+                        ? formatPersianDate(
+                            account.createdAt,
+                        )
                         : '—'
                   }}
                 </strong>
@@ -636,22 +769,26 @@ function bankOwnerMatchesKyc(
                   v-if="account.verifiedAt"
               >
                 <span>تاریخ تأیید</span>
+
                 <strong>
                   {{
-                    formatPersianDate(account.verifiedAt)
+                    formatPersianDate(
+                        account.verifiedAt,
+                    )
                   }}
                 </strong>
               </div>
 
               <div class="full">
                 <span>قابل استفاده</span>
+
                 <strong
                     :class="{
-                    'match-success':
-                      account.isUsable,
-                    'match-danger':
-                      !account.isUsable,
-                  }"
+                      'match-success':
+                        account.isUsable,
+                      'match-danger':
+                        !account.isUsable,
+                    }"
                 >
                   {{
                     account.isUsable
@@ -666,6 +803,7 @@ function bankOwnerMatchesKyc(
                   class="full rejection"
               >
                 <span>علت رد</span>
+
                 <strong>
                   {{ account.rejectionReason }}
                 </strong>
@@ -673,7 +811,9 @@ function bankOwnerMatchesKyc(
             </div>
 
             <div
-                v-if="account.status === 'pending'"
+                v-if="
+                  account.status === 'pending'
+                "
                 class="review-actions"
             >
               <AppButton
@@ -681,9 +821,9 @@ function bankOwnerMatchesKyc(
                   icon="check"
                   :loading="loading"
                   :disabled="
-                  loading ||
-                  !bankOwnerMatchesKyc(account)
-                "
+                    loading ||
+                    !bankOwnerMatchesKyc(account)
+                  "
                   @click="approveBank(account)"
               >
                 تأیید حساب بانکی
@@ -700,18 +840,30 @@ function bankOwnerMatchesKyc(
             </div>
 
             <div
-                v-else-if="account.status === 'verified'"
+                v-else-if="
+                  account.status === 'verified'
+                "
                 class="review-result approved"
             >
-              <AppIcon name="check" :size="18"/>
+              <AppIcon
+                  name="check"
+                  :size="18"
+              />
+
               حساب بانکی تأیید شده و قابل استفاده است.
             </div>
 
             <div
-                v-else-if="account.status === 'rejected'"
+                v-else-if="
+                  account.status === 'rejected'
+                "
                 class="review-result rejected-result"
             >
-              <AppIcon name="close" :size="18"/>
+              <AppIcon
+                  name="close"
+                  :size="18"
+              />
+
               این حساب بانکی رد شده است.
             </div>
           </div>
@@ -722,17 +874,15 @@ function bankOwnerMatchesKyc(
     <AppModal
         :model-value="Boolean(rejectStep)"
         :title="
-        rejectStep === 'basic_info'
-          ? 'رد اطلاعات هویتی'
-          : rejectStep === 'identity'
+          rejectStep === 'identity'
             ? 'رد مدرک شناسایی'
             : 'رد حساب بانکی'
-      "
+        "
         description="دلیل رد را وارد کنید. این دلیل برای کاربر قابل مشاهده خواهد بود."
         size="md"
         @update:model-value="
-        (value) => !value && closeReject()
-      "
+          (value) => !value && closeReject()
+        "
     >
       <form
           class="reject-form"
@@ -961,6 +1111,12 @@ function bankOwnerMatchesKyc(
 .reject-form label {
   font-size: var(--font-size-sm);
   font-weight: 700;
+}
+
+.identity-documents {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
 }
 
 .reject-form textarea {

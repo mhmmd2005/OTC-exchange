@@ -42,8 +42,13 @@ const auth = useAuthStore()
 const submitting = ref(false)
 const formElement = ref<HTMLFormElement | null>(null)
 const formError = ref('')
-const selectedFile = ref<File | null>(null)
-const selectedFileName = ref('')
+const selectedFrontFile = ref<File | null>(null)
+const selectedBackFile = ref<File | null>(null)
+
+const selectedFrontFileName = ref('')
+const selectedBackFileName = ref('')
+
+const identityUploadExpanded = ref(false)
 const basicForm = reactive<BasicIdentityInput>({
   firstName: '',
   lastName: '',
@@ -55,6 +60,18 @@ const basicErrors = reactive<Record<string, string>>({})
 
 const isWaiting = computed(() => props.step.status === 'pending')
 
+const isIdentityApproved = computed(
+    () =>
+        props.step.id === 'identity'
+        && props.step.status === 'verified',
+)
+const isIdentityReady = computed(
+    () =>
+        Boolean(
+            selectedFrontFile.value
+            && selectedBackFile.value,
+        ),
+)
 const primaryLabel = computed(() => ({
   mobile: 'دریافت کد تأیید',
   basic_info: 'ثبت اطلاعات و ادامه',
@@ -94,8 +111,13 @@ function isoToPersianDate(value: string): string {
 
 function reset(): void {
   formError.value = ''
-  selectedFile.value = null
-  selectedFileName.value = ''
+  selectedFrontFile.value = null
+  selectedBackFile.value = null
+
+  selectedFrontFileName.value = ''
+  selectedBackFileName.value = ''
+
+  identityUploadExpanded.value = false
 
   Object.keys(basicErrors).forEach(
       (key) => delete basicErrors[key],
@@ -201,30 +223,52 @@ function fileValidationError(file: File): string {
   return ''
 }
 
-function onFileSelected(event: Event): void {
+function onFileSelected(
+    event: Event,
+    side: 'front' | 'back',
+): void {
   const input = event.target as HTMLInputElement
+
   formError.value = ''
 
   const file = input.files?.[0]
 
   if (!file) {
-    selectedFile.value = null
-    selectedFileName.value = ''
+    if (side === 'front') {
+      selectedFrontFile.value = null
+      selectedFrontFileName.value = ''
+    } else {
+      selectedBackFile.value = null
+      selectedBackFileName.value = ''
+    }
+
     return
   }
 
   const error = fileValidationError(file)
 
   if (error) {
-    selectedFile.value = null
-    selectedFileName.value = ''
+    if (side === 'front') {
+      selectedFrontFile.value = null
+      selectedFrontFileName.value = ''
+    } else {
+      selectedBackFile.value = null
+      selectedBackFileName.value = ''
+    }
+
     formError.value = error
     input.value = ''
+
     return
   }
 
-  selectedFile.value = file
-  selectedFileName.value = file.name
+  if (side === 'front') {
+    selectedFrontFile.value = file
+    selectedFrontFileName.value = file.name
+  } else {
+    selectedBackFile.value = file
+    selectedBackFileName.value = file.name
+  }
 }
 
 function readableError(
@@ -305,24 +349,40 @@ async function submit(): Promise<void> {
     }
 
     if (props.step.id === 'identity') {
-      if (!selectedFile.value) {
+      if (
+          !selectedFrontFile.value
+          || !selectedBackFile.value
+      ) {
+        identityUploadExpanded.value = true
+
         formError.value =
-            'یک تصویر واضح یا فایل PDF مدرک شناسایی را انتخاب کنید.'
+            'تصویر روی کارت و پشت کارت را انتخاب کنید.'
+
         return
       }
 
-      const error = fileValidationError(
-          selectedFile.value,
+      const frontError = fileValidationError(
+          selectedFrontFile.value,
       )
 
-      if (error) {
-        formError.value = error
+      if (frontError) {
+        formError.value = frontError
+        return
+      }
+
+      const backError = fileValidationError(
+          selectedBackFile.value,
+      )
+
+      if (backError) {
+        formError.value = backError
         return
       }
 
       const result =
           await verificationService.submitIdentityDocument(
-              selectedFile.value,
+              selectedFrontFile.value,
+              selectedBackFile.value,
           )
 
       emit(
@@ -469,45 +529,152 @@ async function submit(): Promise<void> {
     </template>
 
     <template
+        v-else-if="isIdentityApproved"
+    >
+      <div class="step-message step-message--success" role="status">
+        <AppIcon name="check" :size="21"/>
+        <span>
+          <strong>مدرک شناسایی تأیید شد</strong>
+          مدرک شما توسط کارشناسان بررسی و تأیید شده است.
+        </span>
+      </div>
+    </template>
+
+    <template
         v-else-if="!isWaiting && step.id === 'identity'"
     >
       <div class="step-intro">
-        <span><AppIcon name="verify" :size="30"/></span>
+        <span>
+            <AppIcon
+                name="verify"
+                :size="30"
+            />
+        </span>
+
         <div>
-          <strong>تصویر واضح مدرک شناسایی</strong>
-          <p>نور کافی باشد، همه گوشه‌ها دیده شوند و نوشته‌ها تار یا پوشیده نباشند.</p>
+          <strong>مدرک شناسایی</strong>
+
+          <p>
+            تصویر واضح کارت ملی خود را ارسال کنید.
+            نور کافی باشد، تمام بخش‌های کارت دیده شوند
+            و تصویر تار یا بریده نباشد.
+          </p>
         </div>
       </div>
 
-      <label
-          class="file-drop"
-          :class="{ selected: selectedFile }"
+      <button
+          v-if="!identityUploadExpanded"
+          type="button"
+          class="file-drop identity-upload-trigger"
+          @click="identityUploadExpanded = true"
       >
-        <input
-            type="file"
-            accept="image/jpeg,image/png,application/pdf"
-            @change="onFileSelected"
-        />
-
         <AppIcon
-            :name="selectedFile ? 'check' : 'upload'"
+            name="upload"
             :size="24"
         />
 
         <span>
-          <strong>
-            {{ selectedFileName || 'انتخاب مدرک شناسایی' }}
-          </strong>
+            <strong>
+                انتخاب مدرک شناسایی
+            </strong>
 
-          <small>
-            {{
-              selectedFile
-                  ? 'فایل آماده ارسال است'
-                  : 'JPG، PNG یا PDF؛ حداکثر ۵ مگابایت'
-            }}
-          </small>
+            <small>
+                روی کارت و پشت کارت را بارگذاری کنید
+            </small>
         </span>
-      </label>
+
+        <AppIcon
+            name="chevronLeft"
+            :size="18"
+        />
+      </button>
+
+      <div
+          v-else
+          class="identity-sides"
+      >
+        <label
+            class="file-drop"
+            :class="{
+                selected: selectedFrontFile,
+            }"
+        >
+          <input
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              @change="
+                    onFileSelected($event, 'front')
+                "
+          />
+
+          <AppIcon
+              :name="
+                    selectedFrontFile
+                        ? 'check'
+                        : 'upload'
+                "
+              :size="24"
+          />
+
+          <span>
+                <strong>
+                    {{
+                    selectedFrontFileName
+                    || 'روی کارت'
+                  }}
+                </strong>
+
+                <small>
+                    {{
+                    selectedFrontFile
+                        ? 'فایل روی کارت آماده است'
+                        : 'تصویر روی کارت را انتخاب کنید'
+                  }}
+                </small>
+            </span>
+        </label>
+
+        <label
+            class="file-drop"
+            :class="{
+                selected: selectedBackFile,
+            }"
+        >
+          <input
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              @change="
+                    onFileSelected($event, 'back')
+                "
+          />
+
+          <AppIcon
+              :name="
+                    selectedBackFile
+                        ? 'check'
+                        : 'upload'
+                "
+              :size="24"
+          />
+
+          <span>
+                <strong>
+                    {{
+                    selectedBackFileName
+                    || 'پشت کارت'
+                  }}
+                </strong>
+
+                <small>
+                    {{
+                    selectedBackFile
+                        ? 'فایل پشت کارت آماده است'
+                        : 'تصویر پشت کارت را انتخاب کنید'
+                  }}
+                </small>
+            </span>
+        </label>
+      </div>
     </template>
 
     <template
@@ -528,7 +695,7 @@ async function submit(): Promise<void> {
     </div>
 
     <div
-        v-if="!isWaiting"
+        v-if="!isWaiting && !isIdentityApproved"
         class="form-actions"
     >
       <AppButton
@@ -537,7 +704,13 @@ async function submit(): Promise<void> {
           size="lg"
           :icon="primaryIcon"
           :loading="submitting"
-          :disabled="step.locked"
+          :disabled="
+    step.locked
+    || (
+        step.id === 'identity'
+        && !isIdentityReady
+    )
+"
       >
         {{ primaryLabel }}
       </AppButton>
@@ -592,6 +765,11 @@ async function submit(): Promise<void> {
   color: var(--color-danger)
 }
 
+.step-message--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
 .step-intro {
   display: flex;
   align-items: center;
@@ -638,6 +816,56 @@ async function submit(): Promise<void> {
 .readonly-value bdi {
   color: var(--color-text-primary);
   font-weight: 700
+}
+
+.identity-upload-trigger {
+  width: 100%;
+  border: 1px dashed var(--color-border-hover);
+  text-align: right;
+  font: inherit;
+}
+
+.identity-upload-trigger > span {
+  flex: 1;
+}
+
+.identity-upload-trigger > span {
+  display: grid;
+  gap: .15rem;
+  min-width: 0;
+}
+
+.identity-upload-trigger > span strong {
+  color: var(--color-text-primary);
+}
+
+.identity-upload-trigger > span small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.identity-upload-trigger:hover {
+  border-color: var(--color-border-focus);
+  background: var(--color-surface-2);
+}
+
+.identity-sides {
+  display: grid;
+  grid-template-columns: repeat(
+        2,
+        minmax(0, 1fr)
+    );
+  gap: var(--space-3);
+}
+
+.identity-sides .file-drop {
+  min-height: 7rem;
+}
+
+@media (max-width: 560px) {
+  .identity-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .file-drop {
