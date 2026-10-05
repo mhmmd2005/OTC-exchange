@@ -49,7 +49,6 @@ urlpatterns = [
     ),
     path("api/v1/assets/", include("apps.assets.urls")),
     path("api/v1/wallets/", include("apps.wallets.urls")),
-    path("api/v1/wallet", WalletSummaryAPIView.as_view(), name="wallet-summary"),
     path("api/v1/otc/", include("apps.otc.urls")),
     path("api/v1/trade/", include("apps.otc.urls")),
     path("api/v1/orders/", include("apps.orders.urls")),

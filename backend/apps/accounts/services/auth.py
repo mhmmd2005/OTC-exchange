@@ -36,6 +36,7 @@ from apps.accounts.tasks import send_otp_sms_task
 from apps.kyc.models import KycApplication
 from apps.security.models import LoginHistory, SecurityEvent
 from apps.security.services import TwoFactorService
+from apps.wallets.services import provision_user_wallets
 
 
 class AuthService:
@@ -67,8 +68,8 @@ class AuthService:
     ) -> dict:
         token = secrets.token_urlsafe(32)
         expires_at = (
-            int(time.time())
-            + cls.LOGIN_2FA_TTL_SECONDS
+                int(time.time())
+                + cls.LOGIN_2FA_TTL_SECONDS
         )
 
         cache.set(
@@ -159,8 +160,8 @@ class AuthService:
             }
 
         if not can_resend(
-            normalized_phone,
-            purpose,
+                normalized_phone,
+                purpose,
         ):
             raise Throttled(
                 detail=(
@@ -198,10 +199,10 @@ class AuthService:
             purpose=purpose,
             code_hash=hash_otp(code),
             expires_at=(
-                timezone.now()
-                + timedelta(
-                    seconds=settings.OTP_TTL_SECONDS
-                )
+                    timezone.now()
+                    + timedelta(
+                seconds=settings.OTP_TTL_SECONDS
+            )
             ),
             max_attempts=settings.OTP_MAX_ATTEMPTS,
             request_ip=request_ip,
@@ -244,14 +245,14 @@ class AuthService:
     @staticmethod
     def get_kyc_status(user):
         return (
-            KycApplication.objects
-            .filter(user=user)
-            .values_list(
-                "status",
-                flat=True,
-            )
-            .first()
-            or "not_started"
+                KycApplication.objects
+                .filter(user=user)
+                .values_list(
+                    "status",
+                    flat=True,
+                )
+                .first()
+                or "not_started"
         )
 
     @staticmethod
@@ -433,8 +434,8 @@ class AuthService:
                 "purpose": challenge.purpose,
                 "exp": int(
                     (
-                        timezone.now()
-                        + timedelta(minutes=10)
+                            timezone.now()
+                            + timedelta(minutes=10)
                     ).timestamp()
                 ),
             },
@@ -447,7 +448,7 @@ class AuthService:
             "next_step": (
                 "completed"
                 if challenge.purpose
-                == "phone_verification"
+                   == "phone_verification"
                 else "password"
             ),
             "expires_in": 600,
@@ -697,8 +698,8 @@ class AuthService:
         )
 
         remaining = (
-            expires_at
-            - int(time.time())
+                expires_at
+                - int(time.time())
         )
 
         if remaining <= 0:
@@ -762,7 +763,7 @@ class AuthService:
             )
 
         if not TwoFactorService.is_enabled(
-            user
+                user
         ):
             cache.delete(cache_key)
 
@@ -909,7 +910,7 @@ class AuthService:
             is_phone_verified=True,
             phone_verified_at=timezone.now(),
         )
-
+        provision_user_wallets(user)
         user.set_password(
             password
         )

@@ -5,26 +5,100 @@ from .models import Transaction
 
 class TransactionSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
-    referenceNumber = serializers.CharField(source="reference_number")
-    type = serializers.CharField(source="transaction_type")
-    assetSymbol = serializers.CharField(source="asset.symbol", read_only=True)
-    amount = serializers.DecimalField(max_digits=24, decimal_places=8)
-    tomanAmount = serializers.DecimalField(source="toman_amount", max_digits=24, decimal_places=8, required=False, allow_null=True)
-    fee = serializers.DecimalField(max_digits=24, decimal_places=8, required=False, allow_null=True)
-    networkCode = serializers.CharField(source="network_code", required=False, allow_blank=True)
-    address = serializers.CharField(required=False, allow_blank=True)
-    txId = serializers.CharField(source="txid", required=False, allow_blank=True)
-    confirmations = serializers.IntegerField(required=False)
-    requiredConfirmations = serializers.IntegerField(source="required_confirmations", required=False)
-    bankAccountId = serializers.CharField(source="bank_account_id", required=False, allow_blank=True)
-    orderId = serializers.CharField(source="order_id", required=False, allow_blank=True)
-    title = serializers.CharField()
-    description = serializers.CharField(required=False, allow_blank=True)
-    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
-    completedAt = serializers.DateTimeField(source="completed_at", read_only=True, required=False, allow_null=True)
+
+    referenceNumber = serializers.CharField(
+        source="reference_number",
+        read_only=True,
+    )
+
+    type = serializers.CharField(
+        source="transaction_type",
+        read_only=True,
+    )
+
+    status = serializers.CharField(
+        read_only=True,
+    )
+
+    assetSymbol = serializers.CharField(
+        source="asset.symbol",
+        read_only=True,
+    )
+
+    amount = serializers.DecimalField(
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+
+    tomanAmount = serializers.DecimalField(
+        source="toman_amount",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+
+    fee = serializers.DecimalField(
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+
+    networkCode = serializers.CharField(
+        source="network_code",
+        read_only=True,
+    )
+
+    address = serializers.CharField(
+        read_only=True,
+    )
+
+    txId = serializers.CharField(
+        source="txid",
+        read_only=True,
+    )
+
+    confirmations = serializers.IntegerField(
+        read_only=True,
+    )
+
+    requiredConfirmations = serializers.IntegerField(
+        source="required_confirmations",
+        read_only=True,
+    )
+
+    bankAccountId = serializers.CharField(
+        source="bank_account_id",
+        read_only=True,
+    )
+
+    orderId = serializers.CharField(
+        source="order_id",
+        read_only=True,
+    )
+
+    title = serializers.CharField(
+        read_only=True,
+    )
+
+    description = serializers.CharField(
+        read_only=True,
+    )
+
+    createdAt = serializers.DateTimeField(
+        source="created_at",
+        read_only=True,
+    )
+
+    completedAt = serializers.DateTimeField(
+        source="completed_at",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Transaction
+
         fields = [
             "id",
             "referenceNumber",
@@ -46,4 +120,5 @@ class TransactionSerializer(serializers.ModelSerializer):
             "createdAt",
             "completedAt",
         ]
-        read_only_fields = ["id", "createdAt"]
+
+        read_only_fields = fields

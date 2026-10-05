@@ -8,7 +8,6 @@ class WalletSerializer(serializers.ModelSerializer):
         model = Wallet
         fields = [
             "id",
-            "user",
             "asset",
             "balance",
             "available_balance",
@@ -18,4 +17,14 @@ class WalletSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "asset",
+            "balance",
+            "available_balance",
+            "locked_balance",
+            "deposit_address",
+            "network",
+            "created_at",
+            "updated_at",
+        ]

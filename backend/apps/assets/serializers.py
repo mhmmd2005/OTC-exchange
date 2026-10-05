@@ -5,20 +5,58 @@ from .models import Asset, AssetNetwork
 
 class AssetNetworkSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
-    assetSymbol = serializers.CharField(source="asset.symbol", read_only=True)
-    code = serializers.CharField()
-    name = serializers.CharField()
-    displayName = serializers.CharField(source="display_name")
-    addressRegex = serializers.CharField(source="address_regex", required=False, allow_blank=True)
-    memoRequired = serializers.BooleanField(source="memo_required")
-    depositEnabled = serializers.BooleanField(source="deposit_enabled")
-    withdrawalEnabled = serializers.BooleanField(source="withdrawal_enabled")
-    status = serializers.CharField()
-    confirmations = serializers.IntegerField()
-    estimatedArrivalMinutes = serializers.IntegerField(source="estimated_arrival_minutes")
-    minimumDeposit = serializers.DecimalField(source="minimum_deposit", max_digits=24, decimal_places=8)
-    minimumWithdrawal = serializers.DecimalField(source="minimum_withdrawal", max_digits=24, decimal_places=8)
-    withdrawalFee = serializers.DecimalField(source="withdrawal_fee", max_digits=24, decimal_places=8)
+    assetSymbol = serializers.CharField(
+        source="asset.symbol",
+        read_only=True,
+    )
+    code = serializers.CharField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    displayName = serializers.CharField(
+        source="display_name",
+        read_only=True,
+    )
+    addressRegex = serializers.CharField(
+        source="address_regex",
+        read_only=True,
+    )
+    memoRequired = serializers.BooleanField(
+        source="memo_required",
+        read_only=True,
+    )
+    depositEnabled = serializers.BooleanField(
+        source="deposit_enabled",
+        read_only=True,
+    )
+    withdrawalEnabled = serializers.BooleanField(
+        source="withdrawal_enabled",
+        read_only=True,
+    )
+    status = serializers.CharField(read_only=True)
+    confirmations = serializers.IntegerField(
+        read_only=True,
+    )
+    estimatedArrivalMinutes = serializers.IntegerField(
+        source="estimated_arrival_minutes",
+        read_only=True,
+    )
+    minimumDeposit = serializers.DecimalField(
+        source="minimum_deposit",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+    minimumWithdrawal = serializers.DecimalField(
+        source="minimum_withdrawal",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+    withdrawalFee = serializers.DecimalField(
+        source="withdrawal_fee",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
 
     class Meta:
         model = AssetNetwork
@@ -43,23 +81,82 @@ class AssetNetworkSerializer(serializers.ModelSerializer):
 
 class AssetSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
-    symbol = serializers.CharField()
-    nameFa = serializers.CharField(source="name_fa")
-    nameEn = serializers.CharField(source="name")
-    iconUrl = serializers.URLField(source="icon_url", required=False, allow_blank=True)
-    color = serializers.CharField()
-    pricePrecision = serializers.IntegerField(source="price_precision")
-    amountPrecision = serializers.IntegerField(source="amount_precision")
-    buyPriceToman = serializers.DecimalField(source="buy_price_toman", max_digits=24, decimal_places=8)
-    sellPriceToman = serializers.DecimalField(source="sell_price_toman", max_digits=24, decimal_places=8)
-    change24hPercent = serializers.DecimalField(source="change_24h_percent", max_digits=10, decimal_places=2)
-    high24hToman = serializers.DecimalField(source="high_24h_toman", max_digits=24, decimal_places=8)
-    low24hToman = serializers.DecimalField(source="low_24h_toman", max_digits=24, decimal_places=8)
-    tradable = serializers.BooleanField()
-    depositEnabled = serializers.BooleanField(source="deposit_enabled")
-    withdrawalEnabled = serializers.BooleanField(source="withdrawal_enabled")
-    networks = AssetNetworkSerializer(many=True, read_only=True)
-    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+
+    symbol = serializers.CharField(read_only=True)
+    nameFa = serializers.CharField(
+        source="name_fa",
+        read_only=True,
+    )
+    nameEn = serializers.CharField(
+        source="name",
+        read_only=True,
+    )
+    iconUrl = serializers.URLField(
+        source="icon_url",
+        read_only=True,
+    )
+    color = serializers.CharField(read_only=True)
+
+    pricePrecision = serializers.IntegerField(
+        source="price_precision",
+        read_only=True,
+    )
+    amountPrecision = serializers.IntegerField(
+        source="amount_precision",
+        read_only=True,
+    )
+
+    buyPriceToman = serializers.DecimalField(
+        source="buy_price_toman",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+    sellPriceToman = serializers.DecimalField(
+        source="sell_price_toman",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+    change24hPercent = serializers.DecimalField(
+        source="change_24h_percent",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+    )
+    high24hToman = serializers.DecimalField(
+        source="high_24h_toman",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+    low24hToman = serializers.DecimalField(
+        source="low_24h_toman",
+        max_digits=24,
+        decimal_places=8,
+        read_only=True,
+    )
+
+    tradable = serializers.BooleanField(read_only=True)
+
+    depositEnabled = serializers.BooleanField(
+        source="deposit_enabled",
+        read_only=True,
+    )
+    withdrawalEnabled = serializers.BooleanField(
+        source="withdrawal_enabled",
+        read_only=True,
+    )
+
+    networks = AssetNetworkSerializer(
+        many=True,
+        read_only=True,
+    )
+
+    updatedAt = serializers.DateTimeField(
+        source="updated_at",
+        read_only=True,
+    )
 
     class Meta:
         model = Asset

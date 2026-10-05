@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 
 from django.db import models
+from django.db.models import Q
 
 from apps.accounts.models import User
 from apps.assets.models import Asset
@@ -44,7 +45,6 @@ class Transaction(models.Model):
     reference_number = models.CharField(
         max_length=50,
         unique=True,
-        db_index=True,
         blank=True,
     )
 
@@ -109,6 +109,14 @@ class Transaction(models.Model):
         default="",
     )
 
+    # Used for safe retry handling of client requests,
+    # especially withdrawals.
+    idempotency_key = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+    )
+
     title = models.CharField(
         max_length=255,
         default="",
@@ -140,15 +148,55 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "idempotency_key"],
+                condition=~Q(idempotency_key=""),
+                name="unique_transaction_user_idempotency_key",
+            ),
+            models.CheckConstraint(
+                condition=Q(amount__gte=0),
+                name="transaction_amount_gte_zero",
+            ),
+            models.CheckConstraint(
+                condition=Q(toman_amount__gte=0),
+                name="transaction_toman_amount_gte_zero",
+            ),
+            models.CheckConstraint(
+                condition=Q(fee__gte=0),
+                name="transaction_fee_gte_zero",
+            ),
+            models.CheckConstraint(
+                condition=Q(confirmations__gte=0),
+                name="transaction_confirmations_gte_zero",
+            ),
+            models.CheckConstraint(
+                condition=Q(required_confirmations__gte=0),
+                name="transaction_required_confirmations_gte_zero",
+            ),
+        ]
+
         indexes = [
             models.Index(
-                fields=["user", "status"]
+                fields=["user", "status"],
+                name="txn_user_status_idx",
             ),
             models.Index(
-                fields=["txid"]
+                fields=["user", "transaction_type"],
+                name="txn_user_type_idx",
             ),
             models.Index(
-                fields=["reference_number"]
+                fields=["user", "created_at"],
+                name="txn_user_created_idx",
+            ),
+            models.Index(
+                fields=["txid"],
+                name="txn_txid_idx",
+            ),
+            models.Index(
+                fields=["order_id"],
+                name="txn_order_idx",
             ),
         ]
 
