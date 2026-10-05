@@ -256,11 +256,18 @@ class DashboardSummarySerializer(serializers.Serializer):
 
 class IranianBankSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
+
     nameFa = serializers.CharField(source="name_fa")
     nameEn = serializers.CharField(source="name_en")
-    cardPrefixes = serializers.JSONField(source="card_prefixes")
+
+    cardPrefixes = serializers.SerializerMethodField()
+
     color = serializers.CharField()
-    logoUrl = serializers.URLField(source="logo_url", required=False, allow_blank=True)
+    logoUrl = serializers.URLField(
+        source="logo_url",
+        required=False,
+        allow_blank=True,
+    )
 
     class Meta:
         model = IranianBank
@@ -273,10 +280,22 @@ class IranianBankSerializer(serializers.ModelSerializer):
             "logoUrl",
         ]
 
-    def get_kycStatus(self, obj):
-        return map_kyc_status(
-            get_user_kyc_status(obj["user"])
+    def get_cardPrefixes(self, obj):
+        prefixes = getattr(
+            obj,
+            "active_card_prefixes",
+            None,
         )
+
+        if prefixes is None:
+            prefixes = obj.bank_card_prefixes.filter(
+                is_active=True,
+            ).order_by("-prefix")
+
+        return [
+            prefix.prefix
+            for prefix in prefixes
+        ]
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
@@ -361,13 +380,13 @@ class LoginPasswordSerializer(serializers.Serializer):
         write_only=True
     )
 
+
 class TwoFactorLoginSerializer(serializers.Serializer):
     two_factor_token = serializers.CharField()
     code = serializers.CharField(
         min_length=6,
         max_length=6,
     )
-
 
 
 class RegistrationPasswordSerializer(serializers.Serializer):

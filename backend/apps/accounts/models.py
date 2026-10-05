@@ -164,9 +164,19 @@ class IranianBank(models.Model):
         default=True,
         db_index=True,
     )
+
+    # Compatibility field for existing data/migrations.
+    # The canonical card-prefix registry is BankCardPrefix.
     card_prefixes = models.JSONField(default=list)
-    color = models.CharField(max_length=7, default="#6366f1")
-    logo_url = models.URLField(blank=True, default="")
+
+    color = models.CharField(
+        max_length=7,
+        default="#6366f1",
+    )
+    logo_url = models.URLField(
+        blank=True,
+        default="",
+    )
 
     class Meta:
         ordering = ["name_fa"]
@@ -181,21 +191,61 @@ class BankCardPrefix(models.Model):
         on_delete=models.CASCADE,
         related_name="bank_card_prefixes",
     )
-    prefix = models.CharField(max_length=16, db_index=True)
-    is_active = models.BooleanField(default=True, db_index=True)
-    is_legacy = models.BooleanField(default=False, db_index=True)
-    source = models.CharField(max_length=50, default="manual", db_index=True)
-    source_url = models.URLField(blank=True, default="")
-    verified_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    prefix = models.CharField(
+        max_length=16,
+        db_index=True,
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+    )
+    is_legacy = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+    source = models.CharField(
+        max_length=50,
+        default="manual",
+        db_index=True,
+    )
+    source_url = models.URLField(
+        blank=True,
+        default="",
+    )
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
 
     class Meta:
         ordering = ["-prefix"]
-        unique_together = ("bank", "prefix")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["prefix"],
+                name="unique_bank_card_prefix",
+            ),
+        ]
         indexes = [
-            models.Index(fields=["bank", "prefix", "is_active"]),
-            models.Index(fields=["bank", "is_active", "is_legacy"]),
+            models.Index(
+                fields=[
+                    "bank",
+                    "prefix",
+                    "is_active",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "bank",
+                    "is_active",
+                    "is_legacy",
+                ],
+            ),
         ]
 
     def __str__(self):
@@ -203,6 +253,7 @@ class BankCardPrefix(models.Model):
 
 
 class BankVerificationObservation(models.Model):
+    RESULT_PENDING = "pending"
     RESULT_INVALID_CARD = "invalid_card"
     RESULT_INVALID_IBAN = "invalid_iban"
     RESULT_DUPLICATE_CARD = "duplicate_card"
@@ -213,17 +264,52 @@ class BankVerificationObservation(models.Model):
     RESULT_OWNERSHIP_FAILED = "ownership_failed"
     RESULT_OWNERSHIP_UNAVAILABLE = "ownership_unavailable"
     RESULT_VERIFIED = "verified"
+
     RESULT_CHOICES = [
-        (RESULT_INVALID_CARD, "Invalid Card"),
-        (RESULT_INVALID_IBAN, "Invalid IBAN"),
-        (RESULT_DUPLICATE_CARD, "Duplicate Card"),
-        (RESULT_DUPLICATE_IBAN, "Duplicate IBAN"),
-        (RESULT_UNKNOWN_CARD_PREFIX, "Unknown Card Prefix"),
-        (RESULT_UNKNOWN_IBAN_BANK, "Unknown IBAN Bank"),
-        (RESULT_BANK_MISMATCH, "Bank Mismatch"),
-        (RESULT_OWNERSHIP_FAILED, "Ownership Failed"),
-        (RESULT_OWNERSHIP_UNAVAILABLE, "Ownership Unavailable"),
-        (RESULT_VERIFIED, "Verified"),
+        (
+            RESULT_PENDING,
+            "Pending",
+        ),
+        (
+            RESULT_INVALID_CARD,
+            "Invalid Card",
+        ),
+        (
+            RESULT_INVALID_IBAN,
+            "Invalid IBAN",
+        ),
+        (
+            RESULT_DUPLICATE_CARD,
+            "Duplicate Card",
+        ),
+        (
+            RESULT_DUPLICATE_IBAN,
+            "Duplicate IBAN",
+        ),
+        (
+            RESULT_UNKNOWN_CARD_PREFIX,
+            "Unknown Card Prefix",
+        ),
+        (
+            RESULT_UNKNOWN_IBAN_BANK,
+            "Unknown IBAN Bank",
+        ),
+        (
+            RESULT_BANK_MISMATCH,
+            "Bank Mismatch",
+        ),
+        (
+            RESULT_OWNERSHIP_FAILED,
+            "Ownership Failed",
+        ),
+        (
+            RESULT_OWNERSHIP_UNAVAILABLE,
+            "Ownership Unavailable",
+        ),
+        (
+            RESULT_VERIFIED,
+            "Verified",
+        ),
     ]
 
     user = models.ForeignKey(
@@ -233,66 +319,241 @@ class BankVerificationObservation(models.Model):
         blank=True,
         related_name="bank_verification_observations",
     )
-    card_prefix = models.CharField(max_length=16, blank=True, default="")
-    observed_card_prefix = models.CharField(max_length=16, blank=True, default="")
-    card_last4 = models.CharField(max_length=4, blank=True, default="")
-    card_fingerprint = models.CharField(max_length=128, blank=True, default="")
-    iban_bank_code = models.CharField(max_length=3, blank=True, default="")
-    iban_fingerprint = models.CharField(max_length=128, blank=True, default="")
-    card_luhn_valid = models.BooleanField(default=False)
-    iban_checksum_valid = models.BooleanField(default=False)
-    card_bank_known = models.BooleanField(default=False)
-    iban_bank_known = models.BooleanField(default=False)
-    banks_match = models.BooleanField(default=False)
-    card_ownership_verified = models.BooleanField(default=False)
-    iban_ownership_verified = models.BooleanField(default=False)
-    result = models.CharField(max_length=30, choices=RESULT_CHOICES, default=RESULT_INVALID_CARD)
-    failure_reason = models.CharField(max_length=255, blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    detected_card_bank = models.ForeignKey(
+        IranianBank,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="card_detection_observations",
+    )
+
+    detected_iban_bank = models.ForeignKey(
+        IranianBank,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="iban_detection_observations",
+    )
+
+    card_prefix = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+    )
+
+    observed_card_prefix = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+    )
+
+    card_last4 = models.CharField(
+        max_length=4,
+        blank=True,
+        default="",
+    )
+
+    card_fingerprint = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+    )
+
+    iban_bank_code = models.CharField(
+        max_length=3,
+        blank=True,
+        default="",
+    )
+
+    iban_fingerprint = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+    )
+
+    card_luhn_valid = models.BooleanField(
+        default=False,
+    )
+
+    iban_checksum_valid = models.BooleanField(
+        default=False,
+    )
+
+    card_bank_known = models.BooleanField(
+        default=False,
+    )
+
+    iban_bank_known = models.BooleanField(
+        default=False,
+    )
+
+    banks_match = models.BooleanField(
+        default=False,
+    )
+
+    card_ownership_verified = models.BooleanField(
+        default=False,
+    )
+
+    iban_ownership_verified = models.BooleanField(
+        default=False,
+    )
+
+    result = models.CharField(
+        max_length=30,
+        choices=RESULT_CHOICES,
+        default=RESULT_PENDING,
+    )
+
+    failure_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "created_at"]),
-            models.Index(fields=["result", "created_at"]),
-            models.Index(fields=["card_prefix", "card_last4"]),
+            models.Index(
+                fields=[
+                    "user",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "result",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "card_prefix",
+                    "card_last4",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "observed_card_prefix",
+                    "created_at",
+                ],
+            ),
         ]
 
     def __str__(self):
-        return f"{self.result} - {self.card_last4 or self.iban_bank_code or self.user_id}"
+        return (
+            f"{self.result} - "
+            f"{self.card_last4 or self.iban_bank_code or self.user_id}"
+        )
 
 
 class BankAccount(models.Model):
     STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("verified", "Verified"),
-        ("needs_correction", "Needs Correction"),
-        ("rejected", "Rejected"),
+        (
+            "pending",
+            "Pending",
+        ),
+        (
+            "verified",
+            "Verified",
+        ),
+        (
+            "needs_correction",
+            "Needs Correction",
+        ),
+        (
+            "rejected",
+            "Rejected",
+        ),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bank_accounts")
-    bank = models.ForeignKey(IranianBank, on_delete=models.PROTECT, related_name="accounts")
-    owner_name = models.CharField(max_length=255)
-    card_number = models.CharField(max_length=16)
-    iban = models.CharField(max_length=26)
-    account_number = models.CharField(max_length=20, blank=True, default="")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    preferred = models.BooleanField(default=False)
-    rejection_reason = models.TextField(blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True)
-    verified_at = models.DateTimeField(null=True, blank=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="bank_accounts",
+    )
+
+    bank = models.ForeignKey(
+        IranianBank,
+        on_delete=models.PROTECT,
+        related_name="accounts",
+    )
+
+    owner_name = models.CharField(
+        max_length=255,
+    )
+
+    card_number = models.CharField(
+        max_length=16,
+    )
+
+    iban = models.CharField(
+        max_length=26,
+    )
+
+    account_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+
+    preferred = models.BooleanField(
+        default=False,
+    )
+
+    rejection_reason = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "status"]),
-            models.Index(fields=["user", "preferred"]),
-            models.Index(fields=["card_number"]),
-            models.Index(fields=["iban"]),
+            models.Index(
+                fields=[
+                    "user",
+                    "status",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "user",
+                    "preferred",
+                ],
+            ),
+            models.Index(
+                fields=["card_number"],
+            ),
+            models.Index(
+                fields=["iban"],
+            ),
         ]
 
     def __str__(self):
-        return f"{self.user.phone_number} - {self.card_number}"
+        return (
+            f"{self.user.phone_number} - "
+            f"{self.card_number}"
+        )
 
     @property
     def is_usable(self):
@@ -308,11 +569,13 @@ class BankAccount(models.Model):
         self.rejection_reason = ""
         self.verified_at = timezone.now()
 
-        self.save(update_fields=[
-            "status",
-            "rejection_reason",
-            "verified_at",
-        ])
+        self.save(
+            update_fields=[
+                "status",
+                "rejection_reason",
+                "verified_at",
+            ],
+        )
 
     def reject(self, reason):
         if self.status != "pending":
@@ -325,9 +588,11 @@ class BankAccount(models.Model):
         self.verified_at = None
         self.preferred = False
 
-        self.save(update_fields=[
-            "status",
-            "rejection_reason",
-            "verified_at",
-            "preferred",
-        ])
+        self.save(
+            update_fields=[
+                "status",
+                "rejection_reason",
+                "verified_at",
+                "preferred",
+            ],
+        )

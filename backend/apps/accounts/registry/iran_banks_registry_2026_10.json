@@ -1,0 +1,298 @@
+{
+  "version": "2026-10-05",
+  "description": "Curated Iranian bank card-prefix registry for bank detection. Ownership verification remains delegated to Ehraz.",
+  "sources": [
+    {
+      "id": "ir_banks_info",
+      "name": "IR-Banks/ir-banks-info",
+      "url": "https://github.com/IR-Banks/ir-banks-info"
+    },
+    {
+      "id": "iran_bankit",
+      "name": "amirhossein7/iran-bankit",
+      "url": "https://github.com/amirhossein7/iran-bankit"
+    }
+  ],
+  "banks": [
+    {
+      "name_fa": "بانک مرکزی جمهوری اسلامی ایران",
+      "name_en": "Central Bank of Iran",
+      "sheba_code": "010",
+      "prefixes": [
+        "636795"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک دی",
+      "name_en": "Dey Bank",
+      "sheba_code": "066",
+      "prefixes": [
+        "502938"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک اقتصاد نوین",
+      "name_en": "Eghtesad Novin Bank",
+      "sheba_code": "055",
+      "prefixes": [
+        "627412"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک توسعه صادرات ایران",
+      "name_en": "Export Development Bank of Iran",
+      "sheba_code": "020",
+      "prefixes": [
+        "207177",
+        "627648"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک گردشگری",
+      "name_en": "Gardeshgari Bank",
+      "sheba_code": "064",
+      "prefixes": [
+        "505416",
+        "505426"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک ایران زمین",
+      "name_en": "Iran Zamin Bank",
+      "sheba_code": "069",
+      "prefixes": [
+        "505785"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک کارآفرین",
+      "name_en": "Karafarin Bank",
+      "sheba_code": "053",
+      "prefixes": [
+        "502910",
+        "627488"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک کشاورزی",
+      "name_en": "Keshavarzi Bank",
+      "sheba_code": "016",
+      "prefixes": [
+        "603770",
+        "639217"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک مسکن",
+      "name_en": "Maskan Bank",
+      "sheba_code": "014",
+      "prefixes": [
+        "628023"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک قرض الحسنه مهر ایران",
+      "name_en": "Mehr Iran Bank",
+      "sheba_code": "060",
+      "prefixes": [
+        "606373"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "مؤسسه اعتباری ملل",
+      "name_en": "Melal Credit Institution",
+      "sheba_code": "075",
+      "prefixes": [
+        "606256"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک ملت",
+      "name_en": "Mellat Bank",
+      "sheba_code": "012",
+      "prefixes": [
+        "610433",
+        "991975"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک ملی ایران",
+      "name_en": "Melli Bank of Iran",
+      "sheba_code": "017",
+      "prefixes": [
+        "603799"
+      ],
+      "legacy_prefixes": [
+        "507677",
+        "636214"
+      ]
+    },
+    {
+      "name_fa": "بانک خاورمیانه",
+      "name_en": "Middle East Bank",
+      "sheba_code": "078",
+      "prefixes": [
+        "585947"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک پارسیان",
+      "name_en": "Parsian Bank",
+      "sheba_code": "054",
+      "prefixes": [
+        "622106",
+        "627884",
+        "639194"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک پاسارگاد",
+      "name_en": "Pasargad Bank",
+      "sheba_code": "057",
+      "prefixes": [
+        "502229",
+        "639347"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "پست بانک ایران",
+      "name_en": "Post Bank Iran",
+      "sheba_code": "021",
+      "prefixes": [
+        "627760"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک رفاه کارگران",
+      "name_en": "Refah Kargaran Bank",
+      "sheba_code": "013",
+      "prefixes": [
+        "589463"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک قرض الحسنه رسالت",
+      "name_en": "Resalat Bank",
+      "sheba_code": "070",
+      "prefixes": [
+        "504172"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک صادرات ایران",
+      "name_en": "Saderat Bank",
+      "sheba_code": "019",
+      "prefixes": [
+        "603769"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک سامان",
+      "name_en": "Saman Bank",
+      "sheba_code": "056",
+      "prefixes": [
+        "621986",
+        "62198619"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک صنعت و معدن",
+      "name_en": "Sanat o Madan Bank",
+      "sheba_code": "011",
+      "prefixes": [
+        "627961"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک سرمایه",
+      "name_en": "Sarmayeh Bank",
+      "sheba_code": "058",
+      "prefixes": [
+        "639607"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک سپه",
+      "name_en": "Sepah Bank",
+      "sheba_code": "015",
+      "prefixes": [
+        "589210"
+      ],
+      "legacy_prefixes": [
+        "505801",
+        "606737",
+        "627381",
+        "636949",
+        "639370",
+        "639599"
+      ]
+    },
+    {
+      "name_fa": "بانک شهر",
+      "name_en": "Shahr Bank",
+      "sheba_code": "061",
+      "prefixes": [
+        "502806",
+        "504706"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک سینا",
+      "name_en": "Sina Bank",
+      "sheba_code": "059",
+      "prefixes": [
+        "639346"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک تجارت",
+      "name_en": "Tejarat Bank",
+      "sheba_code": "018",
+      "prefixes": [
+        "585983",
+        "627353"
+      ],
+      "legacy_prefixes": []
+    },
+    {
+      "name_fa": "بانک توسعه تعاون",
+      "name_en": "Tosee Taavon Bank",
+      "sheba_code": "022",
+      "prefixes": [
+        "502908"
+      ],
+      "legacy_prefixes": []
+    }
+  ],
+  "unresolved_prefixes": [
+    {
+      "prefix": "505809",
+      "reason": "Conflicting public sources; excluded from canonical registry pending stronger verification.",
+      "candidate_bank": "بانک خاورمیانه"
+    }
+  ]
+}

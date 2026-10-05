@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-
-from apps.accounts.models import BankAccount, BankCardPrefix, BankVerificationObservation, IranianBank
+from django.db.models import Prefetch
+from apps.accounts.models import BankAccount, BankVerificationObservation, IranianBank
 from apps.accounts.serializers import (
     BankAccountSerializer,
     DashboardSummarySerializer,
@@ -37,7 +37,6 @@ from apps.accounts.services.bank_registry import (
     create_bank_verification_observation,
     find_bank_by_card,
     find_bank_by_iban,
-    get_iban_bank_code,
     is_valid_card_number,
     is_valid_iranian_iban,
     normalize_card,
@@ -584,9 +583,33 @@ class IranianBankListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        banks = IranianBank.objects.filter(is_active=True)
-        serializer = IranianBankSerializer(banks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        prefix_queryset = (
+            BankCardPrefix.objects
+            .filter(is_active=True)
+            .order_by("-prefix")
+        )
+
+        banks = (
+            IranianBank.objects
+            .filter(is_active=True)
+            .prefetch_related(
+                Prefetch(
+                    "bank_card_prefixes",
+                    queryset=prefix_queryset,
+                    to_attr="active_card_prefixes",
+                )
+            )
+        )
+
+        serializer = IranianBankSerializer(
+            banks,
+            many=True,
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class BankAccountListCreateAPIView(APIView):
@@ -649,7 +672,8 @@ class BankAccountListCreateAPIView(APIView):
             return Response(
                 {
                     "detail": (
-                        "ابتدا باید احراز هویت خود را تکمیل کنید."
+                        "ابتدا باید احراز هویت "
+                        "خود را تکمیل کنید."
                     )
                 },
                 status=status.HTTP_409_CONFLICT,
@@ -659,8 +683,9 @@ class BankAccountListCreateAPIView(APIView):
             return Response(
                 {
                     "detail": (
-                        "ابتدا باید اطلاعات هویتی و مدرک شناسایی "
-                        "توسط ادمین تأیید شوند."
+                        "ابتدا باید اطلاعات هویتی و "
+                        "مدرک شناسایی توسط ادمین "
+                        "تأیید شوند."
                     )
                 },
                 status=status.HTTP_409_CONFLICT,
@@ -670,7 +695,8 @@ class BankAccountListCreateAPIView(APIView):
             return Response(
                 {
                     "detail": (
-                        "سرویس احراز هویت هنوز پیکربندی نشده است."
+                        "سرویس احراز هویت هنوز "
+                        "پیکربندی نشده است."
                     )
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -680,45 +706,99 @@ class BankAccountListCreateAPIView(APIView):
             return Response(
                 {
                     "detail": (
-                        "اطلاعات هویتی لازم برای بررسی حساب بانکی کامل نیست."
+                        "اطلاعات هویتی لازم برای "
+                        "بررسی حساب بانکی کامل نیست."
                     )
                 },
                 status=status.HTTP_409_CONFLICT,
             )
 
         owner_name = (
-            f"{kyc.first_name} {kyc.last_name}"
+            f"{kyc.first_name} "
+            f"{kyc.last_name}"
         ).strip()
 
         if not owner_name:
             return Response(
                 {
                     "detail": (
-                        "نام و نام خانوادگی تأییدشده احراز هویت "
+                        "نام و نام خانوادگی "
+                        "تأییدشده احراز هویت "
                         "در دسترس نیست."
                     )
                 },
                 status=status.HTTP_409_CONFLICT,
             )
 
-        card_luhn_valid = is_valid_card_number(card_digits)
-        iban_valid = is_valid_iranian_iban(iban_value)
-        card_bank = find_bank_by_card(card_digits)
-        iban_bank = find_bank_by_iban(iban_value)
+        card_luhn_valid = (
+            is_valid_card_number(
+                card_digits,
+            )
+        )
 
-        if not card_luhn_valid:
+        iban_checksum_valid = (
+            is_valid_iranian_iban(
+                iban_value,
+            )
+        )
+
+        card_bank = find_bank_by_card(
+            card_digits,
+        )
+
+        iban_bank = find_bank_by_iban(
+            iban_value,
+        )
+
+        banks_match = bool(
+            card_bank
+            and iban_bank
+            and card_bank.pk == iban_bank.pk
+        )
+
+        # One submission = one observation.
+        observation = (
             create_bank_verification_observation(
                 user=request.user,
                 card_number=card_digits,
                 iban=iban_value,
-                card_luhn_valid=False,
-                iban_checksum_valid=iban_valid,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=iban_bank is not None,
-                banks_match=bool(card_bank and iban_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_INVALID_CARD,
-                failure_reason="card_luhn_invalid",
+                card_luhn_valid=card_luhn_valid,
+                iban_checksum_valid=(
+                    iban_checksum_valid
+                ),
+                card_bank_known=(
+                        card_bank is not None
+                ),
+                iban_bank_known=(
+                        iban_bank is not None
+                ),
+                banks_match=banks_match,
+                detected_card_bank=card_bank,
+                detected_iban_bank=iban_bank,
+                result=(
+                    BankVerificationObservation
+                    .RESULT_PENDING
+                ),
             )
+        )
+
+        if not card_luhn_valid:
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_INVALID_CARD
+            )
+
+            observation.failure_reason = (
+                "card_luhn_invalid"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
@@ -730,19 +810,23 @@ class BankAccountListCreateAPIView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        if not iban_valid:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=False,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=iban_bank is not None,
-                banks_match=bool(card_bank and iban_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_INVALID_IBAN,
-                failure_reason="iban_checksum_invalid",
+        if not iban_checksum_valid:
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_INVALID_IBAN
             )
+
+            observation.failure_reason = (
+                "iban_checksum_invalid"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
@@ -754,34 +838,39 @@ class BankAccountListCreateAPIView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        if card_bank is None and card_digits:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=False,
-                iban_bank_known=iban_bank is not None,
-                banks_match=bool(iban_bank and card_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_UNKNOWN_CARD_PREFIX,
-                failure_reason="card_prefix_unknown",
-                observed_card_prefix=card_digits[:10],
+        if card_bank is None:
+            observation.failure_reason = (
+                "card_prefix_unknown"
+            )
+
+            observation.observed_card_prefix = (
+                card_digits[:10]
+            )
+
+            observation.save(
+                update_fields=[
+                    "failure_reason",
+                    "observed_card_prefix",
+                ],
             )
 
         if iban_bank is None:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=False,
-                banks_match=False,
-                result=BankVerificationObservation.RESULT_UNKNOWN_IBAN_BANK,
-                failure_reason="iban_bank_unknown",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_UNKNOWN_IBAN_BANK
             )
+
+            observation.failure_reason = (
+                "iban_bank_unknown"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
@@ -794,94 +883,109 @@ class BankAccountListCreateAPIView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        if card_bank is not None and iban_bank.pk != card_bank.pk:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=True,
-                iban_bank_known=True,
-                banks_match=False,
-                result=BankVerificationObservation.RESULT_BANK_MISMATCH,
-                failure_reason="card_iban_bank_mismatch",
+        if (
+                card_bank is not None
+                and card_bank.pk != iban_bank.pk
+        ):
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_BANK_MISMATCH
             )
+
+            observation.failure_reason = (
+                "card_iban_bank_mismatch"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
                         "iban": (
-                            "بانک شماره کارت و شماره شبا "
-                            "با یکدیگر مطابقت ندارند."
+                            "بانک شماره کارت و "
+                            "شماره شبا با یکدیگر "
+                            "مطابقت ندارند."
                         )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        bank = card_bank if card_bank is not None else iban_bank
+        # If card bank is unknown but IBAN bank is known,
+        # use the IBAN bank as the account bank.
+        bank = (
+            card_bank
+            if card_bank is not None
+            else iban_bank
+        )
 
-        # ---------------------------------------------------------
-        # Duplicate card
-        # ---------------------------------------------------------
         if BankAccount.objects.filter(
                 card_number=card_digits,
         ).exists():
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_DUPLICATE_CARD,
-                failure_reason="duplicate_card",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_DUPLICATE_CARD
             )
+
+            observation.failure_reason = (
+                "duplicate_card"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
                         "cardNumber": (
-                            "این شماره کارت قبلاً ثبت شده است."
+                            "این شماره کارت قبلاً "
+                            "ثبت شده است."
                         )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        # ---------------------------------------------------------
-        # Duplicate IBAN
-        # ---------------------------------------------------------
         if BankAccount.objects.filter(
                 iban=iban_value,
         ).exists():
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_DUPLICATE_IBAN,
-                failure_reason="duplicate_iban",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_DUPLICATE_IBAN
             )
+
+            observation.failure_reason = (
+                "duplicate_iban"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "fields": {
                         "iban": (
-                            "این شماره شبا قبلاً ثبت شده است."
+                            "این شماره شبا قبلاً "
+                            "ثبت شده است."
                         )
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        # ---------------------------------------------------------
-        # Gregorian → Jalali YYYYMMDD
-        # ---------------------------------------------------------
         birth_date = (
             jdatetime.date
             .fromgregorian(
@@ -890,169 +994,217 @@ class BankAccountListCreateAPIView(APIView):
             .strftime("%Y%m%d")
         )
 
-        # ---------------------------------------------------------
-        # Ehraz: IBAN ownership
-        # ---------------------------------------------------------
         try:
             ehraz_result = (
-                EhrazService.match_iban_with_national(
+                EhrazService
+                .match_iban_with_national(
                     iban=iban_value,
                     national_code=kyc.national_id,
                     birth_date=birth_date,
                 )
             )
         except EhrazAPIError as exc:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
-                failure_reason="ehraz_iban_unavailable",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_UNAVAILABLE
             )
+
+            observation.failure_reason = (
+                "ehraz_iban_unavailable"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": str(exc),
                 },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status=(
+                    status.HTTP_503_SERVICE_UNAVAILABLE
+                ),
             )
 
         if "matched" not in ehraz_result:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
-                failure_reason="ehraz_iban_response_incomplete",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_UNAVAILABLE
             )
+
+            observation.failure_reason = (
+                "ehraz_iban_response_incomplete"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": (
-                        "پاسخ سرویس احراز مالکیت حساب بانکی کامل نیست."
+                        "پاسخ سرویس احراز مالکیت "
+                        "حساب بانکی کامل نیست."
                     )
                 },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status=(
+                    status.HTTP_503_SERVICE_UNAVAILABLE
+                ),
             )
 
         if ehraz_result["matched"] is not True:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                card_ownership_verified=False,
-                iban_ownership_verified=False,
-                result=BankVerificationObservation.RESULT_OWNERSHIP_FAILED,
-                failure_reason="ehraz_iban_mismatch",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_FAILED
             )
+
+            observation.failure_reason = (
+                "ehraz_iban_mismatch"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": (
-                        "اطلاعات حساب بانکی با اطلاعات هویتی "
-                        "شما مطابقت ندارد."
+                        "اطلاعات حساب بانکی با "
+                        "اطلاعات هویتی شما "
+                        "مطابقت ندارد."
                     )
                 },
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status=(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY
+                ),
             )
 
-        # ---------------------------------------------------------
-        # Ehraz: Card ownership
-        # ---------------------------------------------------------
+        observation.iban_ownership_verified = True
+
+        observation.save(
+            update_fields=[
+                "iban_ownership_verified",
+            ],
+        )
+
         try:
             card_result = (
-                EhrazService.match_card_with_national(
+                EhrazService
+                .match_card_with_national(
                     card_number=card_digits,
                     national_code=kyc.national_id,
                     birth_date=birth_date,
                 )
             )
         except EhrazAPIError as exc:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                card_ownership_verified=False,
-                iban_ownership_verified=True,
-                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
-                failure_reason="ehraz_card_unavailable",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_UNAVAILABLE
             )
+
+            observation.failure_reason = (
+                "ehraz_card_unavailable"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": str(exc),
                 },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status=(
+                    status.HTTP_503_SERVICE_UNAVAILABLE
+                ),
             )
 
         if "matched" not in card_result:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                card_ownership_verified=False,
-                iban_ownership_verified=True,
-                result=BankVerificationObservation.RESULT_OWNERSHIP_UNAVAILABLE,
-                failure_reason="ehraz_card_response_incomplete",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_UNAVAILABLE
             )
+
+            observation.failure_reason = (
+                "ehraz_card_response_incomplete"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": (
-                        "پاسخ سرویس احراز مالکیت کارت کامل نیست."
+                        "پاسخ سرویس احراز مالکیت "
+                        "کارت کامل نیست."
                     )
                 },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status=(
+                    status.HTTP_503_SERVICE_UNAVAILABLE
+                ),
             )
 
         if card_result["matched"] is not True:
-            create_bank_verification_observation(
-                user=request.user,
-                card_number=card_digits,
-                iban=iban_value,
-                card_luhn_valid=True,
-                iban_checksum_valid=True,
-                card_bank_known=card_bank is not None,
-                iban_bank_known=True,
-                banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-                card_ownership_verified=False,
-                iban_ownership_verified=True,
-                result=BankVerificationObservation.RESULT_OWNERSHIP_FAILED,
-                failure_reason="ehraz_card_mismatch",
+            observation.result = (
+                BankVerificationObservation
+                .RESULT_OWNERSHIP_FAILED
             )
+
+            observation.failure_reason = (
+                "ehraz_card_mismatch"
+            )
+
+            observation.save(
+                update_fields=[
+                    "result",
+                    "failure_reason",
+                ],
+            )
+
             return Response(
                 {
                     "detail": (
-                        "اطلاعات کارت با اطلاعات هویتی "
-                        "شما مطابقت ندارد."
+                        "اطلاعات کارت با "
+                        "اطلاعات هویتی شما "
+                        "مطابقت ندارد."
                     )
                 },
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status=(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY
+                ),
             )
 
-        # ---------------------------------------------------------
-        # Create verified bank account
-        # ---------------------------------------------------------
+        observation.card_ownership_verified = True
+        observation.result = (
+            BankVerificationObservation
+            .RESULT_VERIFIED
+        )
+        observation.failure_reason = ""
+
+        observation.save(
+            update_fields=[
+                "card_ownership_verified",
+                "result",
+                "failure_reason",
+            ],
+        )
+
         account = BankAccount.objects.create(
             user=request.user,
             bank=bank,
@@ -1063,21 +1215,6 @@ class BankAccountListCreateAPIView(APIView):
             status="verified",
             preferred=False,
             verified_at=timezone.now(),
-        )
-
-        create_bank_verification_observation(
-            user=request.user,
-            card_number=card_digits,
-            iban=iban_value,
-            card_luhn_valid=True,
-            iban_checksum_valid=True,
-            card_bank_known=card_bank is not None,
-            iban_bank_known=True,
-            banks_match=bool(card_bank and card_bank.pk == iban_bank.pk),
-            card_ownership_verified=True,
-            iban_ownership_verified=True,
-            result=BankVerificationObservation.RESULT_VERIFIED,
-            failure_reason="",
         )
 
         kyc.sync_status()

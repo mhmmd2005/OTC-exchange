@@ -55,10 +55,6 @@ type ConfirmationAction =
   kind: 'whitelist'
   enabled: boolean
 }
-    | {
-  kind: 'revoke-address'
-  address: WithdrawalAddress
-}
 
 type PhishingMode = 'create' | 'existing'
 
@@ -120,6 +116,12 @@ const withdrawalAddressActionLoading =
 
 const withdrawalAddressModalOpen =
     ref(false)
+
+const withdrawalAddressDetailsOpen =
+    ref(false)
+
+const withdrawalAddressDetailsId =
+    ref('')
 
 const withdrawalAddressConfirmationOpen =
     ref(false)
@@ -324,6 +326,15 @@ const selectedWithdrawalNetwork =
         ),
     )
 
+const selectedWithdrawalAddress =
+    computed(() =>
+        visibleWithdrawalAddresses.value.find(
+            (address) =>
+                String(address.id) ===
+                withdrawalAddressDetailsId.value,
+        ),
+    )
+
 const otherSessionCount = computed(() =>
     sessions.value.filter(
         (session) => !session.current,
@@ -389,26 +400,16 @@ const confirmationCopy = computed(() => {
     }
   }
 
-  if (action.kind === 'whitelist') {
-    return {
-      title: action.enabled
-          ? 'فعال‌کردن فهرست مجاز برداشت؟'
-          : 'غیرفعال‌کردن فهرست مجاز؟',
-      description: action.enabled
-          ? 'پس از فعال‌سازی، برداشت فقط به آدرس‌های تأییدشده انجام می‌شود.'
-          : 'پس از غیرفعال‌سازی، محدودیت فهرست مجاز روی برداشت اعمال نمی‌شود.',
-      confirm: action.enabled
-          ? 'فعال شود'
-          : 'غیرفعال شود',
-    }
-  }
-
   return {
-    title:
-        'غیرفعال‌کردن این آدرس؟',
-    description:
-        `آدرس ${action.address.label || action.address.address} غیرفعال خواهد شد و دیگر برای برداشت قابل استفاده نخواهد بود.`,
-    confirm: 'غیرفعال شود',
+    title: action.enabled
+        ? 'فعال‌کردن فهرست مجاز برداشت؟'
+        : 'غیرفعال‌کردن فهرست مجاز؟',
+    description: action.enabled
+        ? 'پس از فعال‌سازی، برداشت فقط به آدرس‌های تأییدشده انجام می‌شود.'
+        : 'پس از غیرفعال‌سازی، محدودیت فهرست مجاز روی برداشت اعمال نمی‌شود.',
+    confirm: action.enabled
+        ? 'فعال شود'
+        : 'غیرفعال شود',
   }
 })
 
@@ -801,6 +802,43 @@ function openWithdrawalAddressModal(): void {
   resetWithdrawalAddressForm()
   withdrawalAddressModalOpen.value =
       true
+}
+
+function openWithdrawalAddressDetails(
+    address: WithdrawalAddress,
+): void {
+  withdrawalAddressDetailsId.value =
+      String(address.id)
+  withdrawalAddressDetailsOpen.value =
+      true
+}
+
+function closeWithdrawalAddressDetails(): void {
+  if (withdrawalAddressActionLoading.value) {
+    return
+  }
+
+  withdrawalAddressDetailsOpen.value =
+      false
+  withdrawalAddressDetailsId.value =
+      ''
+}
+
+async function setSelectedWithdrawalAddressDefault(): Promise<void> {
+  const address =
+      selectedWithdrawalAddress.value
+
+  if (
+      !address ||
+      address.status !== 'active' ||
+      address.isDefault
+  ) {
+    return
+  }
+
+  await setWithdrawalAddressDefault(
+      address,
+  )
 }
 
 function closeWithdrawalAddressModal(): void {
@@ -1252,61 +1290,6 @@ async function setWithdrawalAddressDefault(
         readableError(
             caught,
             'تغییر آدرس پیش‌فرض انجام نشد.',
-        )
-  } finally {
-    withdrawalAddressActionLoading.value =
-        ''
-  }
-}
-
-function askRevokeWithdrawalAddress(
-    address: WithdrawalAddress,
-): void {
-  confirmation.value = {
-    kind: 'revoke-address',
-    address,
-  }
-}
-
-async function revokeWithdrawalAddress(
-    address: WithdrawalAddress,
-): Promise<void> {
-  if (
-      withdrawalAddressActionLoading.value
-  ) {
-    return
-  }
-
-  withdrawalAddressActionLoading.value =
-      `revoke:${address.id}`
-
-  try {
-    await withdrawalAddressService.remove(
-        String(address.id),
-    )
-
-    withdrawalAddresses.value =
-        withdrawalAddresses.value.filter(
-            (item) =>
-                String(item.id) !==
-                String(address.id),
-        )
-
-    feedback.value =
-        address.status ===
-        'pending_confirmation'
-            ? 'آدرس در انتظار تأیید حذف شد.'
-            : 'آدرس برداشت با موفقیت غیرفعال شد.'
-
-    events.value =
-        await securityService.listEvents()
-
-    confirmation.value = null
-  } catch (caught) {
-    error.value =
-        readableError(
-            caught,
-            'غیرفعال‌سازی آدرس انجام نشد.',
         )
   } finally {
     withdrawalAddressActionLoading.value =
@@ -1818,13 +1801,6 @@ async function runConfirmation(): Promise<void> {
           action.enabled
               ? 'فهرست مجاز برداشت فعال شد.'
               : 'فهرست مجاز برداشت غیرفعال شد.'
-    } else if (
-        action.kind ===
-        'revoke-address'
-    ) {
-      await revokeWithdrawalAddress(
-          action.address,
-      )
     }
 
     if (
@@ -1841,12 +1817,7 @@ async function runConfirmation(): Promise<void> {
               .listEvents()
     }
 
-    if (
-        action.kind !==
-        'revoke-address'
-    ) {
-      confirmation.value = null
-    }
+    confirmation.value = null
   } catch (caught) {
     if (
         action.kind ===
@@ -2467,6 +2438,20 @@ onBeforeUnmount(() => {
                   آدرس
                 </small>
               </div>
+
+              <AppButton
+                  variant="secondary"
+                  size="sm"
+                  icon="plus"
+                  :disabled="
+                  !overview.mobileVerified
+                "
+                  @click="
+                  openWithdrawalAddressModal
+                "
+              >
+                افزودن آدرس
+              </AppButton>
             </div>
 
             <div
@@ -2494,8 +2479,8 @@ onBeforeUnmount(() => {
               <AppSkeleton
                   v-for="i in 2"
                   :key="i"
-                  height="5.8rem"
-                  radius="var(--radius-lg)"
+                  height="3.5rem"
+                  radius="var(--radius-md)"
               />
             </div>
 
@@ -2505,213 +2490,56 @@ onBeforeUnmount(() => {
               "
                 class="withdrawal-address-list"
             >
-              <article
+              <button
                   v-for="
-                  address in visibleWithdrawalAddresses
+                  (address, index) in
+                  visibleWithdrawalAddresses
                 "
                   :key="address.id"
-                  class="withdrawal-address-card"
+                  type="button"
+                  class="withdrawal-address-link"
                   :class="{
                   'is-default':
                     address.isDefault,
-                  'is-blocked':
-                    address.status ===
-                    'blocked',
                 }"
+                  @click="
+                  openWithdrawalAddressDetails(
+                      address,
+                  )
+                "
               >
-                <div
-                    class="withdrawal-address-top"
-                >
-                  <div
-                      class="withdrawal-address-identity"
-                  >
-                    <span
-                        class="address-icon"
-                    >
-                      <AppIcon
-                          name="wallet"
-                          :size="19"
-                      />
-                    </span>
-
-                    <div>
-                      <strong>
-                        {{
-                          address.label ||
-                          'آدرس برداشت'
-                        }}
-                      </strong>
-
-                      <small>
-                        {{
-                          address.assetNameFa
-                        }}
-                        ·
-                        {{
-                          address.networkDisplayName
-                        }}
-                      </small>
-                    </div>
-                  </div>
-
-                  <span
-                      class="address-status"
-                      :class="
-                      `tone-${withdrawalAddressStatusTone(
-                        address.status,
-                      )}`
-                    "
-                  >
-                    {{
-                      withdrawalAddressStatusLabel(
-                          address.status,
-                      )
-                    }}
-                  </span>
-                </div>
-
-                <div
-                    class="withdrawal-address-value"
-                >
-                  <bdi dir="ltr">
-                    {{ address.address }}
-                  </bdi>
-
-                  <small
-                      v-if="address.memo"
-                      dir="ltr"
-                  >
-                    Memo:
-                    {{ address.memo }}
-                  </small>
-                </div>
-
-                <div
-                    v-if="
-                    address.status ===
-                      'cooling_down' &&
-                    address.cooldownUntil
-                  "
-                    class="cooldown-note"
+                <span
+                    class="withdrawal-address-link__icon"
                 >
                   <AppIcon
-                      name="clock"
-                      :size="16"
+                      name="wallet"
+                      :size="17"
                   />
+                </span>
 
-                  <span>
-                    آدرس تأیید شده است و پس از پایان دوره امنیتی فعال می‌شود.
-
-<strong>
-  {{
-    formatCooldownRemaining(
-        cooldownSecondsRemaining(
-            address,
-        ),
-    )
-  }}
-  باقی‌مانده
-</strong>
-
-                    <small>
-                      پایان دوره:
-                      {{
-                        formatPersianDateTime(
-                            address.cooldownUntil,
-                        )
-                      }}
-                    </small>
-                  </span>
-                </div>
-
-                <div
-                    v-if="
-                    address.status ===
-                    'pending_confirmation'
-                  "
-                    class="pending-note"
+                <span
+                    class="withdrawal-address-link__copy"
                 >
-                  <AppIcon
-                      name="shield"
-                      :size="16"
-                  />
+                  آدرس
+                  {{
+                    toPersianDigits(
+                        index + 1,
+                    )
+                  }}
+                </span>
 
-                  <span>
-                    این آدرس هنوز تأیید نشده است.
-                  </span>
-                </div>
-
-                <div
-                    v-if="address.blockedReason"
-                    class="address-warning"
+                <span
+                    v-if="address.isDefault"
+                    class="withdrawal-address-link__default"
                 >
-                  <AppIcon
-                      name="warning"
-                      :size="16"
-                  />
+                  پیش‌فرض
+                </span>
 
-                  <span>
-                    {{ address.blockedReason }}
-                  </span>
-                </div>
-
-                <div
-                    class="withdrawal-address-actions"
-                >
-                  <span
-                      v-if="address.isDefault"
-                      class="default-badge"
-                  >
-                    آدرس پیش‌فرض
-                  </span>
-
-                  <AppButton
-                      v-if="
-                      address.status ===
-                        'active' &&
-                      !address.isDefault
-                    "
-                      variant="ghost"
-                      size="sm"
-                      :loading="
-                      withdrawalAddressActionLoading ===
-                      `default:${address.id}`
-                    "
-                      @click="
-                      setWithdrawalAddressDefault(
-                        address,
-                      )
-                    "
-                  >
-                    انتخاب به‌عنوان پیش‌فرض
-                  </AppButton>
-
-                  <AppButton
-                      v-if="
-                      address.status !==
-                      'blocked'
-                    "
-                      variant="danger"
-                      size="sm"
-                      :loading="
-                      withdrawalAddressActionLoading ===
-                      `revoke:${address.id}`
-                    "
-                      @click="
-                      askRevokeWithdrawalAddress(
-                        address,
-                      )
-                    "
-                  >
-                    {{
-                      address.status ===
-                      'pending_confirmation'
-                          ? 'حذف'
-                          : 'غیرفعال‌سازی'
-                    }}
-                  </AppButton>
-                </div>
-              </article>
+                <AppIcon
+                    name="chevronLeft"
+                    :size="17"
+                />
+              </button>
             </div>
 
             <EmptyState
@@ -3144,6 +2972,179 @@ onBeforeUnmount(() => {
             انصراف
           </AppButton>
         </div>
+      </template>
+    </AppModal>
+
+    <AppModal
+        v-model="withdrawalAddressDetailsOpen"
+        title="جزئیات آدرس برداشت"
+        description="اطلاعات آدرس انتخاب‌شده را بررسی کنید."
+        size="sm"
+        :dismissible="!withdrawalAddressActionLoading"
+        @update:model-value="
+        (value) => {
+          if (!value) {
+            closeWithdrawalAddressDetails()
+          }
+        }
+      "
+    >
+      <div
+          v-if="selectedWithdrawalAddress"
+          class="withdrawal-address-details"
+      >
+        <div class="withdrawal-address-detail-row">
+          <span>نام</span>
+
+          <strong>
+            {{
+              selectedWithdrawalAddress.label ||
+              'آدرس برداشت'
+            }}
+          </strong>
+        </div>
+
+        <div class="withdrawal-address-detail-row">
+          <span>ارز</span>
+
+          <strong>
+            {{
+              selectedWithdrawalAddress.assetNameFa
+            }}
+          </strong>
+        </div>
+
+        <div class="withdrawal-address-detail-row">
+          <span>شبکه</span>
+
+          <strong>
+            {{
+              selectedWithdrawalAddress.networkDisplayName
+            }}
+          </strong>
+        </div>
+
+        <div
+            class="withdrawal-address-detail-block"
+        >
+          <span>آدرس</span>
+
+          <bdi dir="ltr">
+            {{
+              selectedWithdrawalAddress.address
+            }}
+          </bdi>
+        </div>
+
+        <div
+            v-if="selectedWithdrawalAddress.memo"
+            class="withdrawal-address-detail-block"
+        >
+          <span>Memo / Tag</span>
+
+          <bdi dir="ltr">
+            {{
+              selectedWithdrawalAddress.memo
+            }}
+          </bdi>
+        </div>
+
+        <div
+            class="withdrawal-address-detail-status"
+        >
+          <div>
+            <span>وضعیت</span>
+
+            <strong
+                class="address-status"
+                :class="
+                `tone-${withdrawalAddressStatusTone(
+                    selectedWithdrawalAddress.status,
+                )}`
+              "
+            >
+              {{
+                withdrawalAddressStatusLabel(
+                    selectedWithdrawalAddress.status,
+                )
+              }}
+            </strong>
+          </div>
+
+          <div>
+            <span>آدرس پیش‌فرض</span>
+
+            <strong>
+              {{
+                selectedWithdrawalAddress.isDefault
+                    ? 'بله'
+                    : 'خیر'
+              }}
+            </strong>
+          </div>
+        </div>
+
+        <div
+            v-if="
+            selectedWithdrawalAddress.status ===
+                'cooling_down' &&
+            selectedWithdrawalAddress.cooldownUntil
+          "
+            class="withdrawal-address-detail-note"
+        >
+          <AppIcon
+              name="clock"
+              :size="15"
+          />
+
+          <span>
+            {{
+              formatCooldownRemaining(
+                  cooldownSecondsRemaining(
+                      selectedWithdrawalAddress,
+                  ),
+              )
+            }}
+            باقی‌مانده
+          </span>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton
+            v-if="
+            selectedWithdrawalAddress &&
+            selectedWithdrawalAddress.status === 'active' &&
+            !selectedWithdrawalAddress.isDefault
+          "
+            block
+            :loading="
+            withdrawalAddressActionLoading ===
+            `default:${selectedWithdrawalAddress.id}`
+          "
+            @click="
+            setSelectedWithdrawalAddressDefault
+          "
+        >
+          انتخاب به‌عنوان پیش‌فرض
+        </AppButton>
+
+        <div
+            v-else-if="
+            selectedWithdrawalAddress?.isDefault
+          "
+            class="withdrawal-address-detail-default"
+        >
+          آدرس پیش‌فرض انتخاب شده است
+        </div>
+
+        <AppButton
+            variant="secondary"
+            :disabled="Boolean(withdrawalAddressActionLoading)"
+            @click="closeWithdrawalAddressDetails"
+        >
+          بستن
+        </AppButton>
       </template>
     </AppModal>
 
@@ -3653,15 +3654,6 @@ onBeforeUnmount(() => {
             دوباره اسکن کنید.
           </small>
 
-          <small
-              v-if="
-              confirmation?.kind ===
-              'revoke-address'
-            "
-          >
-            پس از غیرفعال‌سازی، این آدرس دیگر برای
-            برداشت قابل استفاده نخواهد بود.
-          </small>
         </div>
       </div>
 
@@ -3699,43 +3691,12 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <div
-          v-if="
-          confirmation?.kind ===
-          'revoke-address'
-        "
-          class="confirmation-address"
-      >
-        <span>
-          آدرس مقصد
-        </span>
-
-        <bdi dir="ltr">
-          {{
-            confirmation.address.address
-          }}
-        </bdi>
-
-        <small>
-          {{
-            confirmation.address.assetNameFa
-          }}
-          ·
-          {{
-            confirmation.address
-                .networkDisplayName
-          }}
-        </small>
-      </div>
-
       <template #footer>
         <AppButton
             variant="danger"
             block
             :loading="
-            confirming ||
-            withdrawalAddressActionLoading ===
-              `revoke:${confirmation?.kind === 'revoke-address' ? confirmation.address.id : ''}`
+            confirming
           "
             @click="runConfirmation"
         >
@@ -4188,228 +4149,198 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-right: 160px;
 }
 
 .address-management-header > div {
   display: grid;
   gap: .15rem;
-
 }
 
-.address-management-header
-strong {
+.address-management-header strong {
   font-size: var(--font-size-sm);
 }
 
-.address-management-header
-small {
+.address-management-header small {
   color: var(--color-text-muted);
   font-size: .7rem;
-  margin-right: 30px;
-}
-
-.address-warning,
-.pending-note,
-.cooldown-note {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
-  line-height: 1.7;
-}
-
-.address-warning {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-}
-
-.pending-note {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
-}
-
-.cooldown-note {
-  background: var(--color-info-soft);
-  color: var(--color-info);
-}
-
-.cooldown-note span {
-  display: grid;
-  gap: .15rem;
-}
-
-.cooldown-note strong {
-  color: var(--color-text-primary);
-}
-
-.cooldown-note small {
-  color: var(--color-text-muted);
 }
 
 .withdrawal-address-list {
   display: grid;
-  gap: var(--space-3);
+  max-height: 18rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
 }
 
-.address-loading {
-  display: grid;
-  gap: var(--space-3);
+.withdrawal-address-list::-webkit-scrollbar {
+  width: .35rem;
 }
 
-.withdrawal-address-card {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-1);
-  transition: background var(--transition-fast),
-  border-color var(--transition-fast);
+.withdrawal-address-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.withdrawal-address-card.is-default {
-  border-color: var(--color-primary);
-  background: linear-gradient(
-      120deg,
-      var(--color-primary-soft),
-      var(--color-surface-1)
-  );
+.withdrawal-address-list::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--color-border-hover);
 }
 
-.withdrawal-address-card.is-blocked {
-  border-color: rgba(
-      240,
-      108,
-      117,
-      .28
-  );
-}
-
-.withdrawal-address-top {
+.withdrawal-address-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.withdrawal-address-identity {
-  display: flex;
-  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
   min-width: 0;
-  gap: var(--space-3);
+  padding: .72rem .2rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--transition-fast),
+  color var(--transition-fast);
 }
 
-.address-icon {
+.withdrawal-address-link:last-child {
+  border-bottom: 0;
+}
+
+.withdrawal-address-link:hover {
+  background: color-mix(
+      in srgb,
+      var(--color-primary-soft) 35%,
+      transparent
+  );
+}
+
+.withdrawal-address-link:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.withdrawal-address-link.is-default {
+  color: var(--color-primary);
+}
+
+.withdrawal-address-link__icon {
   display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2rem;
+  height: 2rem;
   flex: 0 0 auto;
-  border-radius: .85rem;
+  border-radius: .65rem;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   place-items: center;
 }
 
-.withdrawal-address-identity
-> div {
-  display: grid;
+.withdrawal-address-link__copy {
   min-width: 0;
-  gap: .15rem;
-}
-
-.withdrawal-address-identity
-strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
   font-size: var(--font-size-sm);
+  font-weight: 600;
 }
 
-.withdrawal-address-identity
-small {
+.withdrawal-address-link__default {
+  flex: 0 0 auto;
+  padding: .22rem .5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-gold-soft);
+  color: var(--color-gold);
+  font-size: .63rem;
+  font-weight: 700;
+}
+
+.address-loading {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.withdrawal-address-details {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.withdrawal-address-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.withdrawal-address-detail-row span,
+.withdrawal-address-detail-block > span,
+.withdrawal-address-detail-status span {
   color: var(--color-text-muted);
   font-size: .7rem;
 }
 
-.address-status {
-  flex: 0 0 auto;
-  padding: .25rem .55rem;
-  border-radius: var(--radius-pill);
-  font-size: .68rem;
-  font-weight: 700;
+.withdrawal-address-detail-row strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  text-align: end;
 }
 
-.tone-success {
-  background: var(--color-success-soft);
-  color: var(--color-success);
-}
-
-.tone-warning {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
-}
-
-.tone-danger {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-}
-
-.tone-info {
-  background: var(--color-info-soft);
-  color: var(--color-info);
-}
-
-.withdrawal-address-value {
+.withdrawal-address-detail-block {
   display: grid;
-  gap: .2rem;
+  gap: .25rem;
   min-width: 0;
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
 }
 
-.withdrawal-address-value
-bdi {
+.withdrawal-address-detail-block bdi {
   overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-family: ui-monospace, monospace;
-  font-size: var(--font-size-xs);
+  font-size: .72rem;
+  line-height: 1.7;
 }
 
-.withdrawal-address-value
-small {
-  color: var(--color-text-muted);
-  font-family: ui-monospace, monospace;
-  font-size: .68rem;
-}
-
-.withdrawal-address-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+.withdrawal-address-detail-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
-.default-badge {
-  margin-inline-end: auto;
-  padding: .3rem .65rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-gold-soft);
-  color: var(--color-gold);
-  font-size: .68rem;
-  font-weight: 700;
-}
-
-.address-create-network {
+.withdrawal-address-detail-status > div {
   display: grid;
-  gap: .2rem;
+  gap: .3rem;
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
+}
+
+.withdrawal-address-detail-status strong {
+  font-size: var(--font-size-xs);
+}
+
+.withdrawal-address-detail-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+  font-size: var(--font-size-xs);
+}
+
+.withdrawal-address-detail-default {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-gold-soft);
+  color: var(--color-gold);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-align: center;
 }
 
 .address-create-network
@@ -5042,27 +4973,15 @@ small {
   }
 
   .address-management-header {
-    align-items: stretch;
-    flex-direction: column;
-
+    align-items: center;
   }
 
-  .address-management-header
-  :deep(.app-button) {
-    width: 100%;
+  .withdrawal-address-list {
+    max-height: 16rem;
   }
 
-  .withdrawal-address-top {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .withdrawal-address-actions {
-    justify-content: flex-start;
-  }
-
-  .default-badge {
-    margin-inline-end: 0;
+  .withdrawal-address-detail-status {
+    grid-template-columns: 1fr;
   }
 
   .list-header {
@@ -5172,18 +5091,8 @@ small {
       auto 1fr;
   }
 
-  .address-status {
-    align-self: flex-start;
-  }
-
-  .withdrawal-address-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .withdrawal-address-actions
-  :deep(.app-button) {
-    width: 100%;
+  .withdrawal-address-link {
+    padding-block: .65rem;
   }
 
   .two-factor-actions {

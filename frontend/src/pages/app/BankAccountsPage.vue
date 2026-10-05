@@ -30,13 +30,21 @@ const deleteTarget = ref<BankAccount | null>(null)
 const submitting = ref(false)
 const preferredLoadingId = ref('')
 const deleting = ref(false)
+
 const detectedBank = ref<IranianBank | null>(null)
 const detectingBank = ref(false)
 
-const form = reactive({cardNumber: '', iban: '', accountNumber: ''})
+const form = reactive({
+  cardNumber: '',
+  iban: '',
+  accountNumber: '',
+})
+
 const formErrors = reactive<Record<string, string>>({})
 
-const verifiedCount = computed(() => accounts.value.filter((account) => account.status === 'verified').length)
+const verifiedCount = computed(() => (
+    accounts.value.filter((account) => account.status === 'verified').length
+))
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
@@ -46,7 +54,10 @@ function resetForm(): void {
   form.cardNumber = ''
   form.iban = ''
   form.accountNumber = ''
+
   detectedBank.value = null
+  detectingBank.value = false
+
   Object.keys(formErrors).forEach((key) => delete formErrors[key])
 }
 
@@ -59,34 +70,63 @@ function openAdd(): void {
 async function loadAccounts(): Promise<void> {
   loading.value = true
   pageError.value = ''
+
   try {
     accounts.value = await bankService.listAccounts()
   } catch (error) {
-    pageError.value = errorMessage(error, 'حساب‌های بانکی بارگیری نشدند.')
+    pageError.value = errorMessage(
+        error,
+        'حساب‌های بانکی بارگیری نشدند.',
+    )
   } finally {
     loading.value = false
   }
 }
 
 let detectionSequence = 0
-watch(() => form.cardNumber, async (value) => {
-  const digits = normalizeDigits(value).replace(/\D/g, '')
-  formErrors.cardNumber = ''
-  if (digits.length < 6) {
-    detectedBank.value = null
-    return
-  }
-  const sequence = ++detectionSequence
-  detectingBank.value = true
-  try {
-    const bank = await bankService.detectBank(digits)
-    if (sequence === detectionSequence) detectedBank.value = bank
-  } catch {
-    if (sequence === detectionSequence) detectedBank.value = null
-  } finally {
-    if (sequence === detectionSequence) detectingBank.value = false
-  }
-})
+let detectionTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+    () => form.cardNumber,
+    (value) => {
+      const digits = normalizeDigits(value).replace(/\D/g, '')
+
+      formErrors.cardNumber = ''
+
+      if (detectionTimer) {
+        clearTimeout(detectionTimer)
+        detectionTimer = null
+      }
+
+      const sequence = ++detectionSequence
+
+      if (digits.length < 6) {
+        detectedBank.value = null
+        detectingBank.value = false
+        return
+      }
+
+      detectingBank.value = true
+
+      detectionTimer = setTimeout(async () => {
+        try {
+          const bank = await bankService.detectBank(digits)
+
+          if (sequence !== detectionSequence) return
+
+          detectedBank.value = bank
+        } catch {
+          if (sequence !== detectionSequence) return
+
+          detectedBank.value = null
+        } finally {
+          if (sequence === detectionSequence) {
+            detectingBank.value = false
+          }
+        }
+      }, 250)
+    },
+)
 
 function updateCardNumber(value: string): void {
   form.cardNumber = formatCardNumber(value)
@@ -119,19 +159,32 @@ function validateForm(): boolean {
 
 async function addAccount(): Promise<void> {
   if (!validateForm()) return
+
   submitting.value = true
+
   try {
     await bankService.addAccount({
       cardNumber: form.cardNumber,
       iban: form.iban,
       accountNumber: form.accountNumber.trim() || undefined,
     })
+
     await loadAccounts()
+
     addOpen.value = false
     feedback.value = 'حساب بانکی با موفقیت تأیید و ثبت شد.'
   } catch (error) {
-    if (error instanceof ApiError && error.details?.fields) Object.assign(formErrors, error.details.fields)
-    formErrors.form = errorMessage(error, 'ثبت حساب بانکی انجام نشد.')
+    if (
+        error instanceof ApiError &&
+        error.details?.fields
+    ) {
+      Object.assign(formErrors, error.details.fields)
+    }
+
+    formErrors.form = errorMessage(
+        error,
+        'ثبت حساب بانکی انجام نشد.',
+    )
   } finally {
     submitting.value = false
   }
@@ -140,12 +193,17 @@ async function addAccount(): Promise<void> {
 async function setPreferred(account: BankAccount): Promise<void> {
   preferredLoadingId.value = account.id
   pageError.value = ''
+
   try {
     await bankService.setPreferred(account.id)
     await loadAccounts()
+
     feedback.value = `${account.bank.nameFa} به‌عنوان حساب منتخب تنظیم شد.`
   } catch (error) {
-    pageError.value = errorMessage(error, 'تغییر حساب منتخب انجام نشد.')
+    pageError.value = errorMessage(
+        error,
+        'تغییر حساب منتخب انجام نشد.',
+    )
   } finally {
     preferredLoadingId.value = ''
   }
@@ -153,17 +211,28 @@ async function setPreferred(account: BankAccount): Promise<void> {
 
 async function removeAccount(): Promise<void> {
   if (!deleteTarget.value) return
+
   const target = deleteTarget.value
+
   deleting.value = true
   pageError.value = ''
+
   try {
     await bankService.removeAccount(target.id)
+
     const bankName = target.bank.nameFa
+
     deleteTarget.value = null
+
     await loadAccounts()
+
     feedback.value = `حساب ${bankName} حذف شد.`
   } catch (error) {
-    pageError.value = errorMessage(error, 'حذف حساب بانکی انجام نشد.')
+    pageError.value = errorMessage(
+        error,
+        'حذف حساب بانکی انجام نشد.',
+    )
+
     deleteTarget.value = null
   } finally {
     deleting.value = false
@@ -300,8 +369,22 @@ onMounted(loadAccounts)
           <span>به‌دلیل الزامات مالی، حساب مشترک یا حساب متعلق به شخص دیگر تأیید نمی‌شود.</span></div>
       </form>
       <template #footer>
-        <AppButton block :loading="submitting" @click="addAccount">ثبت و تأیید مالکیت</AppButton>
-        <AppButton variant="secondary" :disabled="submitting" @click="addOpen = false">انصراف</AppButton>
+        <div class="bank-modal-actions">
+          <AppButton
+              :loading="submitting"
+              @click="addAccount"
+          >
+            ثبت و تأیید مالکیت
+          </AppButton>
+
+          <AppButton
+              variant="secondary"
+              :disabled="submitting"
+              @click="addOpen = false"
+          >
+            انصراف
+          </AppButton>
+        </div>
       </template>
     </AppModal>
 
@@ -533,6 +616,25 @@ onMounted(loadAccounts)
 
 .detected-bank > span:last-child {
   display: grid;
+}
+
+.bank-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7rem, auto);
+  align-items: stretch;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.bank-modal-actions > * {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .bank-modal-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .detected-bank strong {

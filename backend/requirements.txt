@@ -12,3 +12,5 @@ redis==5.1.0
 pyotp
 cryptography
 pycryptodome
+jdatetime==6.1.0
+persiantools==6.2.0
