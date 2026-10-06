@@ -396,20 +396,16 @@ const router = createRouter({
             },
         },
 
-        ...(import.meta.env.DEV &&
-        import.meta.env.VITE_USE_MOCK_API === 'true'
-            ? [
-                {
-                    path: '/mock-payment/:id',
-                    name: 'mock-payment',
-                    component: () =>
-                        import('@/pages/MockPaymentPage.vue'),
-                    meta: {
-                        title: 'درگاه پرداخت آزمایشی',
-                    },
-                },
-            ]
-            : []),
+
+        {
+            path: '/payment-test/:token',
+            name: 'payment-test',
+            component: () =>
+                import('@/pages/app/PaymentTestPage.vue'),
+            meta: {
+                title: 'درگاه پرداخت آزمایشی',
+            },
+        },
 
         {
             path: '/:pathMatch(.*)*',

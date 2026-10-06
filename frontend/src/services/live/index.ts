@@ -1018,7 +1018,33 @@ export const walletService: WalletService = {
         api.get<TomanDepositResult>(
             `/wallet/toman/deposits/${id}`,
         ),
+    getTestTomanDeposit(
+        token: string,
+    ) {
+        return api.get<{
+            id: string
+            amount: string
+            paymentUrl: string
+            expiresAt: string
+            status: string
+            createdAt: string
+        }>(
+            `/wallets/toman/deposits/test-pay/${encodeURIComponent(
+                token,
+            )}/`,
+        )
+    },
 
+
+    payTestTomanDeposit(
+        token: string,
+    ) {
+        return api.post<Transaction>(
+            `/wallets/toman/deposits/test-pay/${encodeURIComponent(
+                token,
+            )}/`,
+        )
+    },
     completeTomanDeposit: (
         id: string,
     ) =>

@@ -84,8 +84,13 @@ const apiErrorCodes: ApiErrorCode[] = [
     'NETWORK_DISABLED',
 ]
 
-export const isMockApiEnabled = import.meta.env.DEV
-    && import.meta.env.VITE_USE_MOCK_API === 'true'
+export const isMockApiEnabled =
+    import.meta.env.DEV &&
+    import.meta.env.VITE_USE_MOCK_API === 'true'
+
+export const isTestPaymentEnabled =
+    import.meta.env.DEV &&
+    import.meta.env.VITE_ENABLE_TEST_PAYMENT === 'true'
 
 function sessionStorageAvailable(): boolean {
     return typeof window !== 'undefined' && Boolean(window.sessionStorage)

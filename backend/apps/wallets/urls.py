@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 
 from .views import (
     WalletAssetDetailAPIView,
@@ -33,5 +33,9 @@ urlpatterns = [
         "<str:symbol>/deposit-address/",
         WalletDepositAddressAPIView.as_view(),
         name="wallet-deposit-address",
+    ),
+    path(
+        "toman/deposits/",
+        include("apps.payments.urls"),
     ),
 ]

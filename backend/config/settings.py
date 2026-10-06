@@ -68,10 +68,11 @@ INSTALLED_APPS = [
     "apps.markets",
     "apps.admin_panel",
     "apps.withdrawals",
+    "apps.payments",
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # <--- قرارگیری در بالاترین موقعیت جهت مدیریت فوری Preflight
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -323,3 +324,13 @@ WITHDRAWAL_ADDRESS_COOLDOWN_SECONDS = int(
         "86400",
     )
 )
+
+PAYMENT_GATEWAY = os.environ.get(
+    "PAYMENT_GATEWAY",
+    "test_nexpal",
+).strip().lower()
+
+TEST_NEXPAL_PAYMENT_URL_BASE = os.environ.get(
+    "TEST_NEXPAL_PAYMENT_URL_BASE",
+    "http://127.0.0.1:5173/payment-test",
+).strip().rstrip("/")

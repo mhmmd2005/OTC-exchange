@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import BankAccount
+from apps.payments.services import get_toman_deposit_limit_data
 from .models import KycApplication
 from .serializers import (
     BasicInfoSerializer,
@@ -349,6 +350,7 @@ class VerificationSummaryAPIView(APIView):
 
     def get(self, request):
         user = request.user
+
         kyc, _ = KycApplication.objects.get_or_create(
             user=user,
         )
@@ -358,9 +360,11 @@ class VerificationSummaryAPIView(APIView):
             if user.is_phone_verified
             else "not_started"
         )
+
         basic_status = self.map_status(
             kyc.basic_info_status,
         )
+
         identity_status = self.map_status(
             kyc.identity_status,
         )
@@ -374,11 +378,13 @@ class VerificationSummaryAPIView(APIView):
                     status="verified",
             ).exists():
                 bank_status = "verified"
+
             elif BankAccount.objects.filter(
                     user=user,
                     status="pending",
             ).exists():
                 bank_status = "pending"
+
             elif BankAccount.objects.filter(
                     user=user,
                     status="rejected",
@@ -400,16 +406,25 @@ class VerificationSummaryAPIView(APIView):
 
         if not user.is_phone_verified:
             current_step_id = "mobile"
+
         elif kyc.basic_info_status == "rejected":
             current_step_id = "basic_info"
+
         elif kyc.identity_status == "rejected":
             current_step_id = "identity"
+
         elif kyc.basic_info_status == "not_started":
             current_step_id = "basic_info"
+
         elif kyc.identity_status == "not_started":
             current_step_id = "identity"
-        elif bank_unlocked and bank_status in {"not_started", "rejected"}:
+
+        elif bank_unlocked and bank_status in {
+            "not_started",
+            "rejected",
+        }:
             current_step_id = "bank"
+
         else:
             current_step_id = None
 
@@ -417,7 +432,9 @@ class VerificationSummaryAPIView(APIView):
             {
                 "id": "mobile",
                 "title": "تأیید شماره موبایل",
-                "description": "مالکیت شماره موبایل خود را تأیید کنید.",
+                "description": (
+                    "مالکیت شماره موبایل خود را تأیید کنید."
+                ),
                 "status": mobile_status,
                 "required": True,
                 "locked": mobile_status == "verified",
@@ -431,7 +448,8 @@ class VerificationSummaryAPIView(APIView):
                 "id": "basic_info",
                 "title": "اطلاعات هویتی",
                 "description": (
-                    "نام، نام خانوادگی، نام پدر، کد ملی و تاریخ تولد را وارد کنید."
+                    "نام، نام خانوادگی، نام پدر، "
+                    "کد ملی و تاریخ تولد را وارد کنید."
                 ),
                 "status": basic_status,
                 "required": True,
@@ -439,9 +457,11 @@ class VerificationSummaryAPIView(APIView):
                 "actionLabel": (
                     "ارسال مجدد"
                     if kyc.basic_info_status == "rejected"
-                    else "ثبت اطلاعات"
-                    if kyc.basic_info_status == "not_started"
-                    else None
+                    else (
+                        "ثبت اطلاعات"
+                        if kyc.basic_info_status == "not_started"
+                        else None
+                    )
                 ),
                 "rejectionReason": (
                     kyc.basic_info_rejection_reason
@@ -457,16 +477,20 @@ class VerificationSummaryAPIView(APIView):
             {
                 "id": "identity",
                 "title": "مدرک شناسایی",
-                "description": "مدرک شناسایی خود را برای بررسی ارسال کنید.",
+                "description": (
+                    "مدرک شناسایی خود را برای بررسی ارسال کنید."
+                ),
                 "status": identity_status,
                 "required": True,
                 "locked": not kyc.can_edit_identity,
                 "actionLabel": (
                     "ارسال مجدد"
                     if kyc.identity_status == "rejected"
-                    else "ارسال مدرک"
-                    if kyc.identity_status == "not_started"
-                    else None
+                    else (
+                        "ارسال مدرک"
+                        if kyc.identity_status == "not_started"
+                        else None
+                    )
                 ),
                 "rejectionReason": (
                     kyc.identity_rejection_reason
@@ -482,14 +506,21 @@ class VerificationSummaryAPIView(APIView):
             {
                 "id": "bank",
                 "title": "حساب بانکی",
-                "description": "یک حساب بانکی به نام خودتان اضافه کنید.",
+                "description": (
+                    "یک حساب بانکی به نام خودتان اضافه کنید."
+                ),
                 "status": bank_status,
                 "required": True,
                 "locked": not bank_unlocked,
                 "actionLabel": (
                     "افزودن حساب بانکی"
-                    if bank_unlocked
-                       and bank_status in {"not_started", "rejected"}
+                    if (
+                            bank_unlocked
+                            and bank_status in {
+                                "not_started",
+                                "rejected",
+                            }
+                    )
                     else None
                 ),
                 "actionRoute": "/app/bank-accounts",
@@ -498,19 +529,23 @@ class VerificationSummaryAPIView(APIView):
 
         if bank_status == "verified":
             verification_status = "verified"
+
         elif (
                 kyc.basic_info_status == "rejected"
                 or kyc.identity_status == "rejected"
                 or bank_status == "rejected"
         ):
             verification_status = "rejected"
+
         elif review_pending:
             verification_status = "pending"
+
         elif any(
                 step["status"] != "not_started"
                 for step in steps
         ):
             verification_status = "in_progress"
+
         else:
             verification_status = "not_started"
 
@@ -518,30 +553,49 @@ class VerificationSummaryAPIView(APIView):
             step["status"] == "verified"
             for step in steps
         )
+
         progress = round(
             verified_count / len(steps) * 100,
         )
 
         if verification_status == "verified":
-            message = "احراز هویت شما با موفقیت تکمیل شده است."
-        elif review_pending and kyc.identity_status == "pending":
+            message = (
+                "احراز هویت شما با موفقیت تکمیل شده است."
+            )
+
+        elif (
+                review_pending
+                and kyc.identity_status == "pending"
+        ):
             message = (
                 "مدرک شناسایی شما برای بررسی ادمین ارسال شده است. "
                 "نتیجه پس از بررسی در حساب شما اعلام می‌شود."
             )
-        elif review_pending and bank_status == "pending":
+
+        elif (
+                review_pending
+                and bank_status == "pending"
+        ):
             message = (
                 "حساب بانکی شما برای بررسی ادمین ارسال شده است. "
                 "نتیجه پس از بررسی در حساب شما اعلام می‌شود."
             )
+
         elif verification_status == "rejected":
-            message = "یکی از مراحل احراز هویت نیاز به اصلاح دارد."
+            message = (
+                "یکی از مراحل احراز هویت نیاز به اصلاح دارد."
+            )
+
         else:
             message = (
                 "برای تکمیل احراز هویت، مراحل باقی‌مانده را انجام دهید."
             )
 
         current_level = user.kyc_level or "level_0"
+
+        toman_deposit_limits = get_toman_deposit_limit_data(
+            user=user,
+        )
 
         return Response({
             "status": verification_status,
@@ -550,6 +604,7 @@ class VerificationSummaryAPIView(APIView):
             "message": message,
             "currentStepId": current_step_id,
             "reviewPending": review_pending,
+
             "basicInfo": {
                 "firstName": kyc.first_name,
                 "lastName": kyc.last_name,
@@ -561,18 +616,31 @@ class VerificationSummaryAPIView(APIView):
                     else ""
                 ),
             },
+
             "steps": steps,
+
             "levels": [],
+
             "limits": {
                 "accountLevel": current_level,
+
                 "dailyBuy": "0",
                 "dailySell": "0",
-                "dailyTomanDeposit": "0",
+
+                "dailyTomanDeposit": str(
+                    toman_deposit_limits["daily"]
+                ),
+
                 "dailyTomanWithdrawal": "0",
                 "dailyCryptoWithdrawalTomanEquivalent": "0",
+
                 "usedBuy": "0",
                 "usedSell": "0",
-                "usedTomanDeposit": "0",
+
+                "usedTomanDeposit": str(
+                    toman_deposit_limits["used"]
+                ),
+
                 "usedTomanWithdrawal": "0",
                 "usedCryptoWithdrawalTomanEquivalent": "0",
             },
