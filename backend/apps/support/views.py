@@ -58,7 +58,22 @@ class TicketListCreateAPIView(APIView):
         search = request.query_params.get("search")
 
         if status_value:
-            queryset = queryset.filter(status=status_value)
+            status_map = {
+                "open": "open",
+                "waiting_for_user": "pending",
+                "answered": "resolved",
+                "closed": "closed",
+            }
+
+            mapped_status = status_map.get(status_value)
+
+            if mapped_status is None:
+                return Response(
+                    {"detail": "وضعیت درخواست معتبر نیست."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            queryset = queryset.filter(status=mapped_status)
 
         if category:
             queryset = queryset.filter(category=category)
@@ -74,7 +89,7 @@ class TicketListCreateAPIView(APIView):
 
         return Response(
             {
-                "item":serializer.data,
+                "items": serializer.data,
                 "total": queryset.count(),
             },
             status=status.HTTP_200_OK,

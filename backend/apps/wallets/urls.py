@@ -38,4 +38,8 @@ urlpatterns = [
         "toman/deposits/",
         include("apps.payments.urls"),
     ),
+    path(
+        "toman/withdrawals/",
+        include("apps.withdrawals.toman_urls"),
+    ),
 ]

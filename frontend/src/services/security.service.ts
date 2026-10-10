@@ -41,6 +41,8 @@ export interface SecurityService {
 }
 
 interface SecurityOverviewResponse {
+    score: number
+    passwordConfigured: boolean
     mobileVerified: boolean
     emailVerified: boolean
     twoFactorEnabled: boolean
@@ -103,7 +105,9 @@ function mapSecurityOverview(
     data: SecurityOverviewResponse,
 ): SecurityOverview {
     return {
-        ...mockDbSecurity,
+        score: Number(data.score ?? 0),
+        passwordConfigured:
+            Boolean(data.passwordConfigured),
         mobileVerified:
             Boolean(data.mobileVerified),
         emailVerified:

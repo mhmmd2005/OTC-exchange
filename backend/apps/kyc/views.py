@@ -7,9 +7,11 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from apps.accounts.models import BankAccount
 from apps.payments.services import get_toman_deposit_limit_data
+from apps.accounts.models import BankAccount
+from apps.withdrawals.services.toman_withdrawal_service import (
+    get_toman_withdrawal_limit_data,
+)
 from .models import KycApplication
 from .serializers import (
     BasicInfoSerializer,
@@ -597,6 +599,10 @@ class VerificationSummaryAPIView(APIView):
             user=user,
         )
 
+        toman_withdrawal_limits = get_toman_withdrawal_limit_data(
+            user=user,
+        )
+
         return Response({
             "status": verification_status,
             "currentLevel": current_level,
@@ -631,17 +637,23 @@ class VerificationSummaryAPIView(APIView):
                     toman_deposit_limits["daily"]
                 ),
 
-                "dailyTomanWithdrawal": "0",
-                "dailyCryptoWithdrawalTomanEquivalent": "0",
+                "dailyTomanWithdrawal": str(
+                    toman_withdrawal_limits["daily"]
+                ),
 
-                "usedBuy": "0",
-                "usedSell": "0",
+                "dailyCryptoWithdrawalTomanEquivalent": "0",
 
                 "usedTomanDeposit": str(
                     toman_deposit_limits["used"]
                 ),
 
-                "usedTomanWithdrawal": "0",
+                "usedTomanWithdrawal": str(
+                    toman_withdrawal_limits["used"]
+                ),
+
                 "usedCryptoWithdrawalTomanEquivalent": "0",
+
+                "usedBuy": "0",
+                "usedSell": "0",
             },
         })

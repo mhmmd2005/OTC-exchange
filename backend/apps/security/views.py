@@ -11,6 +11,7 @@ from apps.accounts.services.session import (
     get_session,
     get_user_sessions,
 )
+from apps.withdrawals.models import WithdrawalAddress
 from .models import LoginHistory, SecurityEvent
 from .serializers import (
     ActiveSessionSerializer,
@@ -22,13 +23,35 @@ from .services import TwoFactorService
 
 
 def build_security_overview(user):
+    password_configured = user.has_usable_password()
+    mobile_verified = bool(user.is_phone_verified)
+    email_verified = user.email_verified_at is not None
+    two_factor_enabled = TwoFactorService.is_enabled(user)
+    anti_phishing_enabled = bool(user.anti_phishing_code)
+    withdrawal_whitelist_enabled = bool(
+        user.withdrawal_whitelist_enabled
+    )
+
+    score = (
+            (20 if password_configured else 0)
+            + (15 if mobile_verified else 0)
+            + (15 if email_verified else 0)
+            + (20 if two_factor_enabled else 0)
+            + (15 if anti_phishing_enabled else 0)
+            + (15 if withdrawal_whitelist_enabled else 0)
+    )
+
     return {
-        "mobileVerified": user.is_phone_verified,
-        "emailVerified": user.email_verified_at is not None,
-        "twoFactorEnabled": TwoFactorService.is_enabled(user),
-        "antiPhishingEnabled": bool(user.anti_phishing_code),
-        "antiPhishingCode": user.anti_phishing_code,
-        "withdrawalWhitelistEnabled": user.withdrawal_whitelist_enabled,
+        "score": score,
+        "passwordConfigured": password_configured,
+        "mobileVerified": mobile_verified,
+        "emailVerified": email_verified,
+        "twoFactorEnabled": two_factor_enabled,
+        "antiPhishingEnabled": anti_phishing_enabled,
+        "antiPhishingCode": user.anti_phishing_code or "",
+        "withdrawalWhitelistEnabled": (
+            withdrawal_whitelist_enabled
+        ),
         "activeSessionsCount": len(
             get_user_sessions(user.id)
         ),
@@ -577,7 +600,22 @@ class WithdrawalWhitelistAPIView(APIView):
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
-
+        if enabled and not WithdrawalAddress.objects.filter(
+                user=request.user,
+                status=WithdrawalAddress.Status.ACTIVE,
+                network__withdrawal_enabled=True,
+                network__asset__is_active=True,
+                network__asset__withdrawal_enabled=True,
+        ).exists():
+            return Response(
+                {
+                    "detail": (
+                        "برای فعال‌سازی فهرست مجاز، ابتدا حداقل "
+                        "یک آدرس برداشت فعال و قابل‌استفاده ثبت کنید."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         old_value = (
             request.user.withdrawal_whitelist_enabled
         )

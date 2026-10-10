@@ -36,6 +36,7 @@ class TicketSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
     messages = TicketMessageSerializer(many=True, read_only=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
@@ -65,6 +66,12 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_orderId(self, obj):
         return None
+
+    def get_status(self, obj):
+        return {
+            "pending": "waiting_for_user",
+            "resolved": "answered",
+        }.get(obj.status, obj.status)
 
 
 class CreateTicketSerializer(serializers.Serializer):

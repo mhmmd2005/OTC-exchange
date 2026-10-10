@@ -434,9 +434,6 @@ onMounted(load)
   font-size: var(--font-size-xs);
 }
 
-.list-toolbar :deep(.tabs) {
-  min-width: 19rem;
-}
 
 .notification-list-card {
   overflow: hidden;

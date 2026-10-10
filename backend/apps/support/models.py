@@ -6,7 +6,16 @@ from apps.accounts.models import User
 class Ticket(models.Model):
     STATUS_CHOICES = [("open", "Open"), ("pending", "Pending"), ("resolved", "Resolved"), ("closed", "Closed")]
     PRIORITY_CHOICES = [("low", "Low"), ("medium", "Medium"), ("high", "High"), ("urgent", "Urgent")]
-    CATEGORY_CHOICES = [("account", "Account"), ("wallet", "Wallet"), ("trading", "Trading"), ("security", "Security"), ("other", "Other")]
+    CATEGORY_CHOICES = [
+        ("trade", "Trading"),
+        ("deposit", "Deposit"),
+        ("withdrawal", "Withdrawal"),
+        ("verification", "Verification"),
+        ("bank", "Bank"),
+        ("security", "Security"),
+        ("technical", "Technical"),
+        ("other", "Other"),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tickets")
     subject = models.CharField(max_length=255)

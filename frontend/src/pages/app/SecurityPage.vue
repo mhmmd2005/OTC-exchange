@@ -2034,8 +2034,8 @@ onBeforeUnmount(() => {
           </h2>
 
           <p>
-            با فعال‌کردن ورود دومرحله‌ای و کنترل
-            نشست‌های ناشناس، امنیت حساب را بالاتر ببرید.
+            با فعال‌کردن بخش های امنیتی و کنترل
+            نشست‌های ناشناس، امنیت حسابتان را بالاتر ببرید.
           </p>
         </div>
 
@@ -2107,32 +2107,13 @@ onBeforeUnmount(() => {
       </AppCard>
 
       <div class="security-grid">
-        <AppCard
-            padding="lg"
-            class="protection-card"
-        >
-          <div class="section-heading">
-            <span>
-              <AppIcon
-                  name="lock"
-                  :size="21"
-              />
-            </span>
-
-            <div>
-              <h2>
-                ورود و بازیابی
-              </h2>
-
-              <p>
-                راه‌های ورود و تأیید هویت حساب
-              </p>
-            </div>
-          </div>
-
-          <div class="setting-list">
-            <div class="setting-row">
-              <span class="setting-icon">
+        <div class="security-main-column">
+          <AppCard
+              padding="lg"
+              class="protection-card"
+          >
+            <div class="section-heading">
+              <span>
                 <AppIcon
                     name="lock"
                     :size="21"
@@ -2140,159 +2121,276 @@ onBeforeUnmount(() => {
               </span>
 
               <div>
-                <strong>
-                  رمز عبور
-                </strong>
+                <h2>
+                  ورود و بازیابی
+                </h2>
 
-                <small>
-                  برای حساب شما تنظیم شده است
-                </small>
+                <p>
+                  راه‌های ورود و تأیید هویت حساب
+                </p>
+              </div>
+            </div>
+
+            <div class="setting-list">
+              <div class="setting-row">
+                <span class="setting-icon">
+                  <AppIcon
+                      name="lock"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    رمز عبور
+                  </strong>
+
+                  <small>
+                    برای حساب شما تنظیم شده است
+                  </small>
+                </div>
+
+                <StatusBadge
+                    domain="security"
+                    status="secure"
+                />
+
+                <AppButton
+                    variant="secondary"
+                    size="sm"
+                    icon="edit"
+                    @click="openPassword"
+                >
+                  تغییر رمز
+                </AppButton>
               </div>
 
-              <StatusBadge
-                  domain="security"
-                  status="secure"
-              />
-
-              <AppButton
-                  variant="secondary"
-                  size="sm"
-                  icon="edit"
-                  @click="openPassword"
+              <div
+                  class="setting-row featured"
               >
-                تغییر رمز
-              </AppButton>
+                <span class="setting-icon">
+                  <AppIcon
+                      name="shield"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    ورود دومرحله‌ای
+                  </strong>
+
+                  <small>
+                    تأیید ورود با کد برنامه Authenticator
+                  </small>
+                </div>
+
+                <StatusBadge
+                    domain="security"
+                    :status="
+                    overview.twoFactorEnabled
+                      ? 'enabled'
+                      : 'disabled'
+                  "
+                />
+
+                <AppButton
+                    :variant="
+                    overview.twoFactorEnabled
+                      ? 'ghost'
+                      : 'primary'
+                  "
+                    size="sm"
+                    @click="requestTwoFactorChange"
+                >
+                  {{
+                    overview.twoFactorEnabled
+                        ? 'غیرفعال‌سازی'
+                        : 'فعال‌سازی'
+                  }}
+                </AppButton>
+              </div>
+
+              <div class="setting-row">
+                <span class="setting-icon">
+                  <AppIcon
+                      name="phone"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    شماره موبایل
+                  </strong>
+
+                  <small>
+                    برای کدهای امنیتی و بازیابی
+                  </small>
+                </div>
+
+                <StatusBadge
+                    domain="security"
+                    :status="
+                    overview.mobileVerified
+                      ? 'verified'
+                      : 'unverified'
+                  "
+                />
+
+                <span class="row-note">
+                  {{
+                    overview.mobileVerified
+                        ? 'نیاز به اقدام نیست'
+                        : 'تکمیل در احراز هویت'
+                  }}
+                </span>
+              </div>
+
+              <div class="setting-row">
+                <span class="setting-icon">
+                  <AppIcon
+                      name="mail"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    نشانی ایمیل
+                  </strong>
+
+                  <small>
+                    برای هشدارهای ورود و بازیابی
+                  </small>
+                </div>
+
+                <StatusBadge
+                    domain="security"
+                    :status="
+                    overview.emailVerified
+                      ? 'verified'
+                      : 'unverified'
+                  "
+                />
+
+                <AppButton
+                    v-if="
+                    !overview.emailVerified
+                  "
+                    to="/app/profile"
+                    variant="ghost"
+                    size="sm"
+                >
+                  بررسی ایمیل
+                </AppButton>
+
+                <span
+                    v-else
+                    class="row-note"
+                >
+                  تأییدشده
+                </span>
+              </div>
             </div>
+          </AppCard>
+
+          <AppCard
+              padding="none"
+              class="events-card"
+          >
+            <header class="list-header">
+              <div>
+                <span>
+                  <AppIcon
+                      name="clock"
+                      :size="21"
+                  />
+                </span>
+
+                <div>
+                  <h2>
+                    تاریخچه امنیتی
+                  </h2>
+
+                  <p>
+                    آخرین ورودها و تغییرات مهم حساب
+                  </p>
+                </div>
+              </div>
+            </header>
 
             <div
-                class="setting-row featured"
+                v-if="events.length"
+                class="event-list"
             >
-              <span class="setting-icon">
-                <AppIcon
-                    name="shield"
-                    :size="21"
-                />
-              </span>
-
-              <div>
-                <strong>
-                  ورود دومرحله‌ای
-                </strong>
-
-                <small>
-                  تأیید ورود با کد برنامه Authenticator
-                </small>
-              </div>
-
-              <StatusBadge
-                  domain="security"
-                  :status="
-                  overview.twoFactorEnabled
-                    ? 'enabled'
-                    : 'disabled'
-                "
-              />
-
-              <AppButton
-                  :variant="
-                  overview.twoFactorEnabled
-                    ? 'ghost'
-                    : 'primary'
-                "
-                  size="sm"
-                  @click="requestTwoFactorChange"
+              <article
+                  v-for="event in events"
+                  :key="event.id"
               >
-                {{
-                  overview.twoFactorEnabled
-                      ? 'غیرفعال‌سازی'
-                      : 'فعال‌سازی'
-                }}
-              </AppButton>
+                <span
+                    class="event-icon"
+                    :class="
+                    `tone-${eventTone(event.type)}`
+                  "
+                >
+                  <AppIcon
+                      :name="
+                      eventIcon(event.type)
+                    "
+                      :size="20"
+                  />
+                </span>
+
+                <div>
+                  <h3>
+                    {{ event.title }}
+                  </h3>
+
+                  <p>
+                    {{ event.description }}
+                  </p>
+
+                  <small>
+                    {{ event.deviceName }} ·
+
+                    <bdi dir="ltr">
+                      {{ event.ipAddress }}
+                    </bdi>
+                  </small>
+                </div>
+
+                <time
+                    class="event-time"
+                    :datetime="event.createdAt"
+                >
+                  <strong>
+                    {{
+                      formatSecurityEventTime(
+                          event.createdAt,
+                      )
+                    }}
+                  </strong>
+
+                  <small>
+                    {{
+                      formatPersianDateTime(
+                          event.createdAt,
+                      )
+                    }}
+                  </small>
+                </time>
+              </article>
             </div>
 
-            <div class="setting-row">
-              <span class="setting-icon">
-                <AppIcon
-                    name="phone"
-                    :size="21"
-                />
-              </span>
-
-              <div>
-                <strong>
-                  شماره موبایل
-                </strong>
-
-                <small>
-                  برای کدهای امنیتی و بازیابی
-                </small>
-              </div>
-
-              <StatusBadge
-                  domain="security"
-                  :status="
-                  overview.mobileVerified
-                    ? 'verified'
-                    : 'unverified'
-                "
-              />
-
-              <span class="row-note">
-                {{
-                  overview.mobileVerified
-                      ? 'نیاز به اقدام نیست'
-                      : 'تکمیل در احراز هویت'
-                }}
-              </span>
-            </div>
-
-            <div class="setting-row">
-              <span class="setting-icon">
-                <AppIcon
-                    name="mail"
-                    :size="21"
-                />
-              </span>
-
-              <div>
-                <strong>
-                  نشانی ایمیل
-                </strong>
-
-                <small>
-                  برای هشدارهای ورود و بازیابی
-                </small>
-              </div>
-
-              <StatusBadge
-                  domain="security"
-                  :status="
-                  overview.emailVerified
-                    ? 'verified'
-                    : 'unverified'
-                "
-              />
-
-              <AppButton
-                  v-if="
-                  !overview.emailVerified
-                "
-                  to="/app/profile"
-                  variant="ghost"
-                  size="sm"
-              >
-                بررسی ایمیل
-              </AppButton>
-
-              <span
-                  v-else
-                  class="row-note"
-              >
-                تأییدشده
-              </span>
-            </div>
-          </div>
-        </AppCard>
+            <EmptyState
+                v-else
+                icon="clock"
+                title="رویداد امنیتی ثبت نشده"
+                description="ورودها و تغییرات امنیتی مهم در این بخش نمایش داده می‌شوند."
+            />
+          </AppCard>
+        </div>
 
         <AppCard
             padding="lg"
@@ -2573,102 +2671,6 @@ onBeforeUnmount(() => {
               }}
             </p>
           </div>
-        </AppCard>
-
-        <AppCard
-            padding="none"
-            class="events-card"
-        >
-          <header class="list-header">
-            <div>
-              <span>
-                <AppIcon
-                    name="clock"
-                    :size="21"
-                />
-              </span>
-
-              <div>
-                <h2>
-                  تاریخچه امنیتی
-                </h2>
-
-                <p>
-                  آخرین ورودها و تغییرات مهم حساب
-                </p>
-              </div>
-            </div>
-          </header>
-
-          <div
-              v-if="events.length"
-              class="event-list"
-          >
-            <article
-                v-for="event in events"
-                :key="event.id"
-            >
-              <span
-                  class="event-icon"
-                  :class="
-                  `tone-${eventTone(event.type)}`
-                "
-              >
-                <AppIcon
-                    :name="
-                    eventIcon(event.type)
-                  "
-                    :size="20"
-                />
-              </span>
-
-              <div>
-                <h3>
-                  {{ event.title }}
-                </h3>
-
-                <p>
-                  {{ event.description }}
-                </p>
-
-                <small>
-                  {{ event.deviceName }} ·
-
-                  <bdi dir="ltr">
-                    {{ event.ipAddress }}
-                  </bdi>
-                </small>
-              </div>
-
-              <time
-                  class="event-time"
-                  :datetime="event.createdAt"
-              >
-                <strong>
-                  {{
-                    formatSecurityEventTime(
-                        event.createdAt,
-                    )
-                  }}
-                </strong>
-
-                <small>
-                  {{
-                    formatPersianDateTime(
-                        event.createdAt,
-                    )
-                  }}
-                </small>
-              </time>
-            </article>
-          </div>
-
-          <EmptyState
-              v-else
-              icon="clock"
-              title="رویداد امنیتی ثبت نشده"
-              description="ورودها و تغییرات امنیتی مهم در این بخش نمایش داده می‌شوند."
-          />
         </AppCard>
       </div>
 
@@ -3562,8 +3564,11 @@ onBeforeUnmount(() => {
           />
 
           <span>
-            اگر پیامی این عبارت را نداشت،
-            روی لینک‌های آن کلیک نکنید.
+**هشدار امنیتی**
+
+پیش از کلیک روی لینک‌های پیام، عبارت ضد فیشینگ اختصاصی خود را بررسی کنید. اگر این عبارت در پیام وجود ندارد یا با عبارت ثبت‌شده در حساب شما مطابقت ندارد، به پیام اعتماد نکنید و روی لینک‌های آن کلیک نکنید.
+
+روشا از این عبارت برای کمک به تشخیص پیام‌های رسمی خود استفاده می‌کند.
           </span>
         </div>
       </form>
@@ -3932,28 +3937,33 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-xs);
 }
 
+/* =========================================================
+   SECURITY CONTENT LAYOUT
+========================================================= */
+
 .security-grid {
   display: grid;
   grid-template-columns:
     minmax(0, 1.25fr)
     minmax(20rem, .75fr);
-  grid-template-areas:
-    "protection withdrawal"
-    "events withdrawal";
   align-items: start;
   gap: var(--space-5);
 }
 
-.protection-card {
-  grid-area: protection;
+.security-main-column {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
+.protection-card,
+.events-card,
 .withdrawal-security {
-  grid-area: withdrawal;
-}
-
-.events-card {
-  grid-area: events;
+  min-width: 0;
+  height: auto;
+  align-self: start;
 }
 
 .section-heading {
@@ -4598,6 +4608,9 @@ small {
   }
 }
 
+/* =========================================================
+   SECURITY EVENT HISTORY
+========================================================= */
 
 .event-list {
   display: grid;
@@ -4888,6 +4901,10 @@ small {
   line-height: 1.8;
 }
 
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
 @media (max-width: 1150px) {
   .score-card {
     flex-wrap: wrap;
@@ -4899,10 +4916,14 @@ small {
 
   .security-grid {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "protection"
-      "withdrawal"
-      "events";
+  }
+
+  .security-main-column {
+    gap: var(--space-5);
+  }
+
+  .withdrawal-security {
+    grid-column: auto;
   }
 }
 

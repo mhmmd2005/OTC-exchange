@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-
+from decimal import Decimal
 import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -334,3 +334,37 @@ TEST_NEXPAL_PAYMENT_URL_BASE = os.environ.get(
     "TEST_NEXPAL_PAYMENT_URL_BASE",
     "http://127.0.0.1:5173/payment-test",
 ).strip().rstrip("/")
+
+
+PAYOUT_GATEWAY = os.environ.get(
+    "PAYOUT_GATEWAY",
+    "test",
+).strip().lower()
+
+TOMAN_DAILY_WITHDRAWAL_LIMIT = Decimal(
+    os.environ.get(
+        "TOMAN_DAILY_WITHDRAWAL_LIMIT",
+        "500000000",
+    ),
+)
+
+MIN_TOMAN_WITHDRAWAL = Decimal(
+    os.environ.get(
+        "MIN_TOMAN_WITHDRAWAL",
+        "50000",
+    ),
+)
+
+TOMAN_WITHDRAWAL_FEE = Decimal(
+    os.environ.get(
+        "TOMAN_WITHDRAWAL_FEE",
+        "6000",
+    ),
+)
+
+TOMAN_WITHDRAWAL_ESTIMATE_TTL_SECONDS = int(
+    os.environ.get(
+        "TOMAN_WITHDRAWAL_ESTIMATE_TTL_SECONDS",
+        "300",
+    )
+)

@@ -685,13 +685,16 @@ export const securityService: SecurityService = {
             {code},
         ),
 
-    setWithdrawalWhitelist: (
+    setWithdrawalWhitelist: async (
         enabled: boolean,
-    ) =>
-        api.patch<SecurityOverview>(
-            '/security/withdrawal-whitelist',
+    ) => {
+        await api.patch<SecurityOverview>(
+            '/security/withdrawal-whitelist/',
             {enabled},
-        ),
+        )
+
+        return securityService.getOverview()
+    },
 }
 
 export const withdrawalAddressService = {

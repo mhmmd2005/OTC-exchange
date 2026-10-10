@@ -1,5 +1,9 @@
 from django.db import models
 
+from decimal import Decimal
+
+from django.conf import settings
+from django.db import models
 from apps.accounts.models import User
 from apps.assets.models import AssetNetwork
 
@@ -189,3 +193,160 @@ class WithdrawalAddress(models.Model):
     @property
     def is_active(self):
         return self.status == self.Status.ACTIVE
+
+
+
+
+class TomanWithdrawalAttempt(models.Model):
+    class Status(models.TextChoices):
+        ESTIMATED = "estimated", "Estimated"
+        PROCESSING = "processing", "Processing"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+        CANCELLED = "cancelled", "Cancelled"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="toman_withdrawal_attempts",
+    )
+
+    bank_account = models.ForeignKey(
+        "accounts.BankAccount",
+        on_delete=models.PROTECT,
+        related_name="toman_withdrawal_attempts",
+    )
+
+    amount = models.DecimalField(
+        max_digits=24,
+        decimal_places=8,
+        default=Decimal("0"),
+    )
+
+    fee = models.DecimalField(
+        max_digits=24,
+        decimal_places=8,
+        default=Decimal("0"),
+    )
+
+    receivable = models.DecimalField(
+        max_digits=24,
+        decimal_places=8,
+        default=Decimal("0"),
+    )
+
+    # Only a hash is persisted.
+    # The raw estimate token is returned to the client.
+    estimate_token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+    )
+
+    estimate_version = models.PositiveIntegerField(
+        default=1,
+    )
+
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ESTIMATED,
+        db_index=True,
+    )
+
+    # This is the normalized internal idempotency key.
+    idempotency_key = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_reference = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_code = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
+
+    provider_message = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    transaction = models.OneToOneField(
+        "transactions.Transaction",
+        on_delete=models.PROTECT,
+        related_name="toman_withdrawal_attempt",
+        null=True,
+        blank=True,
+    )
+
+    expires_at = models.DateTimeField(
+        db_index=True,
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    failed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "user",
+                    "idempotency_key",
+                ],
+                condition=~models.Q(
+                    idempotency_key=""
+                ),
+                name=(
+                    "unique_user_toman_withdrawal_idempotency"
+                ),
+            ),
+        ]
+
+        indexes = [
+            models.Index(
+                fields=["user", "status"],
+                name="toman_wd_user_status_idx",
+            ),
+            models.Index(
+                fields=["user", "created_at"],
+                name="toman_wd_user_created_idx",
+            ),
+            models.Index(
+                fields=["expires_at", "status"],
+                name="toman_wd_exp_status_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.user.phone_number} - "
+            f"Toman withdrawal - "
+            f"{self.amount}"
+        )
