@@ -14,7 +14,12 @@ from .views.kyc import (
     AdminKycRejectBankAPIView,
     AdminKycRejectStepAPIView,
 )
-
+from .views.support import (
+    AdminTicketDetailAPIView,
+    AdminTicketListAPIView,
+    AdminTicketReplyAPIView,
+    AdminTicketStatusAPIView,
+)
 
 urlpatterns = [
     path(
@@ -67,5 +72,25 @@ urlpatterns = [
         "kyc/<int:pk>/reject/bank/<int:bank_id>/",
         AdminKycRejectBankAPIView.as_view(),
         name="admin-kyc-reject-bank",
+    ),
+    path(
+        "support/tickets/",
+        AdminTicketListAPIView.as_view(),
+        name="admin-ticket-list",
+    ),
+    path(
+        "support/tickets/<int:pk>/",
+        AdminTicketDetailAPIView.as_view(),
+        name="admin-ticket-detail",
+    ),
+    path(
+        "support/tickets/<int:pk>/reply/",
+        AdminTicketReplyAPIView.as_view(),
+        name="admin-ticket-reply",
+    ),
+    path(
+        "support/tickets/<int:pk>/status/",
+        AdminTicketStatusAPIView.as_view(),
+        name="admin-ticket-status",
     ),
 ]

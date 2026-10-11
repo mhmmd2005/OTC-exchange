@@ -1,8 +1,10 @@
+from django.db import models
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .models import FAQ
 from .models import Ticket, TicketMessage
 from .serializers import (
     CreateTicketMessageSerializer,
@@ -10,13 +12,46 @@ from .serializers import (
     TicketMessageSerializer,
     TicketSerializer,
 )
+from .serializers import (
+    FAQSerializer,
+)
 
 
 class FAQListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response([], status=status.HTTP_200_OK)
+        queryset = FAQ.objects.filter(
+            is_active=True,
+        )
+
+        category = request.query_params.get(
+            "category",
+        )
+        search = (
+                request.query_params.get("search") or ""
+        ).strip()
+
+        if category:
+            queryset = queryset.filter(
+                category=category,
+            )
+
+        if search:
+            queryset = queryset.filter(
+                models.Q(question__icontains=search)
+                | models.Q(answer__icontains=search)
+            )
+
+        serializer = FAQSerializer(
+            queryset,
+            many=True,
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class TicketDetailAPIView(APIView):

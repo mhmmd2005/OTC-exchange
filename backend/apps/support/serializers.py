@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from .models import FAQ
 from .models import Ticket, TicketMessage
 
 
@@ -21,13 +22,26 @@ class TicketMessageSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_sender(self, obj):
+        if obj.admin_sender_id:
+            return "support"
+
         request = self.context.get("request")
+
         if request and obj.sender_id == request.user.id:
             return "user"
-        return "support"
+
+        return "user" if obj.sender_id else "support"
 
     def get_senderName(self, obj):
-        return obj.sender.full_name or obj.sender.phone_number
+        if obj.admin_sender_id:
+            admin = obj.admin_sender
+            return admin.full_name or admin.email
+
+        if obj.sender_id:
+            user = obj.sender
+            return user.full_name or user.phone_number
+
+        return "پشتیبانی"
 
 
 class TicketSerializer(serializers.ModelSerializer):
@@ -85,3 +99,18 @@ class CreateTicketSerializer(serializers.Serializer):
 
 class CreateTicketMessageSerializer(serializers.Serializer):
     body = serializers.CharField(min_length=2)
+
+
+class FAQSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = FAQ
+        fields = [
+            "id",
+            "category",
+            "question",
+            "answer",
+            "tags",
+        ]
+        read_only_fields = fields

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-
+from apps.support.models import Ticket, TicketMessage
 from apps.accounts.serializers import BankAccountSerializer
 from apps.kyc.models import KycApplication
 
@@ -138,3 +138,126 @@ class KycRejectSerializer(serializers.Serializer):
             )
 
         return value
+
+
+
+class AdminTicketMessageSerializer(serializers.ModelSerializer):
+    sender = serializers.SerializerMethodField()
+    senderName = serializers.SerializerMethodField()
+    body = serializers.CharField(source="message", read_only=True)
+    createdAt = serializers.DateTimeField(
+        source="created_at",
+        read_only=True,
+    )
+
+    class Meta:
+        model = TicketMessage
+        fields = [
+            "id",
+            "sender",
+            "senderName",
+            "body",
+            "createdAt",
+        ]
+        read_only_fields = fields
+
+    def get_sender(self, obj):
+        return "support" if obj.admin_sender_id else "user"
+
+    def get_senderName(self, obj):
+        if obj.admin_sender_id:
+            admin = obj.admin_sender
+            return admin.full_name or admin.email
+
+        if obj.sender_id:
+            user = obj.sender
+            return user.full_name or user.phone_number
+
+        return "—"
+
+
+class AdminTicketListSerializer(serializers.ModelSerializer):
+    ticketNumber = serializers.SerializerMethodField()
+    userName = serializers.SerializerMethodField()
+    userPhone = serializers.CharField(
+        source="user.phone_number",
+        read_only=True,
+    )
+    userEmail = serializers.EmailField(
+        source="user.email",
+        read_only=True,
+        allow_null=True,
+    )
+    createdAt = serializers.DateTimeField(
+        source="created_at",
+        read_only=True,
+    )
+    updatedAt = serializers.DateTimeField(
+        source="updated_at",
+        read_only=True,
+    )
+    messageCount = serializers.IntegerField(
+        source="message_count",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Ticket
+        fields = [
+            "id",
+            "ticketNumber",
+            "subject",
+            "category",
+            "status",
+            "priority",
+            "userName",
+            "userPhone",
+            "userEmail",
+            "createdAt",
+            "updatedAt",
+            "messageCount",
+        ]
+        read_only_fields = fields
+
+    def get_ticketNumber(self, obj):
+        return f"TK-{obj.id:05d}"
+
+    def get_userName(self, obj):
+        return obj.user.full_name or obj.user.phone_number
+
+
+class AdminTicketDetailSerializer(AdminTicketListSerializer):
+    messages = AdminTicketMessageSerializer(
+        many=True,
+        read_only=True,
+    )
+
+    class Meta(AdminTicketListSerializer.Meta):
+        fields = AdminTicketListSerializer.Meta.fields + [
+            "messages",
+        ]
+        read_only_fields = fields
+
+
+class AdminTicketReplySerializer(serializers.Serializer):
+    body = serializers.CharField(
+        min_length=2,
+        max_length=10000,
+        trim_whitespace=True,
+    )
+
+    def validate_body(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "متن پاسخ را وارد کنید."
+            )
+
+        return value
+
+
+class AdminTicketStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=Ticket.STATUS_CHOICES,
+    )

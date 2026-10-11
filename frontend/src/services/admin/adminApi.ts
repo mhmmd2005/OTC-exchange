@@ -1,9 +1,12 @@
-import {ApiError, type ApiErrorCode, type ApiErrorDetails,} from '@/services/api'
+import {
+    ApiError,
+    type ApiErrorCode,
+    type ApiErrorDetails,
+} from '@/services/api'
 
-const configuredBaseUrl =
-    String(
-        import.meta.env.VITE_API_BASE_URL ?? '',
-    ).replace(/\/$/, '')
+const configuredBaseUrl = String(
+    import.meta.env.VITE_API_BASE_URL ?? '',
+).replace(/\/$/, '')
 
 const ADMIN_ACCESS_TOKEN_KEY =
     'rosha_admin_access_token'
@@ -48,20 +51,17 @@ export function resolveAdminMediaUrl(
     }
 
     try {
-        const origin =
-            new URL(baseUrl).origin
+        const origin = new URL(baseUrl).origin
 
-        const normalizedPath =
-            value.startsWith('/')
-                ? value
-                : `/${value}`
+        const normalizedPath = value.startsWith('/')
+            ? value
+            : `/${value}`
 
         return `${origin}${normalizedPath}`
     } catch {
         return value
     }
 }
-
 
 function getAdminAccessToken(): string | null {
     if (
@@ -93,7 +93,9 @@ function setAdminTokens(
     accessToken: string,
     refreshToken: string,
 ): void {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {
+        return
+    }
 
     window.sessionStorage.setItem(
         ADMIN_ACCESS_TOKEN_KEY,
@@ -109,7 +111,9 @@ function setAdminTokens(
 function setAdminAccessToken(
     accessToken: string,
 ): void {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {
+        return
+    }
 
     window.sessionStorage.setItem(
         ADMIN_ACCESS_TOKEN_KEY,
@@ -118,7 +122,9 @@ function setAdminAccessToken(
 }
 
 function clearAdminTokens(): void {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {
+        return
+    }
 
     window.sessionStorage.removeItem(
         ADMIN_ACCESS_TOKEN_KEY,
@@ -199,10 +205,7 @@ function extractErrorMessage(
         return data.detail
     }
 
-    for (
-        const [key, value]
-        of Object.entries(data)
-        ) {
+    for (const [key, value] of Object.entries(data)) {
         if (
             key === 'code'
             || key === 'details'
@@ -258,14 +261,10 @@ async function parseResponse<T>(
     response: Response,
 ): Promise<T> {
     const contentType =
-        response.headers.get(
-            'content-type',
-        ) ?? ''
+        response.headers.get('content-type') ?? ''
 
     const isJson =
-        contentType.includes(
-            'application/json',
-        )
+        contentType.includes('application/json')
 
     const payload: unknown = isJson
         ? await response.json()
@@ -277,26 +276,17 @@ async function parseResponse<T>(
             && typeof payload === 'object'
             && !Array.isArray(payload)
                 ? (
-                    payload as Record<
-                        string,
-                        unknown
-                    >
+                    payload as Record<string, unknown>
                 ).code
                 : undefined
 
         throw new ApiError(
-            extractErrorMessage(
-                payload,
-            ),
+            extractErrorMessage(payload),
             typeof backendCode === 'string'
                 ? backendCode as ApiErrorCode
-                : errorCodeFromStatus(
-                    response.status,
-                ),
+                : errorCodeFromStatus(response.status),
             response.status,
-            extractErrorDetails(
-                payload,
-            ),
+            extractErrorDetails(payload),
         )
     }
 
@@ -318,10 +308,31 @@ async function parseResponse<T>(
     return payload as T
 }
 
-async function refreshAdminAccessToken():
+/*
+ * Refresh requests must be shared.
+ *
+ * The backend generates a new refresh token and updates
+ * the session's refresh_jti every time a refresh succeeds.
+ * Without a shared promise, simultaneous 401 responses
+ * may attempt to refresh with the same old token.
+ */
+let adminRefreshPromise: Promise<boolean> | null = null
+
+function refreshAdminAccessToken(): Promise<boolean> {
+    if (!adminRefreshPromise) {
+        adminRefreshPromise =
+            performAdminAccessTokenRefresh()
+                .finally(() => {
+                    adminRefreshPromise = null
+                })
+    }
+
+    return adminRefreshPromise
+}
+
+async function performAdminAccessTokenRefresh():
     Promise<boolean> {
-    const refreshToken =
-        getAdminRefreshToken()
+    const refreshToken = getAdminRefreshToken()
 
     if (!refreshToken) {
         return false
@@ -329,32 +340,24 @@ async function refreshAdminAccessToken():
 
     try {
         const response = await fetch(
-            buildUrl(
-                '/admin/auth/refresh/',
-            ),
+            buildUrl('/admin/auth/refresh/'),
             {
                 method: 'POST',
-
                 headers: {
-                    Accept:
-                        'application/json',
-                    'Content-Type':
-                        'application/json',
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
                 },
-
                 credentials: 'include',
-
                 body: JSON.stringify({
                     refresh: refreshToken,
                 }),
             },
         )
 
-        const result =
-            await parseResponse<{
-                access: string
-                refresh?: string
-            }>(response)
+        const result = await parseResponse<{
+            access: string
+            refresh?: string
+        }>(response)
 
         if (!result.access) {
             throw new ApiError(
@@ -364,19 +367,17 @@ async function refreshAdminAccessToken():
             )
         }
 
-        setAdminAccessToken(
-            result.access,
-        )
-
+        /*
+         * Save the tokens returned by the same refresh
+         * response. The backend rotates the refresh token.
+         */
         if (result.refresh) {
-            if (
-                typeof window !== 'undefined'
-            ) {
-                window.sessionStorage.setItem(
-                    ADMIN_REFRESH_TOKEN_KEY,
-                    result.refresh,
-                )
-            }
+            setAdminTokens(
+                result.access,
+                result.refresh,
+            )
+        } else {
+            setAdminAccessToken(result.access)
         }
 
         return true
@@ -391,8 +392,7 @@ export async function adminRequest<T>(
     options: AdminRequestOptions = {},
     allowRefresh = true,
 ): Promise<T> {
-    const headers =
-        new Headers(options.headers)
+    const headers = new Headers(options.headers)
 
     headers.set(
         'Accept',
@@ -409,8 +409,7 @@ export async function adminRequest<T>(
         )
     }
 
-    const accessToken =
-        getAdminAccessToken()
+    const accessToken = getAdminAccessToken()
 
     if (accessToken) {
         headers.set(
@@ -424,9 +423,7 @@ export async function adminRequest<T>(
             ? options.body
             : options.body === undefined
                 ? undefined
-                : JSON.stringify(
-                    options.body,
-                )
+                : JSON.stringify(options.body)
 
     const {
         body: _body,
@@ -437,11 +434,8 @@ export async function adminRequest<T>(
         buildUrl(path),
         {
             ...requestOptions,
-
             credentials: 'include',
-
             headers,
-
             body: requestBody,
         },
     )
@@ -449,18 +443,17 @@ export async function adminRequest<T>(
     if (
         response.status === 401
         && allowRefresh
-        && !path.includes(
-            '/admin/auth/login/',
-        )
-        && !path.includes(
-            '/admin/auth/refresh/',
-        )
+        && !path.includes('/admin/auth/login/')
+        && !path.includes('/admin/auth/refresh/')
         && getAdminRefreshToken()
     ) {
-        const refreshed =
-            await refreshAdminAccessToken()
+        const refreshed = await refreshAdminAccessToken()
 
         if (refreshed) {
+            /*
+             * Retry the failed request exactly once
+             * with the newly saved access token.
+             */
             return adminRequest<T>(
                 path,
                 options,
@@ -469,9 +462,7 @@ export async function adminRequest<T>(
         }
     }
 
-    return parseResponse<T>(
-        response,
-    )
+    return parseResponse<T>(response)
 }
 
 export const adminApi = Object.freeze({

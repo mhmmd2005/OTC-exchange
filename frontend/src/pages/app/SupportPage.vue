@@ -33,7 +33,7 @@ const ticketsLoading = ref(true)
 const ticketsError = ref('')
 const ticketSearch = ref('')
 const ticketStatus = ref<TicketStatus | ''>('')
-
+const ticketCategory = ref<SupportCategory | ''>('')
 const createOpen = ref(route.query.new === '1')
 const creating = ref(false)
 const createError = ref('')
@@ -56,7 +56,16 @@ const ticketStatuses: Array<{ value: TicketStatus | ''; label: string }> = [
   {value: 'answered', label: 'پاسخ داده شده'},
   {value: 'closed', label: 'بسته شده'},
 ]
-const ticketCategoryOptions = SUPPORT_CATEGORIES.map(({value, label}) => ({value, label}))
+const ticketCategoryOptions: Array<{
+  value: SupportCategory | ''
+  label: string
+}> = [
+  {value: '', label: 'همه دسته‌بندی‌ها'},
+  ...SUPPORT_CATEGORIES.map(({value, label}) => ({
+    value,
+    label,
+  })),
+]
 
 const faqCountLabel = computed(() => faqsLoading.value ? 'در حال جست‌وجو…' : `${toPersianDigits(faqs.value.length)} پاسخ`)
 
@@ -85,6 +94,7 @@ async function loadTickets(): Promise<void> {
       pageSize: 30,
       search: ticketSearch.value,
       status: ticketStatus.value || undefined,
+      category: ticketCategory.value || undefined,
     })
     tickets.value = result.items
     ticketsTotal.value = result.total
@@ -167,7 +177,7 @@ watch([faqSearch, faqCategory], () => {
 })
 
 let ticketTimer: ReturnType<typeof setTimeout> | undefined
-watch([ticketSearch, ticketStatus], () => {
+watch([ticketSearch, ticketStatus, ticketCategory], () => {
   if (ticketTimer) clearTimeout(ticketTimer)
   ticketTimer = setTimeout(loadTickets, 220)
 })
@@ -313,6 +323,11 @@ onMounted(() => {
         <div>
           <AppInput v-model="ticketSearch" icon="search" inputmode="search" placeholder="موضوع یا شماره درخواست"/>
           <AppSelect v-model="ticketStatus" :options="ticketStatuses" aria-label="فیلتر درخواست‌ها بر اساس وضعیت"/>
+          <AppSelect
+              v-model="ticketCategory"
+              :options="ticketCategoryOptions"
+              aria-label="فیلتر درخواست‌ها بر اساس دسته‌بندی"
+          />
         </div>
       </div>
 
@@ -710,9 +725,9 @@ onMounted(() => {
 
 .tickets-toolbar > div:last-child {
   display: grid;
-  grid-template-columns: minmax(14rem, 1fr) 12rem;
+  grid-template-columns: minmax(12rem, 1fr) 12rem 12rem;
   gap: var(--space-3);
-  min-width: min(100%, 31rem);
+  min-width: min(100%, 40rem);
 }
 
 .ticket-skeletons {
@@ -967,6 +982,18 @@ onMounted(() => {
 
   .message-count {
     display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .tickets-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tickets-toolbar > div:last-child {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
   }
 }
 
