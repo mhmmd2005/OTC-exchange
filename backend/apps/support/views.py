@@ -1,9 +1,9 @@
-from django.db import models
+from django.db import models, transaction
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from .realtime import broadcast_ticket_message
 from .models import FAQ
 from .models import Ticket, TicketMessage
 from .serializers import (
@@ -165,6 +165,7 @@ class TicketListCreateAPIView(APIView):
 class TicketMessageCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, pk):
         serializer = CreateTicketMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -194,6 +195,13 @@ class TicketMessageCreateAPIView(APIView):
 
         ticket.status = "open"
         ticket.save(update_fields=["status", "updated_at"])
+
+        transaction.on_commit(
+            lambda message_id=message.pk: broadcast_ticket_message(
+                message_id
+            ),
+            robust=True,
+        )
 
         response_serializer = TicketMessageSerializer(
             message,

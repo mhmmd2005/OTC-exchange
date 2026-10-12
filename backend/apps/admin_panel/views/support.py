@@ -2,13 +2,13 @@ import re
 
 from django.db import transaction
 from django.db.models import Count, Q
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.support.models import Ticket, TicketMessage
-
+from apps.support.realtime import broadcast_ticket_message
 from ..authentication import AdminJWTAuthentication
 from ..permissions import IsAdminAuthenticated
 from ..serializers import (
@@ -92,10 +92,10 @@ class AdminTicketListAPIView(APIView):
 
         if search:
             condition = (
-                Q(subject__icontains=search)
-                | Q(user__phone_number__icontains=search)
-                | Q(user__full_name__icontains=search)
-                | Q(user__email__icontains=search)
+                    Q(subject__icontains=search)
+                    | Q(user__phone_number__icontains=search)
+                    | Q(user__full_name__icontains=search)
+                    | Q(user__email__icontains=search)
             )
 
             ticket_number = re.fullmatch(
@@ -119,8 +119,8 @@ class AdminTicketListAPIView(APIView):
         )
 
         page_size = (
-            paginator.get_page_size(request)
-            or paginator.page_size
+                paginator.get_page_size(request)
+                or paginator.page_size
         )
 
         return Response(
@@ -199,7 +199,7 @@ class AdminTicketReplyAPIView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        TicketMessage.objects.create(
+        message = TicketMessage.objects.create(
             ticket=ticket,
             admin_sender=request.user,
             message=serializer.validated_data["body"],
@@ -210,7 +210,12 @@ class AdminTicketReplyAPIView(APIView):
         ticket.save(
             update_fields=["status", "updated_at"],
         )
-
+        transaction.on_commit(
+            lambda message_id=message.pk: broadcast_ticket_message(
+                message_id
+            ),
+            robust=True,
+        )
         ticket = (
             Ticket.objects
             .select_related("user")

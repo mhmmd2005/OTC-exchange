@@ -1,7 +1,8 @@
 import os
 from datetime import timedelta
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
+
 import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +44,7 @@ ALLOWED_HOSTS = env.list(
 )
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -69,6 +71,7 @@ INSTALLED_APPS = [
     "apps.admin_panel",
     "apps.withdrawals",
     "apps.payments",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -81,7 +84,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-
+ASGI_APPLICATION = "config.asgi.application"
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
@@ -258,6 +261,26 @@ REDIS_CACHE_URL = env(
     default="redis://127.0.0.1:6379/1",
 )
 
+# WebSocket channel layer
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
+
+# Origins permitted to open WebSocket connections.
+# In production, configure WS_ALLOWED_ORIGINS in the environment.
+WS_ALLOWED_ORIGINS = env.list(
+    "WS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
+
 CELERY_BROKER_URL = env(
     "CELERY_BROKER_URL",
     default=REDIS_URL,
@@ -298,18 +321,18 @@ SPECTACULAR_SETTINGS = {
 }
 
 BANK_REGISTRY_SOURCE_URL = env(
-   "BANK_REGISTRY_SOURCE_URL",
-   default="",
+    "BANK_REGISTRY_SOURCE_URL",
+    default="",
 )
 
 EHRAZ_API_BASE_URL = os.getenv(
-   "EHRAZ_API_BASE_URL",
-   "https://ehraz.io/api/v1",
+    "EHRAZ_API_BASE_URL",
+    "https://ehraz.io/api/v1",
 )
 
 EHRAZ_API_TOKEN = os.getenv(
-   "EHRAZ_API_TOKEN",
-   "",
+    "EHRAZ_API_TOKEN",
+    "",
 )
 EHRAZ_IDENTITY_SIMILARITY_THRESHOLD = int(
     os.getenv(
@@ -334,7 +357,6 @@ TEST_NEXPAL_PAYMENT_URL_BASE = os.environ.get(
     "TEST_NEXPAL_PAYMENT_URL_BASE",
     "http://127.0.0.1:5173/payment-test",
 ).strip().rstrip("/")
-
 
 PAYOUT_GATEWAY = os.environ.get(
     "PAYOUT_GATEWAY",

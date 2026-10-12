@@ -14,3 +14,7 @@ cryptography
 pycryptodome
 jdatetime==6.1.0
 persiantools==6.2.0
+# Django Channels and WebSocket support
+channels==4.3.2
+channels-redis==4.3.0
+daphne==4.2.3

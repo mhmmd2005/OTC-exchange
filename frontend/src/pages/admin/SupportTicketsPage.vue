@@ -1,15 +1,28 @@
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted, ref, watch,} from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 
 import AppButton from '@/components/ui/AppButton.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 import {adminApi} from '@/services/admin/adminApi'
+import {
+  connectAdminSupportTicketRealtime,
+  type SupportRealtimeEvent,
+  type SupportRealtimeState,
+} from '@/services/supportWebSocket.service'
 
 import type {
   AdminTicket,
   AdminTicketCategory,
   AdminTicketListResponse,
+  AdminTicketMessage,
   AdminTicketPriority,
   AdminTicketStatus,
 } from '@/services/admin/supportAdmin.service'
@@ -108,6 +121,24 @@ const feedback = ref('')
 
 const replyBody = ref('')
 const statusDraft = ref<AdminTicketStatus>('open')
+
+const realtimeState = ref<SupportRealtimeState>('disconnected')
+const adminThreadRef = ref<HTMLElement | null>(null)
+
+let stopRealtimeSocket: (() => void) | null = null
+let realtimeTicketId: number | null = null
+
+const realtimeStatusText = computed(() => {
+  if (realtimeState.value === 'connected') {
+    return 'اتصال زنده برقرار است'
+  }
+
+  if (realtimeState.value === 'connecting') {
+    return 'در حال اتصال...'
+  }
+
+  return 'در انتظار اتصال مجدد'
+})
 
 let listRequestId = 0
 let detailRequestId = 0
@@ -220,6 +251,7 @@ function buildListQuery(): string {
 }
 
 function clearSelection(): void {
+  stopRealtimeConnection()
   selectedId.value = null
   selectedTicket.value = null
 
@@ -231,6 +263,129 @@ function clearSelection(): void {
 
   detailRequestId += 1
   detailLoading.value = false
+}
+
+function stopRealtimeConnection(): void {
+  const stop = stopRealtimeSocket
+  stopRealtimeSocket = null
+  realtimeTicketId = null
+  realtimeState.value = 'disconnected'
+  stop?.()
+}
+
+function startRealtimeConnection(ticketId: number): void {
+  if (
+    realtimeTicketId === ticketId
+    && stopRealtimeSocket
+  ) {
+    return
+  }
+
+  stopRealtimeConnection()
+  realtimeTicketId = ticketId
+
+  stopRealtimeSocket = connectAdminSupportTicketRealtime(
+    ticketId,
+    {
+      onState(state: SupportRealtimeState) {
+        if (realtimeTicketId === ticketId) {
+          realtimeState.value = state
+        }
+      },
+      onMessage: handleAdminRealtimeMessage,
+    },
+  )
+}
+
+function scrollAdminThreadToLatest(
+  behavior: ScrollBehavior = 'auto',
+): void {
+  void nextTick().then(() => {
+    const thread = adminThreadRef.value
+    if (!thread) return
+
+    // Scroll only inside the conversation pane, not the full admin page.
+    thread.scrollTo({
+      top: thread.scrollHeight,
+      behavior,
+    })
+  })
+}
+
+function handleAdminRealtimeMessage(
+  event: SupportRealtimeEvent,
+): void {
+  const currentTicket = selectedTicket.value
+
+  if (
+    !currentTicket
+    || selectedId.value !== event.ticketId
+    || currentTicket.id !== event.ticketId
+  ) {
+    return
+  }
+
+  const messageId = Number(event.message.id)
+  if (!Number.isFinite(messageId)) return
+
+  if (!currentTicket.messages) {
+    currentTicket.messages = []
+  }
+
+  const alreadyExists = currentTicket.messages.some(
+    (message) => String(message.id) === String(messageId),
+  )
+
+  if (!alreadyExists) {
+    const incomingMessage: AdminTicketMessage = {
+      id: messageId,
+      sender: event.message.sender,
+      senderName: event.message.senderName,
+      body: event.message.body,
+      createdAt: event.message.createdAt,
+    }
+
+    currentTicket.messages.push(incomingMessage)
+  }
+
+  const draftWasUnmodified =
+    statusDraft.value === currentTicket.status
+
+  const validStatuses: AdminTicketStatus[] = [
+    'open',
+    'pending',
+    'resolved',
+    'closed',
+  ]
+
+  if (validStatuses.includes(event.ticket.adminStatus as AdminTicketStatus)) {
+    currentTicket.status = event.ticket.adminStatus as AdminTicketStatus
+  }
+
+  if (draftWasUnmodified) {
+    statusDraft.value = currentTicket.status
+  }
+
+  currentTicket.updatedAt = event.ticket.updatedAt
+  currentTicket.messageCount = event.ticket.messageCount
+
+  const listedTicket = tickets.value.find(
+    (item) => item.id === event.ticketId,
+  )
+
+  if (listedTicket) {
+    listedTicket.status = currentTicket.status
+    listedTicket.updatedAt = currentTicket.updatedAt
+    listedTicket.messageCount = currentTicket.messageCount
+  }
+
+  if (!alreadyExists) {
+    scrollAdminThreadToLatest('smooth')
+  }
+
+  if (statusFilter.value) {
+    void loadTickets()
+  }
 }
 
 async function loadTickets(
@@ -307,6 +462,10 @@ async function loadTicketDetails(
 ): Promise<void> {
   const requestId = ++detailRequestId
 
+  if (realtimeTicketId !== id) {
+    stopRealtimeConnection()
+  }
+
   selectedId.value = id
 
   detailError.value = ''
@@ -336,6 +495,8 @@ async function loadTicketDetails(
 
     selectedTicket.value = ticket
     statusDraft.value = ticket.status
+    startRealtimeConnection(id)
+    scrollAdminThreadToLatest('auto')
   } catch (error) {
     if (
         requestId !== detailRequestId
@@ -421,6 +582,7 @@ async function sendReply(): Promise<void> {
     statusDraft.value = updatedTicket.status
     replyBody.value = ''
     feedback.value = 'پاسخ با موفقیت ارسال شد.'
+    scrollAdminThreadToLatest('auto')
 
     // فهرست را تازه کن، اما جزئیات انتخاب‌شده را به‌اجبار نبند.
     await loadTickets()
@@ -529,6 +691,7 @@ onBeforeUnmount(() => {
   }
 
   // پاسخ درخواست‌های در حال اجرا پس از خروج از صفحه نادیده گرفته می‌شوند.
+  stopRealtimeConnection()
   listRequestId += 1
   detailRequestId += 1
 })
@@ -1127,7 +1290,9 @@ onBeforeUnmount(() => {
           <div class="conversation-heading">
             <div>
               <h3>گفت‌وگو</h3>
-              <p>پیام‌های ثبت‌شده برای این درخواست</p>
+              <p>
+                پیام‌های ثبت‌شده برای این درخواست · {{ realtimeStatusText }}
+              </p>
             </div>
 
             <span class="message-count">
@@ -1157,6 +1322,7 @@ onBeforeUnmount(() => {
 
           <div
               v-else
+              ref="adminThreadRef"
               class="message-thread"
               aria-live="polite"
           >
@@ -2151,11 +2317,16 @@ onBeforeUnmount(() => {
 
 .message-thread {
   display: grid;
+  align-content: start;
   gap: 1rem;
+  height: clamp(16rem, 45vh, 30rem);
   max-height: 32rem;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 1.25rem;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .message-item {

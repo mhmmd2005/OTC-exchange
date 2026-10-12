@@ -7,6 +7,7 @@ from .views import (
     TicketListCreateAPIView,
     TicketMessageCreateAPIView,
 )
+from .websocket_views import UserSupportWebSocketTicketAPIView
 
 urlpatterns = [
     path(
@@ -33,5 +34,10 @@ urlpatterns = [
         "tickets/<int:pk>/close",
         TicketCloseAPIView.as_view(),
         name="ticket-close",
+    ),
+    path(
+        "tickets/<int:pk>/ws-ticket",
+        UserSupportWebSocketTicketAPIView.as_view(),
+        name="support-ticket-ws-ticket",
     ),
 ]

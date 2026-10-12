@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.support.websocket_views import AdminSupportWebSocketTicketAPIView
 from .views.auth import (
     AdminLoginAPIView,
     AdminLogoutAPIView,
@@ -92,5 +93,10 @@ urlpatterns = [
         "support/tickets/<int:pk>/status/",
         AdminTicketStatusAPIView.as_view(),
         name="admin-ticket-status",
+    ),
+    path(
+        "support/tickets/<int:pk>/ws-ticket/",
+        AdminSupportWebSocketTicketAPIView.as_view(),
+        name="admin-support-ticket-ws-ticket",
     ),
 ]
