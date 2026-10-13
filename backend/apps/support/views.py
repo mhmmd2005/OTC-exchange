@@ -21,37 +21,36 @@ class FAQListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = FAQ.objects.filter(
-            is_active=True,
-        )
+        queryset = FAQ.objects.filter(is_active=True)
 
-        category = request.query_params.get(
-            "category",
-        )
-        search = (
-                request.query_params.get("search") or ""
-        ).strip()
+        category = (request.query_params.get("category") or "").strip()
+        search = (request.query_params.get("search") or "").strip()
 
         if category:
-            queryset = queryset.filter(
-                category=category,
-            )
+            queryset = queryset.filter(category=category)
+
+        # FAQ data is typically small; checking tags in Python makes tag search
+        # work consistently across SQLite and PostgreSQL JSONField backends.
+        items = list(queryset.order_by("sort_order", "id"))
 
         if search:
-            queryset = queryset.filter(
-                models.Q(question__icontains=search)
-                | models.Q(answer__icontains=search)
-            )
+            needle = search.casefold()
 
-        serializer = FAQSerializer(
-            queryset,
-            many=True,
-        )
+            def matches(faq):
+                text_matches = (
+                    needle in (faq.question or "").casefold()
+                    or needle in (faq.answer or "").casefold()
+                )
+                tag_matches = any(
+                    needle in str(tag).casefold()
+                    for tag in (faq.tags or [])
+                )
+                return text_matches or tag_matches
 
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
-        )
+            items = [faq for faq in items if matches(faq)]
+
+        serializer = FAQSerializer(items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TicketDetailAPIView(APIView):

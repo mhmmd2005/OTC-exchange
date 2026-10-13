@@ -418,8 +418,6 @@ async function loadTickets(
         Math.ceil(result.total / PAGE_SIZE),
     )
 
-    // اگر حذف یا فیلترشدن داده‌ها صفحه فعلی را نامعتبر کرد،
-    // به آخرین صفحه معتبر برگرد.
     if (page.value > lastPage) {
       page.value = lastPage
 

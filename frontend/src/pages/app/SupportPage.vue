@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, reactive, ref, watch} from 'vue'
+import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {SUPPORT_CATEGORIES, supportCategoryMeta} from '@/components/support/supportMeta'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -24,8 +24,17 @@ const faqSearch = ref('')
 const faqCategory = ref<SupportCategory | ''>('')
 const faqs = ref<FaqItem[]>([])
 const faqsLoading = ref(true)
+const faqsHasLoaded = ref(false)
 const faqsError = ref('')
 const openFaqId = ref('')
+const faqPage = ref(1)
+const faqListRef = ref<HTMLElement | null>(null)
+const faqViewLoading = ref(false)
+const FAQ_PAGE_SIZE = 5
+const FAQ_PAGE_LOADING_MS = 480
+
+let faqRequestId = 0
+let faqPageLoadingTimer: ReturnType<typeof setTimeout> | undefined
 
 const tickets = ref<SupportTicket[]>([])
 const ticketsTotal = ref(0)
@@ -67,22 +76,219 @@ const ticketCategoryOptions: Array<{
   })),
 ]
 
-const faqCountLabel = computed(() => faqsLoading.value ? 'در حال جست‌وجو…' : `${toPersianDigits(faqs.value.length)} پاسخ`)
+const activeFaq = computed(() =>
+  faqs.value.find((faq) => faq.id === openFaqId.value) ?? null,
+)
+
+// The «همه» category is paginated in groups of five; specific categories remain unpaginated.
+const isAllFaqCategory = computed(() => !faqCategory.value)
+const faqTotalPages = computed(() =>
+  isAllFaqCategory.value
+    ? Math.max(1, Math.ceil(faqs.value.length / FAQ_PAGE_SIZE))
+    : 1,
+)
+const faqPages = computed(() =>
+  Array.from({length: faqTotalPages.value}, (_, index) => index + 1),
+)
+const visibleFaqs = computed(() => {
+  if (!isAllFaqCategory.value) return faqs.value
+
+  const start = (faqPage.value - 1) * FAQ_PAGE_SIZE
+  return faqs.value.slice(start, start + FAQ_PAGE_SIZE)
+})
+
+function showFaqPageLoading(): void {
+  if (faqPageLoadingTimer) clearTimeout(faqPageLoadingTimer)
+
+  faqViewLoading.value = true
+  faqPageLoadingTimer = setTimeout(() => {
+    faqViewLoading.value = false
+    faqPageLoadingTimer = undefined
+  }, FAQ_PAGE_LOADING_MS)
+}
+
+function clearFaqPageLoadingTimer(): void {
+  if (faqPageLoadingTimer) {
+    clearTimeout(faqPageLoadingTimer)
+    faqPageLoadingTimer = undefined
+  }
+}
+
+function goToFaqPage(page: number): void {
+  if (page < 1 || page > faqTotalPages.value || page === faqPage.value) return
+
+  clearFaqPageLoadingTimer()
+  showFaqPageLoading()
+  faqPage.value = page
+  openFaqId.value = ''
+  void nextTick(() => {
+    if (faqListRef.value) faqListRef.value.scrollTop = 0
+  })
+}
+
+function toggleFaq(faqId: string): void {
+  // Clicking the currently open question closes its answer without scrolling.
+  if (openFaqId.value === faqId) {
+    openFaqId.value = ''
+    return
+  }
+
+  openFaqId.value = faqId
+}
+
+let faqScrollAnimationFrame: number | null = null
+
+function findFaqScrollContainer(element: HTMLElement): HTMLElement | Window {
+  let parent = element.parentElement
+
+  while (parent && parent !== document.body && parent !== document.documentElement) {
+    const styles = window.getComputedStyle(parent)
+    const canScrollY = /(auto|scroll|overlay)/.test(styles.overflowY)
+      && parent.scrollHeight > parent.clientHeight + 1
+
+    if (canScrollY) return parent
+    parent = parent.parentElement
+  }
+
+  return window
+}
+
+function scrollToActiveAnswer(): void {
+  const faqId = activeFaq.value?.id
+  if (!faqId) return
+
+  // Wait for Vue's transition/layout to settle, then use a slower custom animation.
+  requestAnimationFrame(() => {
+    const answerElement = document.getElementById(`faq-answer-${faqId}`)
+    if (!answerElement || activeFaq.value?.id !== faqId) return
+
+    if (faqScrollAnimationFrame !== null) {
+      cancelAnimationFrame(faqScrollAnimationFrame)
+      faqScrollAnimationFrame = null
+    }
+
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const scrollContainer = findFaqScrollContainer(answerElement)
+    // Resolve the union once into a stable, explicitly typed element reference.
+    // This avoids TypeScript treating the container as Window | HTMLElement
+    // inside later callbacks and branches.
+    const elementScrollContainer: HTMLElement | null =
+      scrollContainer === window ? null : scrollContainer as HTMLElement
+    const answerRect = answerElement.getBoundingClientRect()
+    const scrollMarginTop = Number.parseFloat(window.getComputedStyle(answerElement).scrollMarginTop) || 0
+    let startTop: number
+    let targetTop: number
+
+    if (elementScrollContainer === null) {
+      startTop = window.scrollY
+      targetTop = Math.max(
+        0,
+        Math.min(
+          document.documentElement.scrollHeight - window.innerHeight,
+          startTop + answerRect.top - scrollMarginTop,
+        ),
+      )
+    } else {
+      startTop = elementScrollContainer.scrollTop
+      targetTop = Math.max(
+        0,
+        Math.min(
+          elementScrollContainer.scrollHeight - elementScrollContainer.clientHeight,
+          startTop + answerRect.top - elementScrollContainer.getBoundingClientRect().top - scrollMarginTop,
+        ),
+      )
+    }
+
+    const setScrollTop = (top: number): void => {
+      if (elementScrollContainer === null) window.scrollTo(0, top)
+      else elementScrollContainer.scrollTop = top
+    }
+
+    if (prefersReducedMotion || Math.abs(targetTop - startTop) < 2) {
+      setScrollTop(targetTop)
+      return
+    }
+
+    // 900ms with ease-in-out feels deliberate without making the interface sluggish.
+    const duration = 1500
+    let animationStart: number | null = null
+
+    const animateScroll = (timestamp: number) => {
+      if (animationStart === null) animationStart = timestamp
+      const progress = Math.min((timestamp - animationStart) / duration, 1)
+      const easedProgress = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2
+
+      setScrollTop(startTop + (targetTop - startTop) * easedProgress)
+
+      if (progress < 1) {
+        faqScrollAnimationFrame = requestAnimationFrame(animateScroll)
+      } else {
+        faqScrollAnimationFrame = null
+      }
+    }
+
+    faqScrollAnimationFrame = requestAnimationFrame(animateScroll)
+  })
+}
+
+const faqCountLabel = computed(() => {
+  if (faqsLoading.value && !faqsHasLoaded.value) {
+    return 'در حال بارگذاری…'
+  }
+
+  return `${toPersianDigits(faqs.value.length)} پاسخ`
+})
 
 function readableError(caught: unknown, fallback: string): string {
   return caught instanceof Error ? caught.message : fallback
 }
 
 async function loadFaqs(): Promise<void> {
+  const requestId = ++faqRequestId
+
+  clearFaqPageLoadingTimer()
   faqsLoading.value = true
+  if (faqsHasLoaded.value) faqViewLoading.value = true
   faqsError.value = ''
+
   try {
-    faqs.value = await supportService.listFaqs(faqSearch.value, faqCategory.value || undefined)
-    if (openFaqId.value && !faqs.value.some((faq) => faq.id === openFaqId.value)) openFaqId.value = ''
+    const result = await supportService.listFaqs(
+        faqSearch.value,
+        faqCategory.value || undefined,
+    )
+
+    if (requestId !== faqRequestId) {
+      return
+    }
+
+    faqs.value = result
+    faqsHasLoaded.value = true
+
+    if (
+        openFaqId.value
+        && !faqs.value.some(
+            (faq) => faq.id === openFaqId.value,
+        )
+    ) {
+      openFaqId.value = ''
+    }
   } catch (caught) {
-    faqsError.value = readableError(caught, 'پاسخ‌های راهنما بارگیری نشدند.')
+    if (requestId !== faqRequestId) {
+      return
+    }
+
+    faqsError.value = readableError(
+        caught,
+        'پاسخ‌های راهنما بارگیری نشدند.',
+    )
   } finally {
-    faqsLoading.value = false
+    if (requestId === faqRequestId) {
+      faqsLoading.value = false
+      faqViewLoading.value = false
+      clearFaqPageLoadingTimer()
+    }
   }
 }
 
@@ -171,9 +377,25 @@ async function createTicket(): Promise<void> {
 }
 
 let faqTimer: ReturnType<typeof setTimeout> | undefined
+
 watch([faqSearch, faqCategory], () => {
-  if (faqTimer) clearTimeout(faqTimer)
-  faqTimer = setTimeout(loadFaqs, 220)
+  faqRequestId += 1
+  clearFaqPageLoadingTimer()
+  faqViewLoading.value = faqsHasLoaded.value
+  faqPage.value = 1
+  openFaqId.value = ''
+  void nextTick(() => {
+    if (faqListRef.value) faqListRef.value.scrollTop = 0
+  })
+
+  if (faqTimer) {
+    clearTimeout(faqTimer)
+  }
+
+  faqTimer = setTimeout(() => {
+    faqTimer = undefined
+    void loadFaqs()
+  }, 220)
 })
 
 let ticketTimer: ReturnType<typeof setTimeout> | undefined
@@ -208,6 +430,16 @@ watch(
     },
     {immediate: true},
 )
+
+onBeforeUnmount(() => {
+  if (faqTimer) clearTimeout(faqTimer)
+  if (ticketTimer) clearTimeout(ticketTimer)
+  clearFaqPageLoadingTimer()
+  if (faqScrollAnimationFrame !== null) {
+    cancelAnimationFrame(faqScrollAnimationFrame)
+    faqScrollAnimationFrame = null
+  }
+})
 
 onMounted(() => {
   void Promise.all([loadFaqs(), loadTickets()])
@@ -275,38 +507,158 @@ onMounted(() => {
       </div>
 
       <AppCard padding="none" class="faq-list-card">
-        <div v-if="faqsLoading" class="faq-skeletons">
-          <div v-for="i in 4" :key="i">
-            <AppSkeleton width="60%" height="1.1rem"/>
-            <AppSkeleton width="1.5rem" height="1.5rem" radius="50%"/>
+        <div
+            v-if="faqsLoading && !faqsHasLoaded"
+            class="faq-skeletons faq-skeletons--initial"
+            role="status"
+            aria-live="polite"
+            aria-label="در حال بارگذاری سؤالات"
+        >
+          <div v-for="i in 5" :key="i" class="faq-skeleton-row">
+            <AppSkeleton width="2.4rem" height="2.4rem" radius=".8rem"/>
+            <div class="faq-skeleton-copy">
+              <AppSkeleton :width="i % 2 === 0 ? '56%' : '70%'" height="1rem"/>
+              <AppSkeleton width="4.2rem" height=".7rem" radius="999px"/>
+            </div>
+            <AppSkeleton width="2.4rem" height="2.4rem" radius=".8rem"/>
           </div>
+          <span class="faq-skeleton-label">در حال بارگذاری سؤالات…</span>
         </div>
-        <div v-else-if="faqsError" class="load-error">
+        <div v-else-if="faqsError && !faqsHasLoaded" class="load-error">
           <AppIcon name="warning" :size="26"/>
           <div><strong>راهنما در دسترس نیست</strong>
             <p>{{ faqsError }}</p></div>
           <AppButton variant="secondary" size="sm" icon="refresh" @click="loadFaqs">تلاش دوباره</AppButton>
         </div>
-        <EmptyState v-else-if="!faqs.length" icon="search" title="پاسخی پیدا نشد"
-                    description="عبارت کوتاه‌تری جست‌وجو کنید یا درخواست پشتیبانی بسازید.">
-          <AppButton @click="openCreate(faqCategory || 'other')">ثبت درخواست</AppButton>
+        <EmptyState
+            v-else-if="!faqs.length && !faqViewLoading"
+            icon="search"
+            title="پاسخی پیدا نشد"
+            description="عبارت کوتاه‌تری جست‌وجو کنید یا درخواست پشتیبانی بسازید."
+        >
+          <AppButton @click="openCreate(faqCategory || 'other')">
+            ثبت درخواست
+          </AppButton>
         </EmptyState>
-        <div v-else class="faq-list">
-          <article v-for="faq in faqs" :key="faq.id" :class="{ open: openFaqId === faq.id }">
-            <button type="button" :aria-expanded="openFaqId === faq.id" :aria-controls="`faq-answer-${faq.id}`"
-                    @click="openFaqId = openFaqId === faq.id ? '' : faq.id">
-              <span class="faq-icon"><AppIcon :name="supportCategoryMeta(faq.category).icon" :size="20"/></span>
-              <span><strong>{{ faq.question }}</strong><small>{{
-                  supportCategoryMeta(faq.category).label
-                }}</small></span>
-              <AppIcon :name="openFaqId === faq.id ? 'chevronUp' : 'chevronDown'" :size="19"/>
-            </button>
-            <div v-if="openFaqId === faq.id" :id="`faq-answer-${faq.id}`" class="faq-answer"><p>{{ faq.answer }}</p>
-              <div><span v-for="tag in faq.tags" :key="tag">{{ tag }}</span></div>
+        <template v-else>
+          <div ref="faqListRef" class="faq-list">
+            <div
+                v-if="faqViewLoading"
+                class="faq-skeletons faq-skeletons--in-list"
+                role="status"
+                aria-live="polite"
+                aria-label="در حال به‌روزرسانی سؤالات"
+            >
+              <div v-for="i in 5" :key="i" class="faq-skeleton-row">
+                <AppSkeleton width="2.4rem" height="2.4rem" radius=".8rem"/>
+                <div class="faq-skeleton-copy">
+                  <AppSkeleton :width="i % 2 === 0 ? '56%' : '70%'" height="1rem"/>
+                  <AppSkeleton width="4.2rem" height=".7rem" radius="999px"/>
+                </div>
+                <AppSkeleton width="2.4rem" height="2.4rem" radius=".8rem"/>
+              </div>
+              <span class="faq-skeleton-label">در حال به‌روزرسانی سؤالات…</span>
             </div>
-          </article>
-        </div>
+            <template v-else>
+            <article v-for="faq in visibleFaqs" :key="faq.id" :class="{ open: openFaqId === faq.id }">
+              <button
+                  :id="`faq-question-${faq.id}`"
+                  type="button"
+                  class="faq-question"
+                  :aria-expanded="openFaqId === faq.id"
+                  :aria-controls="openFaqId === faq.id ? `faq-answer-${faq.id}` : undefined"
+                  @click="toggleFaq(faq.id)"
+              >
+                <span class="faq-icon">
+                  <AppIcon :name="supportCategoryMeta(faq.category).icon" :size="20"/>
+                </span>
+
+                <span class="faq-question-copy">
+                  <strong class="faq-question-title">{{ faq.question }}</strong>
+                  <span class="faq-question-category">
+                    {{ supportCategoryMeta(faq.category).label }}
+                  </span>
+                </span>
+
+                <span class="faq-toggle-icon" aria-hidden="true">
+                  <AppIcon
+                      :name="openFaqId === faq.id ? 'chevronUp' : 'chevronDown'"
+                      :size="19"
+                  />
+                </span>
+              </button>
+            </article>
+            </template>
+          </div>
+
+          <nav
+              v-if="isAllFaqCategory && faqTotalPages > 1"
+              class="faq-pagination"
+              aria-label="صفحه‌بندی سؤالات"
+              dir="rtl"
+          >
+            <button type="button" :disabled="faqViewLoading || faqsLoading || faqPage <= 1" @click="goToFaqPage(faqPage - 1)">
+              قبلی
+            </button>
+            <button
+                v-for="page in faqPages"
+                :key="page"
+                type="button"
+                :class="{ active: faqPage === page }"
+                :disabled="faqViewLoading || faqsLoading"
+                :aria-current="faqPage === page ? 'page' : undefined"
+                :aria-label="`رفتن به صفحه ${toPersianDigits(page)}`"
+                @click="goToFaqPage(page)"
+            >
+              {{ toPersianDigits(page) }}
+            </button>
+            <span class="faq-pagination-status">
+              صفحه {{ toPersianDigits(faqPage) }} از {{ toPersianDigits(faqTotalPages) }}
+            </span>
+            <button type="button" :disabled="faqViewLoading || faqsLoading || faqPage >= faqTotalPages" @click="goToFaqPage(faqPage + 1)">
+              بعدی
+            </button>
+          </nav>
+        </template>
+
       </AppCard>
+
+      <Transition name="faq-panel" mode="out-in" @after-enter="scrollToActiveAnswer">
+        <section
+            v-if="activeFaq"
+            :key="activeFaq.id"
+            :id="`faq-answer-${activeFaq.id}`"
+            class="faq-selected-answer-card"
+            :aria-labelledby="`faq-question-${activeFaq.id}`"
+            aria-live="polite"
+        >
+          <div class="faq-selected-question">
+            <div class="faq-selected-question-label">
+              <span class="faq-selected-question-dot" aria-hidden="true"></span>
+              <span>سؤال انتخاب‌شده</span>
+            </div>
+            <h3>{{ activeFaq.question }}</h3>
+            <span class="faq-question-category">
+              {{ supportCategoryMeta(activeFaq.category).label }}
+            </span>
+          </div>
+
+          <div class="faq-answer">
+            <div class="faq-answer-heading">
+              <span class="faq-answer-heading-icon">
+                <AppIcon name="check" :size="16"/>
+              </span>
+              <strong>پاسخ</strong>
+            </div>
+
+            <p class="faq-answer-text">{{ activeFaq.answer }}</p>
+
+            <div v-if="activeFaq.tags?.length" class="faq-tags" aria-label="برچسب‌های مرتبط">
+              <span v-for="tag in activeFaq.tags" :key="tag">{{ tag }}</span>
+            </div>
+          </div>
+        </section>
+      </Transition>
 
       <AppCard class="still-need-help" padding="lg">
         <span><AppIcon name="mail" :size="25"/></span>
@@ -507,6 +859,11 @@ onMounted(() => {
   gap: var(--space-4);
 }
 
+/* Leave enough room after the final FAQ element for scrolling and mobile viewports. */
+.faq-section {
+  padding-block-end: max(var(--space-8), env(safe-area-inset-bottom, 0px));
+}
+
 .faq-search-wrap {
   position: relative;
   width: min(100%, 45rem);
@@ -564,18 +921,61 @@ onMounted(() => {
 
 .faq-skeletons {
   display: grid;
+  width: 100%;
 }
 
-.faq-skeletons > div {
+.faq-skeletons--initial {
+  min-height: 18rem;
+}
+
+.faq-skeleton-row {
   display: flex;
+  direction: rtl;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
+  min-height: 5.25rem;
   padding: var(--space-5);
+  box-sizing: border-box;
 }
 
-.faq-skeletons > div + div {
+.faq-skeleton-row + .faq-skeleton-row {
   border-top: 1px solid var(--color-border-soft);
+}
+
+.faq-skeleton-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .65rem;
+  min-width: 0;
+}
+
+.faq-skeleton-label {
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.faq-skeletons--in-list .faq-skeleton-label {
+  padding-top: var(--space-2);
+}
+
+@media (max-width: 767px) {
+  .faq-skeleton-row {
+    gap: var(--space-3);
+    min-height: 4.9rem;
+    padding: var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-skeletons :deep(*) {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 .load-error {
@@ -597,24 +997,135 @@ onMounted(() => {
   font-size: var(--font-size-sm);
 }
 
+.faq-list {
+  max-height: min(36rem, 65vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  /* Keep the last question away from the clipped edge of the rounded card. */
+  padding-block-end: var(--space-3);
+  scroll-padding-block: var(--space-3);
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .faq-list {
+    max-height: 60vh;
+  }
+}
+
+.faq-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .45rem;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-soft);
+  background: var(--color-surface-1);
+}
+
+.faq-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: .4rem .7rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: .7rem;
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.faq-pagination button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  color: var(--color-primary);
+}
+
+.faq-pagination button.active {
+  border-color: color-mix(in srgb, var(--color-primary) 38%, transparent);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.faq-pagination button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.faq-pagination-status {
+  padding-inline: .4rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.faq-pagination button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .faq-pagination {
+    gap: .35rem;
+    padding: var(--space-3);
+  }
+
+  .faq-pagination button {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: .35rem .55rem;
+  }
+
+  .faq-pagination-status {
+    flex-basis: 100%;
+    order: 3;
+    text-align: center;
+  }
+}
+
 .faq-list article + article {
   border-top: 1px solid var(--color-border-soft);
 }
 
-.faq-list article > button {
+.faq-list article {
+  min-width: 0;
+  background: var(--color-surface-1);
+  transition: background-color 220ms ease;
+}
+
+.faq-list article.open {
+  background: var(--color-surface-1);
+}
+
+.faq-list article > .faq-question {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  min-width: 0;
   padding: var(--space-5);
   border: 0;
   background: transparent;
+  color: var(--color-text-primary);
   text-align: start;
+  cursor: pointer;
+  transition: background-color 220ms ease;
 }
 
-.faq-list article > button:hover {
+.faq-list article > .faq-question:hover {
   background: var(--color-surface-2);
+}
+
+.faq-list article.open > .faq-question {
+  background: var(--color-primary-soft);
 }
 
 .faq-icon {
@@ -627,46 +1138,160 @@ onMounted(() => {
   place-items: center;
 }
 
-.faq-list article > button > span:nth-child(2) {
+.faq-question-copy {
   display: grid;
+  justify-items: start;
+  gap: .45rem;
+  min-width: 0;
 }
 
-.faq-list strong {
+.faq-question-title {
+  color: var(--color-text-primary);
   font-size: var(--font-size-md);
+  font-weight: 700;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
 }
 
-.faq-list small {
+.faq-question-category {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: .12rem .55rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+  line-height: 1.7;
 }
 
-.faq-list article > button > svg {
+.faq-toggle-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-soft);
+  border-radius: .7rem;
+  background: var(--color-surface-1);
   color: var(--color-text-muted);
+  place-items: center;
+  transition: transform 240ms ease, color 240ms ease, border-color 240ms ease;
+}
+
+.faq-list article.open .faq-toggle-icon {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  color: var(--color-primary);
+}
+
+/* The answer is a separate panel below the scrollable question list. */
+.faq-selected-answer-card {
+  /* Keep the complete answer away from both sticky headers and the viewport bottom. */
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 3rem;
+  min-width: 0;
+  margin-top: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg, 1rem);
+  background: var(--color-surface-1);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+}
+
+.faq-selected-question {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.faq-selected-question-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.faq-selected-question-dot {
+  width: .5rem;
+  height: .5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.faq-selected-question h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: 750;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
 }
 
 .faq-answer {
-  padding: 0 calc(var(--space-5) + 3.5rem) var(--space-5) var(--space-5);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-soft);
+  border-inline-start: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
 }
 
-.faq-answer p {
+.faq-answer-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-soft);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+}
+
+.faq-answer-heading-icon {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  border-radius: .5rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  place-items: center;
+}
+
+.faq-answer-text {
   margin: 0;
   color: var(--color-text-secondary);
-  line-height: 2;
+  font-size: var(--font-size-sm);
+  line-height: 2.15;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
-.faq-answer > div {
+.faq-tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border-soft);
 }
 
-.faq-answer > div span {
-  padding: .15rem .5rem;
+.faq-tags span {
+  padding: .2rem .6rem;
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-pill);
-  background: var(--color-surface-2);
+  background: var(--color-surface-1);
   color: var(--color-text-muted);
   font-size: .68rem;
+  line-height: 1.7;
 }
 
 .still-need-help {
@@ -943,9 +1568,7 @@ onMounted(() => {
   outline-offset: -2px;
 }
 
-.faq-list article.open {
-  background: linear-gradient(90deg, var(--color-primary-soft), transparent 76%);
-}
+
 
 .ticket-row {
   min-height: 5.5rem;
@@ -1013,10 +1636,6 @@ onMounted(() => {
 
   .section-tabs {
     width: 100%;
-  }
-
-  .faq-answer {
-    padding: 0 var(--space-4) var(--space-4);
   }
 
   .faq-list article > button {
@@ -1142,6 +1761,53 @@ onMounted(() => {
 
   .ticket-copy h3 {
     font-size: var(--font-size-sm);
+  }
+}
+
+/* Smoothly reveal the selected answer outside the question-list container. */
+.faq-panel-enter-active,
+.faq-panel-leave-active {
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.faq-panel-enter-from,
+.faq-panel-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (max-width: 767px) {
+  .faq-list article > .faq-question {
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .faq-selected-answer-card {
+    margin-top: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .faq-answer {
+    padding: var(--space-4);
+  }
+
+  .faq-selected-question h3 {
+    font-size: var(--font-size-sm);
+  }
+
+  .faq-question-title {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* Respect the user's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .faq-panel-enter-active,
+  .faq-panel-leave-active,
+  .faq-list article,
+  .faq-list article > .faq-question,
+  .faq-toggle-icon {
+    transition: none;
   }
 }
 </style>
