@@ -101,8 +101,23 @@ export const usePreferencesStore = defineStore('preferences', () => {
     loading.value = true
     error.value = null
     try {
-      const remote = await userService.getPreferences()
-      preferences.value = mergePreferences({ ...remote, ...loadStoredPreferences() })
+    const remoteResponse = await userService.getPreferences() as UserPreferences & { _isNew?: boolean }
+    const { _isNew: isNewPreferenceRecord, ...remote } = remoteResponse
+    const stored = loadStoredPreferences()
+
+    if (isNewPreferenceRecord && Object.keys(stored).length > 0) {
+      // One-time migration for preferences saved locally before server persistence existed.
+      const legacyPreferences = mergePreferences({ ...remote, ...stored })
+      try {
+        preferences.value = mergePreferences(await userService.updatePreferences(legacyPreferences))
+      } catch {
+        // Keep the user's existing browser preferences usable if this first sync fails.
+        preferences.value = legacyPreferences
+      }
+    } else {
+      // Once a server record exists, the account is authoritative over stale browser data.
+      preferences.value = mergePreferences(remote)
+    }
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : 'تنظیمات بارگیری نشد.'
       preferences.value = mergePreferences(loadStoredPreferences())

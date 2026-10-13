@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.db.models import Prefetch
-from apps.accounts.models import BankAccount, BankVerificationObservation, IranianBank
+from apps.accounts.models import BankAccount, BankVerificationObservation, IranianBank, UserPreferences
 from apps.accounts.serializers import (
     BankAccountSerializer,
     DashboardSummarySerializer,
@@ -508,31 +508,27 @@ class UserPreferencesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # Return default preferences for now
-        # In production, this would be stored in a UserPreferences model
-        serializer = UserPreferencesSerializer({
-            "language": "fa",
-            "theme": "system",
-            "notificationChannels": {
-                "email": True,
-                "sms": True,
-                "push": True
-            },
-            "priceAlerts": True,
-            "securityAlerts": True,
-            "marketingEmails": False
-        })
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        preferences, created = UserPreferences.objects.get_or_create(
+            user=request.user,
+        )
+        serializer = UserPreferencesSerializer(preferences)
+        # Lets the frontend migrate this browser's legacy local preferences once.
+        response_data = dict(serializer.data)
+        response_data["_isNew"] = created
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
+        preferences, _ = UserPreferences.objects.get_or_create(
+            user=request.user,
+        )
         serializer = UserPreferencesSerializer(
+            preferences,
             data=request.data,
-            partial=True
+            partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        # In production, save to UserPreferences model
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
-
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class DashboardSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]

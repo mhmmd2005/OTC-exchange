@@ -7,7 +7,7 @@ from rest_framework_simplejwt.serializers import (
     TokenRefreshSerializer,
 )
 
-from apps.accounts.models import BankAccount, IranianBank, User
+from apps.accounts.models import BankAccount, IranianBank, User, UserPreferences
 from apps.accounts.services.email import EmailVerificationService
 from apps.accounts.services.phone import normalize_phone_number
 from apps.accounts.services.session import (
@@ -231,17 +231,91 @@ class UserProfileSerializer(serializers.ModelSerializer):
         )
 
 
-class UserPreferencesSerializer(serializers.Serializer):
-    language = serializers.CharField(default="fa")
-    theme = serializers.CharField(default="system")
-    notificationChannels = serializers.DictField(
-        child=serializers.BooleanField(),
-        default={"email": True, "sms": True, "push": True}
-    )
-    priceAlerts = serializers.BooleanField(default=True)
-    securityAlerts = serializers.BooleanField(default=True)
-    marketingEmails = serializers.BooleanField(default=False)
+class NotificationChannelsSerializer(serializers.Serializer):
+    inApp = serializers.BooleanField(required=False)
+    sms = serializers.BooleanField(required=False)
+    email = serializers.BooleanField(required=False)
 
+
+class UserPreferencesSerializer(serializers.ModelSerializer):
+    theme = serializers.ChoiceField(
+        choices=UserPreferences.Theme.choices,
+        required=False,
+    )
+    hideBalances = serializers.BooleanField(
+        source="hide_balances",
+        required=False,
+    )
+    hideZeroBalances = serializers.BooleanField(
+        source="hide_zero_balances",
+        required=False,
+    )
+    usePersianDigits = serializers.BooleanField(
+        source="use_persian_digits",
+        required=False,
+    )
+    reduceMotion = serializers.BooleanField(
+        source="reduce_motion",
+        required=False,
+    )
+    favoriteAssets = serializers.ListField(
+        source="favorite_assets",
+        child=serializers.CharField(max_length=20, trim_whitespace=True),
+        required=False,
+        allow_empty=True,
+    )
+    notificationChannels = NotificationChannelsSerializer(
+        source="notification_channels",
+        required=False,
+    )
+
+    class Meta:
+        model = UserPreferences
+        fields = [
+            "theme",
+            "hideBalances",
+            "hideZeroBalances",
+            "usePersianDigits",
+            "reduceMotion",
+            "favoriteAssets",
+            "notificationChannels",
+        ]
+
+    def validate_favoriteAssets(self, value):
+        normalized = [item.strip().upper() for item in value if item.strip()]
+        # Preserve order while preventing duplicate asset symbols.
+        return list(dict.fromkeys(normalized))
+
+    def create(self, validated_data):
+        channels = validated_data.pop("notification_channels", None)
+        if channels is not None:
+            merged_channels = {
+                "inApp": True,
+                "sms": True,
+                "email": False,
+            }
+            merged_channels.update(channels)
+            validated_data["notification_channels"] = merged_channels
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        channels = validated_data.pop("notification_channels", None)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        if channels is not None:
+            merged_channels = {
+                "inApp": True,
+                "sms": True,
+                "email": False,
+            }
+            merged_channels.update(instance.notification_channels or {})
+            merged_channels.update(channels)
+            instance.notification_channels = merged_channels
+
+        instance.save()
+        return instance
 
 class DashboardSummarySerializer(serializers.Serializer):
     user = UserProfileSerializer(read_only=True)

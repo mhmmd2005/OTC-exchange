@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -596,3 +597,48 @@ class BankAccount(models.Model):
                 "preferred",
             ],
         )
+
+
+def default_user_notification_channels():
+    """Return a fresh default notification-channel mapping for each user."""
+    return {"inApp": True, "sms": True, "email": False}
+
+
+def default_user_favorite_assets():
+    """Return a fresh default favorite-assets list for each user."""
+    return ["USDT", "BTC"]
+
+
+class UserPreferences(models.Model):
+    class Theme(models.TextChoices):
+        DARK = "dark", "Dark"
+        LIGHT = "light", "Light"
+        SYSTEM = "system", "System"
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preferences",
+    )
+    theme = models.CharField(
+        max_length=10,
+        choices=Theme.choices,
+        default=Theme.DARK,
+    )
+    hide_balances = models.BooleanField(default=False)
+    hide_zero_balances = models.BooleanField(default=False)
+    use_persian_digits = models.BooleanField(default=True)
+    reduce_motion = models.BooleanField(default=False)
+    favorite_assets = models.JSONField(default=default_user_favorite_assets)
+    notification_channels = models.JSONField(
+        default=default_user_notification_channels,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "User preferences"
+        verbose_name_plural = "User preferences"
+
+    def __str__(self):
+        return f"Preferences for user {self.user_id}"

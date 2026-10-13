@@ -56,6 +56,10 @@ let portfolioHistoryRequestSequence = 0
 
 const isLoading = computed(() => marketStore.loading || walletStore.loading || auxiliaryLoading.value)
 const hidden = computed(() => preferencesStore.preferences.hideBalances)
+const hideZeroBalances = computed(() => preferencesStore.hideZeroBalances)
+const dashboardPreviewAssets = computed(() => (walletStore.summary?.assets ?? [])
+    .filter((asset) => !hideZeroBalances.value || compareDecimal(asset.total, '0') > 0)
+    .slice(0, 4))
 const walletUpdatedLabel = computed(() => walletStore.lastUpdated
     ? `آخرین به‌روزرسانی: ${formatRelativeTime(walletStore.lastUpdated)}`
     : undefined)
@@ -377,7 +381,7 @@ onMounted(() => {
             <AppIcon name="chevronLeft" :size="16"/>
           </RouterLink>
         </div>
-        <DashboardWalletPreview :assets="walletStore.summary.assets.slice(0, 4)" :hidden="hidden"/>
+        <DashboardWalletPreview :assets="dashboardPreviewAssets" :hidden="hidden"/>
       </AppCard>
 
       <AppCard class="dashboard-preview-card" padding="none">
