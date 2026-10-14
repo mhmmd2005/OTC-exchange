@@ -1,10 +1,19 @@
-from django.test import TestCase
+from datetime import timedelta
+from decimal import Decimal
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
+from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import KycApplication
+
 from apps.accounts.services.session import create_session
+from apps.assets.models import Asset
+from apps.orders.models import Order
+from apps.transactions.models import Transaction
+from .models import KycApplication
 
 User = get_user_model()
 
@@ -193,6 +202,77 @@ class KycApplicationAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         kyc.refresh_from_db()
         self.assertEqual(kyc.rejection_reason, "Original reason")
+
+    def test_verification_summary_daily_limits_use_real_usage(self):
+        asset = Asset.objects.create(symbol="USDT", name="Tether", decimals=6)
+        now = timezone.localtime()
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        buy_order = Order.objects.create(
+            user=self.user,
+            asset=asset,
+            side="buy",
+            status="completed",
+            final_toman_amount=Decimal("100000"),
+        )
+        Order.objects.filter(pk=buy_order.pk).update(created_at=day_start + timedelta(hours=1))
+
+        failed_buy_order = Order.objects.create(
+            user=self.user,
+            asset=asset,
+            side="buy",
+            status="failed",
+            final_toman_amount=Decimal("999999"),
+        )
+        Order.objects.filter(pk=failed_buy_order.pk).update(created_at=day_start + timedelta(hours=2))
+
+        sell_order = Order.objects.create(
+            user=self.user,
+            asset=asset,
+            side="sell",
+            status="completed",
+            final_toman_amount=Decimal("205000"),
+        )
+        Order.objects.filter(pk=sell_order.pk).update(created_at=day_start + timedelta(hours=3))
+
+        crypto_withdrawal = Transaction.objects.create(
+            user=self.user,
+            asset=asset,
+            transaction_type="crypto_withdrawal",
+            status="completed",
+            toman_amount=Decimal("75000"),
+        )
+        Transaction.objects.filter(pk=crypto_withdrawal.pk).update(created_at=day_start + timedelta(hours=4))
+
+        cancelled_crypto_withdrawal = Transaction.objects.create(
+            user=self.user,
+            asset=asset,
+            transaction_type="crypto_withdrawal",
+            status="cancelled",
+            toman_amount=Decimal("1234567"),
+        )
+        Transaction.objects.filter(pk=cancelled_crypto_withdrawal.pk).update(created_at=day_start + timedelta(hours=5))
+
+        response = self.client.get("/api/v1/verification")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        limits = response.data["limits"]
+        self.assertEqual(limits["usedBuy"], "100000")
+        self.assertEqual(limits["usedSell"], "205000")
+        self.assertEqual(limits["usedCryptoWithdrawalTomanEquivalent"], "75000")
+        self.assertEqual(limits["dailyBuy"], str(settings.DAILY_BUY_LIMIT))
+        self.assertEqual(limits["dailySell"], str(settings.DAILY_SELL_LIMIT))
+        self.assertEqual(limits["dailyCryptoWithdrawalTomanEquivalent"], str(settings.DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT))
+
+    def test_verification_summary_empty_history_returns_zeroes(self):
+        response = self.client.get("/api/v1/verification")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        limits = response.data["limits"]
+        self.assertEqual(limits["usedBuy"], "0")
+        self.assertEqual(limits["usedSell"], "0")
+        self.assertEqual(limits["usedCryptoWithdrawalTomanEquivalent"], "0")
+        self.assertEqual(limits["dailyBuy"], str(settings.DAILY_BUY_LIMIT))
+        self.assertEqual(limits["dailySell"], str(settings.DAILY_SELL_LIMIT))
+        self.assertEqual(limits["dailyCryptoWithdrawalTomanEquivalent"], str(settings.DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT))
 
 
 class AdminKycAPITests(TestCase):

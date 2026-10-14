@@ -1,14 +1,20 @@
 import jdatetime
+from decimal import Decimal, InvalidOperation
+
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from apps.payments.services import get_toman_deposit_limit_data
+
 from apps.accounts.models import BankAccount
+from apps.orders.models import Order
+from apps.payments.services import get_toman_deposit_limit_data
+from apps.transactions.models import Transaction
 from apps.withdrawals.services.toman_withdrawal_service import (
     get_toman_withdrawal_limit_data,
 )
@@ -343,12 +349,66 @@ class SubmitIdentityDocumentAPIView(APIView):
         )
 
 
+def _get_local_day_start():
+    now = timezone.localtime()
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _parse_decimal_limit(raw_value, *, setting_name, default_value):
+    value_source = default_value if raw_value is None else raw_value
+
+    try:
+        value = Decimal(str(value_source))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise RuntimeError(f"{setting_name} is invalid.") from exc
+
+    if value < 0:
+        raise RuntimeError(f"{setting_name} cannot be negative.")
+
+    return value
+
+
+def _sum_decimal_queryset(queryset, field_name='amount'):
+    total = queryset.aggregate(total=Sum(field_name))['total']
+    return total or Decimal('0')
+
+
 class VerificationSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     @staticmethod
     def map_status(value):
         return "verified" if value == "approved" else value
+
+    @staticmethod
+    def _get_order_daily_usage(user, side):
+        day_start = _get_local_day_start()
+        now = timezone.localtime()
+        return _sum_decimal_queryset(
+            Order.objects.filter(
+                user=user,
+                side=side,
+                status='completed',
+                created_at__gte=day_start,
+                created_at__lt=now,
+            ),
+            field_name='final_toman_amount',
+        )
+
+    @staticmethod
+    def _get_crypto_withdrawal_daily_usage(user):
+        day_start = _get_local_day_start()
+        now = timezone.localtime()
+        return _sum_decimal_queryset(
+            Transaction.objects.filter(
+                user=user,
+                transaction_type='crypto_withdrawal',
+                status__in={'completed', 'processing'},
+                created_at__gte=day_start,
+                created_at__lt=now,
+            ),
+            field_name='toman_amount',
+        )
 
     def get(self, request):
         user = request.user
@@ -603,6 +663,25 @@ class VerificationSummaryAPIView(APIView):
             user=user,
         )
 
+        buy_limit = _parse_decimal_limit(
+            getattr(settings, "DAILY_BUY_LIMIT", "500000000"),
+            setting_name="DAILY_BUY_LIMIT",
+            default_value=Decimal("500000000"),
+        )
+        sell_limit = _parse_decimal_limit(
+            getattr(settings, "DAILY_SELL_LIMIT", "500000000"),
+            setting_name="DAILY_SELL_LIMIT",
+            default_value=Decimal("500000000"),
+        )
+        crypto_withdrawal_limit = _parse_decimal_limit(
+            getattr(settings, "DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT", "300000000"),
+            setting_name="DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT",
+            default_value=Decimal("300000000"),
+        )
+        used_buy = self._get_order_daily_usage(user, "buy")
+        used_sell = self._get_order_daily_usage(user, "sell")
+        used_crypto_withdrawal = self._get_crypto_withdrawal_daily_usage(user)
+
         return Response({
             "status": verification_status,
             "currentLevel": current_level,
@@ -630,8 +709,8 @@ class VerificationSummaryAPIView(APIView):
             "limits": {
                 "accountLevel": current_level,
 
-                "dailyBuy": "0",
-                "dailySell": "0",
+                "dailyBuy": str(buy_limit),
+                "dailySell": str(sell_limit),
 
                 "dailyTomanDeposit": str(
                     toman_deposit_limits["daily"]
@@ -641,7 +720,9 @@ class VerificationSummaryAPIView(APIView):
                     toman_withdrawal_limits["daily"]
                 ),
 
-                "dailyCryptoWithdrawalTomanEquivalent": "0",
+                "dailyCryptoWithdrawalTomanEquivalent": str(
+                    crypto_withdrawal_limit
+                ),
 
                 "usedTomanDeposit": str(
                     toman_deposit_limits["used"]
@@ -651,9 +732,11 @@ class VerificationSummaryAPIView(APIView):
                     toman_withdrawal_limits["used"]
                 ),
 
-                "usedCryptoWithdrawalTomanEquivalent": "0",
+                "usedCryptoWithdrawalTomanEquivalent": str(
+                    used_crypto_withdrawal
+                ),
 
-                "usedBuy": "0",
-                "usedSell": "0",
+                "usedBuy": str(used_buy),
+                "usedSell": str(used_sell),
             },
         })

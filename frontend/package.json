@@ -12,6 +12,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
+    "@iran-utils/iranian-banks-vue-icons": "^1.0.4",
     "pinia": "3.0.1",
     "vue": "^3.5.42",
     "vue-router": "4.2.5"

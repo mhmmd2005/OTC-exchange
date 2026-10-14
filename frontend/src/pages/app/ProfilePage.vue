@@ -34,6 +34,17 @@ const levelLabel = computed(() => {
   return profile.value ? labels[profile.value.accountLevel] ?? profile.value.accountLevel : '—'
 })
 
+const securityLevelLabel = computed(() => {
+  const score = security.value?.score
+
+  if (score == null) return '—'
+  if (score >= 85) return 'سطح سه'
+  if (score >= 65) return 'سطح دو'
+  if (score >= 50) return 'سطح یک'
+
+  return 'سطح صفر'
+})
+
 const completionItems = computed(() => {
   if (!profile.value) return []
   return [
@@ -44,6 +55,7 @@ const completionItems = computed(() => {
     {label: 'ورود دومرحله‌ای', complete: Boolean(security.value?.twoFactorEnabled), icon: 'shield'},
   ]
 })
+
 
 const completionPercent = computed(() => {
   if (!completionItems.value.length) return 0
@@ -264,13 +276,13 @@ onMounted(load)
           </span>
 
           <div>
-            <small>سطح حساب</small>
-            <strong>{{ levelLabel }}</strong>
+            <small>سطح امنیت</small>
+            <strong>{{ securityLevelLabel }}</strong>
           </div>
 
           <RouterLink
-              to="/app/verification"
-              aria-label="مشاهده احراز هویت"
+              to="/app/security"
+              aria-label="مشاهده وضعیت امنیت"
           >
             <AppIcon
                 name="chevronLeft"
@@ -512,7 +524,7 @@ onMounted(load)
 
               <div>
                 <strong>احراز هویت</strong>
-                <small>{{ levelLabel }}</small>
+                <small>{{ securityLevelLabel }}</small>
               </div>
 
               <StatusBadge

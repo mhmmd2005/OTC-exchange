@@ -43,6 +43,24 @@ def map_kyc_status(status):
     }.get(status, "not_started")
 
 
+def map_account_level(value):
+    return {
+        "basic": "level_0",
+        "intermediate": "level_1",
+        "advanced": "level_2",
+        "professional": "level_3",
+        "level_0": "level_0",
+        "level_1": "level_1",
+        "level_2": "level_2",
+        "level_3": "level_3",
+    }.get(value, "level_0")
+
+
+class AccountLevelField(serializers.CharField):
+    def to_representation(self, value):
+        return map_account_level(value)
+
+
 class UserSerializer(serializers.ModelSerializer):
     kyc_status = serializers.SerializerMethodField()
 
@@ -96,7 +114,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     kycStatus = serializers.SerializerMethodField()
 
-    accountLevel = serializers.CharField(
+    accountLevel = AccountLevelField(
         source="kyc_level",
         read_only=True,
     )
@@ -317,6 +335,7 @@ class UserPreferencesSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
 class DashboardSummarySerializer(serializers.Serializer):
     user = UserProfileSerializer(read_only=True)
     totalPortfolioToman = serializers.CharField(default="0")
@@ -325,7 +344,10 @@ class DashboardSummarySerializer(serializers.Serializer):
     pendingOrdersCount = serializers.IntegerField(default=0)
     unreadNotificationsCount = serializers.IntegerField(default=0)
     kycStatus = serializers.SerializerMethodField()
-    accountLevel = serializers.CharField(source="user.kyc_level", read_only=True)
+    accountLevel = AccountLevelField(
+        source="user.kyc_level",
+        read_only=True,
+    )
 
 
 class IranianBankSerializer(serializers.ModelSerializer):

@@ -11,7 +11,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import VerificationStepForm from '@/components/verification/VerificationStepForm.vue'
 
-import {userService, verificationService} from '@/services'
+import {securityService, userService, verificationService} from '@/services'
 import {useAuthStore} from '@/stores/auth'
 
 import type {UserProfile, VerificationStep, VerificationSummary,} from '@/types'
@@ -31,6 +31,7 @@ const auth = useAuthStore()
 
 const summary = ref<VerificationSummary | null>(null)
 const profile = ref<UserProfile | null>(null)
+const securityScore = ref<number | null>(null)
 const loading = ref(true)
 const error = ref('')
 const feedback = ref('')
@@ -42,6 +43,18 @@ const currentLevel = computed(() => {
   return summary.value.levels.find(
       (level) => level.level === summary.value?.currentLevel,
   )
+})
+
+
+const securityLevelLabel = computed(() => {
+  const score = securityScore.value
+
+  if (score === null || !Number.isFinite(score)) return '—'
+  if (score >= 85) return 'سطح سه'
+  if (score >= 65) return 'سطح دو'
+  if (score >= 50) return 'سطح یک'
+
+  return 'سطح صفر'
 })
 
 const nextLevel = computed(() => {
@@ -257,9 +270,11 @@ async function load(): Promise<void> {
   const [
     verificationResult,
     profileResult,
+    securityResult,
   ] = await Promise.allSettled([
     verificationService.getSummary(),
     userService.getProfile(),
+    securityService.getOverview(),
   ])
 
   if (verificationResult.status === 'fulfilled') {
@@ -288,7 +303,15 @@ async function load(): Promise<void> {
       )
     }
   }
+  if (securityResult.status === 'fulfilled') {
+    const score = Number(securityResult.value.score)
 
+    securityScore.value = Number.isFinite(score)
+        ? score
+        : null
+  } else {
+    securityScore.value = null
+  }
   loading.value = false
 }
 
@@ -773,18 +796,11 @@ onMounted(load)
 
           <div class="hero-copy">
             <div class="hero-title">
-              <span class="eyebrow">
-                سطح فعلی حساب
-              </span>
+<span class="eyebrow">
+  سطح امنیت فعلی
+</span>
 
-              <h2>
-                {{
-                  currentLevel?.title ||
-                  levelLabel(
-                      summary.currentLevel,
-                  )
-                }}
-              </h2>
+              <h2>{{ securityLevelLabel }}</h2>
 
               <StatusBadge
                   domain="kyc"

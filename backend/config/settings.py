@@ -363,6 +363,27 @@ PAYOUT_GATEWAY = os.environ.get(
     "test",
 ).strip().lower()
 
+DAILY_BUY_LIMIT = Decimal(
+    os.environ.get(
+        "DAILY_BUY_LIMIT",
+        "500000000",
+    ),
+)
+
+DAILY_SELL_LIMIT = Decimal(
+    os.environ.get(
+        "DAILY_SELL_LIMIT",
+        "500000000",
+    ),
+)
+
+DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT = Decimal(
+    os.environ.get(
+        "DAILY_CRYPTO_WITHDRAWAL_TOMAN_LIMIT",
+        "300000000",
+    ),
+)
+
 TOMAN_DAILY_WITHDRAWAL_LIMIT = Decimal(
     os.environ.get(
         "TOMAN_DAILY_WITHDRAWAL_LIMIT",
