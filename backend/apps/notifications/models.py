@@ -6,10 +6,14 @@ from apps.accounts.models import User
 class Notification(models.Model):
     CATEGORY_CHOICES = [
         ("order", "Order"),
-        ("wallet", "Wallet"),
+        ("deposit", "Deposit"),
+        ("withdrawal", "Withdrawal"),
+        ("wallet", "Wallet (legacy)"),
+        ("verification", "Verification"),
+        ("kyc", "KYC (legacy)"),
         ("security", "Security"),
+        ("support", "Support"),
         ("system", "System"),
-        ("kyc", "KYC"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")

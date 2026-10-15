@@ -1,6 +1,8 @@
+
 <script setup lang="ts">
-import {computed, onMounted, ref, watch} from 'vue'
-import {useRouter} from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -8,73 +10,113 @@ import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import AppTabs from '@/components/ui/AppTabs.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import {notificationService} from '@/services'
-import {useNotificationsStore} from '@/stores/notifications'
-import type {NotificationCategory, NotificationItem} from '@/types'
-import {formatPersianDateTime, formatRelativeTime, toPersianDigits} from '@/utils/formatters'
+
+import { useNotificationsStore } from '@/stores/notifications'
+import type { NotificationCategory, NotificationItem } from '@/types'
+import {
+  formatPersianDateTime,
+  formatRelativeTime,
+  toPersianDigits,
+} from '@/utils/formatters'
 
 const router = useRouter()
 const notifications = useNotificationsStore()
+
 const readFilter = ref<'all' | 'unread'>('all')
 const category = ref<NotificationCategory | ''>('')
-const unreadTotal = ref(0)
 const actionLoadingId = ref('')
 const feedback = ref('')
 
 const viewTabs = [
-  {label: 'همه اعلان‌ها', value: 'all'},
-  {label: 'خوانده‌نشده', value: 'unread'},
+  { label: 'همه اعلان‌ها', value: 'all' },
+  { label: 'خوانده‌نشده', value: 'unread' },
 ]
 
-const categories: Array<{ value: NotificationCategory | ''; label: string; icon: string }> = [
-  {value: '', label: 'همه', icon: 'bell'},
-  {value: 'order', label: 'سفارش', icon: 'orders'},
-  {value: 'deposit', label: 'واریز', icon: 'arrowDown'},
-  {value: 'withdrawal', label: 'برداشت', icon: 'arrowUp'},
-  {value: 'verification', label: 'احراز هویت', icon: 'verify'},
-  {value: 'security', label: 'امنیت', icon: 'shield'},
-  {value: 'support', label: 'پشتیبانی', icon: 'help'},
-  {value: 'system', label: 'سیستم', icon: 'settings'},
+const categories: Array<{
+  value: NotificationCategory | ''
+  label: string
+  icon: string
+}> = [
+  { value: '', label: 'همه', icon: 'bell' },
+  { value: 'order', label: 'سفارش', icon: 'orders' },
+  { value: 'deposit', label: 'واریز', icon: 'arrowDown' },
+  { value: 'withdrawal', label: 'برداشت', icon: 'arrowUp' },
+  { value: 'verification', label: 'احراز هویت', icon: 'verify' },
+  { value: 'security', label: 'امنیت', icon: 'shield' },
+  { value: 'support', label: 'پشتیبانی', icon: 'help' },
+  { value: 'system', label: 'سیستم', icon: 'settings' },
 ]
 
 const visibleTitle = computed(() => {
-  const selected = categories.find((item) => item.value === category.value)
-  return category.value ? `اعلان‌های ${selected?.label ?? ''}` : 'آخرین اعلان‌ها'
+  const selected = categories.find(
+    (item) => item.value === category.value,
+  )
+
+  return category.value
+    ? `اعلان‌های ${selected?.label ?? ''}`
+    : 'آخرین اعلان‌ها'
 })
 
 function categoryMeta(value: NotificationCategory) {
-  return categories.find((item) => item.value === value) ?? categories[0]
+  return categories.find(
+    (item) => item.value === value,
+  ) ?? categories[0]
 }
 
 function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : 'اعلان‌ها بارگیری نشدند.'
+  return error instanceof Error
+    ? error.message
+    : 'عملیات انجام نشد. لطفاً دوباره تلاش کنید.'
+}
+
+function currentFilters() {
+  return {
+    category: category.value || undefined,
+    read: readFilter.value === 'unread' ? false : undefined,
+  }
+}
+
+/**
+ * بارگیری فهرست از Store.
+ * Store وضعیت خطای بارگیری را در notifications.error نگه می‌دارد.
+ */
+async function refreshList(): Promise<boolean> {
+  try {
+    await notifications.fetchNotifications(currentFilters())
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function load(): Promise<void> {
   feedback.value = ''
-  try {
-    const [, count] = await Promise.all([
-      notifications.fetchNotifications({
-        category: category.value || undefined,
-        read: readFilter.value === 'unread' ? false : undefined,
-      }),
-      notificationService.getUnreadCount(),
-    ])
-    unreadTotal.value = count
-  } catch {
-    // The store exposes the localized error next to the list.
-  }
+  await refreshList()
 }
 
 async function markAll(): Promise<void> {
-  if (!unreadTotal.value) return
+  if (!notifications.unreadCount || actionLoadingId.value) return
+
   actionLoadingId.value = 'all'
+  feedback.value = ''
+  notifications.error = null
+
   try {
     await notifications.markAllAsRead()
-    unreadTotal.value = 0
-    feedback.value = 'همه اعلان‌ها خوانده شدند.'
-    if (readFilter.value === 'unread') await load()
+
+    let refreshed = true
+
+    // پس از خواندن همه، فیلتر خوانده‌نشده باید خالی شود.
+    if (readFilter.value === 'unread') {
+      refreshed = await refreshList()
+    }
+
+    feedback.value = refreshed
+      ? 'همه اعلان‌ها خوانده شدند.'
+      : 'اعلان‌ها خوانده شدند، اما به‌روزرسانی فهرست انجام نشد.'
   } catch (error) {
+    // خطای عملیات در پیام صفحه نشان داده می‌شود، نه به‌عنوان خطای بارگیری فهرست.
+    notifications.error = null
     feedback.value = readableError(error)
   } finally {
     actionLoadingId.value = ''
@@ -82,13 +124,24 @@ async function markAll(): Promise<void> {
 }
 
 async function markRead(item: NotificationItem): Promise<void> {
-  if (item.read) return
+  if (item.read || actionLoadingId.value) return
+
   actionLoadingId.value = item.id
+  feedback.value = ''
+  notifications.error = null
+
   try {
     await notifications.markAsRead(item.id)
-    unreadTotal.value = Math.max(0, unreadTotal.value - 1)
-    if (readFilter.value === 'unread') await load()
+
+    if (readFilter.value === 'unread') {
+      const refreshed = await refreshList()
+
+      if (!refreshed) {
+        feedback.value = 'اعلان خوانده شد، اما به‌روزرسانی فهرست انجام نشد.'
+      }
+    }
   } catch (error) {
+    notifications.error = null
     feedback.value = readableError(error)
   } finally {
     actionLoadingId.value = ''
@@ -97,44 +150,52 @@ async function markRead(item: NotificationItem): Promise<void> {
 
 async function openNotification(item: NotificationItem): Promise<void> {
   if (actionLoadingId.value) return
+
   if (!item.read) {
-    try {
-      await markRead(item)
-    } catch {
-      // markRead already exposes a recoverable message; navigation is still useful.
-    }
+    // markRead خطا را مدیریت و در پیام صفحه نمایش می‌دهد.
+    await markRead(item)
   }
-  if (item.action?.to) await router.push(item.action.to)
+
+  // حتی اگر خواندن اعلان ناموفق باشد، امکان رفتن به مقصد حفظ می‌شود.
+  if (item.action?.to) {
+    await router.push(item.action.to)
+  }
 }
 
-watch([readFilter, category], load)
-onMounted(load)
+watch([readFilter, category], () => {
+  void load()
+})
+
+onMounted(() => {
+  void load()
+})
 </script>
 
 <template>
   <div class="page notifications-page">
     <PageHeader
-        title="اعلان‌ها"
-        description="رویدادهای مهم حساب و آخرین وضعیت درخواست‌ها را دنبال کنید."
+      title="اعلان‌ها"
+      description="رویدادهای مهم حساب و آخرین وضعیت درخواست‌ها را دنبال کنید."
     >
       <template #actions>
         <div class="notifications-header-actions">
           <AppButton
-              variant="secondary"
-              size="sm"
-              icon="refresh"
-              :loading="notifications.loading"
-              @click="load"
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            :loading="notifications.loading"
+            :disabled="Boolean(actionLoadingId)"
+            @click="load"
           >
             به‌روزرسانی
           </AppButton>
 
           <AppButton
-              variant="secondary"
-              icon="check"
-              :disabled="!unreadTotal"
-              :loading="actionLoadingId === 'all'"
-              @click="markAll"
+            variant="secondary"
+            icon="check"
+            :disabled="!notifications.unreadCount || Boolean(actionLoadingId)"
+            :loading="actionLoadingId === 'all'"
+            @click="markAll"
           >
             خواندن همه
           </AppButton>
@@ -143,116 +204,208 @@ onMounted(load)
     </PageHeader>
 
     <AppCard class="notification-summary" padding="lg">
-      <span class="summary-icon"><AppIcon name="bell" :size="27"/><i v-if="unreadTotal"/></span>
+      <span class="summary-icon">
+        <AppIcon name="bell" :size="27" />
+        <i v-if="notifications.unreadCount" />
+      </span>
+
       <div>
-        <strong v-if="unreadTotal">{{ toPersianDigits(unreadTotal) }} اعلان خوانده‌نشده دارید</strong>
+        <strong v-if="notifications.unreadCount">
+          {{ toPersianDigits(notifications.unreadCount) }}
+          اعلان خوانده‌نشده دارید
+        </strong>
+
         <strong v-else>همه‌چیز را دیده‌اید</strong>
-        <p>{{
-            unreadTotal ? 'رویدادهای مهم را از همین صفحه بررسی کنید.' : 'اعلان تازه‌ای برای بررسی باقی نمانده است.'
-          }}</p>
+
+        <p>
+          {{
+            notifications.unreadCount
+              ? 'رویدادهای مهم را از همین صفحه بررسی کنید.'
+              : 'اعلان تازه‌ای برای بررسی باقی نمانده است.'
+          }}
+        </p>
       </div>
+
       <span class="summary-caption">مرکز رویدادهای حساب</span>
     </AppCard>
 
     <div v-if="feedback" class="feedback" role="status">
-      <AppIcon name="info" :size="18"/>
+      <AppIcon name="info" :size="18" />
       <span>{{ feedback }}</span>
-      <button type="button" aria-label="بستن" @click="feedback = ''">
-        <AppIcon name="close" :size="16"/>
+
+      <button
+        type="button"
+        aria-label="بستن"
+        @click="feedback = ''"
+      >
+        <AppIcon name="close" :size="16" />
       </button>
     </div>
 
     <div class="notification-layout">
       <AppCard class="filters-card" padding="lg">
         <h2>دسته‌بندی‌ها</h2>
+
         <nav aria-label="فیلتر دسته اعلان‌ها">
           <button
-              v-for="item in categories"
-              :key="item.value || 'all'"
-              type="button"
-              :class="{ active: category === item.value }"
-              :aria-pressed="category === item.value"
-              @click="category = item.value"
+            v-for="item in categories"
+            :key="item.value || 'all'"
+            type="button"
+            :class="{ active: category === item.value }"
+            :aria-pressed="category === item.value"
+            :disabled="Boolean(actionLoadingId)"
+            @click="category = item.value"
           >
-            <span><AppIcon :name="item.icon" :size="19"/>{{ item.label }}</span>
-            <AppIcon v-if="category === item.value" name="check" :size="16"/>
+            <span>
+              <AppIcon :name="item.icon" :size="19" />
+              {{ item.label }}
+            </span>
+
+            <AppIcon
+              v-if="category === item.value"
+              name="check"
+              :size="16"
+            />
           </button>
         </nav>
       </AppCard>
 
       <section class="notifications-main">
         <div class="list-toolbar">
-          <div><h2>{{ visibleTitle }}</h2><span v-if="!notifications.loading">{{ toPersianDigits(notifications.total) }} مورد</span>
+          <div>
+            <h2>{{ visibleTitle }}</h2>
+
+            <span v-if="!notifications.loading">
+              {{ toPersianDigits(notifications.total) }} مورد
+            </span>
           </div>
-          <AppTabs v-model="readFilter" :items="viewTabs"/>
+
+          <AppTabs v-model="readFilter" :items="viewTabs" />
         </div>
 
         <AppCard padding="none" class="notification-list-card">
-          <div v-if="notifications.loading" class="notification-skeletons">
-            <div v-for="index in 5" :key="index" class="notification-skeleton">
-              <AppSkeleton width="3rem" height="3rem" radius="1rem"/>
+          <div
+            v-if="notifications.loading"
+            class="notification-skeletons"
+          >
+            <div
+              v-for="index in 5"
+              :key="index"
+              class="notification-skeleton"
+            >
+              <AppSkeleton width="3rem" height="3rem" radius="1rem" />
+
               <div>
-                <AppSkeleton width="45%" height="1rem"/>
-                <AppSkeleton width="85%" height=".8rem"/>
-                <AppSkeleton width="25%" height=".7rem"/>
+                <AppSkeleton width="45%" height="1rem" />
+                <AppSkeleton width="85%" height=".8rem" />
+                <AppSkeleton width="25%" height=".7rem" />
               </div>
             </div>
           </div>
 
-          <div v-else-if="notifications.error" class="error-state" role="alert">
-            <span><AppIcon name="warning" :size="25"/></span>
-            <div><strong>بارگیری اعلان‌ها انجام نشد</strong>
-              <p>{{ notifications.error }}</p></div>
-            <AppButton variant="secondary" size="sm" icon="refresh" @click="load">تلاش دوباره</AppButton>
+          <div
+            v-else-if="notifications.error"
+            class="error-state"
+            role="alert"
+          >
+            <span>
+              <AppIcon name="warning" :size="25" />
+            </span>
+
+            <div>
+              <strong>بارگیری اعلان‌ها انجام نشد</strong>
+              <p>{{ notifications.error }}</p>
+            </div>
+
+            <AppButton
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              @click="load"
+            >
+              تلاش دوباره
+            </AppButton>
           </div>
 
           <EmptyState
-              v-else-if="!notifications.items?.length"
-              icon="bell"
-              :title="readFilter === 'unread' ? 'اعلان خوانده‌نشده‌ای ندارید' : 'اعلانی در این دسته نیست'"
-              :description="readFilter === 'unread' ? 'تمام رویدادهای مهم حساب را بررسی کرده‌اید.' : 'با رخ‌دادن رویداد جدید، اعلان آن اینجا نمایش داده می‌شود.'"
+            v-else-if="!notifications.items?.length"
+            icon="bell"
+            :title="
+              readFilter === 'unread'
+                ? 'اعلان خوانده‌نشده‌ای ندارید'
+                : 'اعلانی در این دسته نیست'
+            "
+            :description="
+              readFilter === 'unread'
+                ? 'تمام رویدادهای مهم حساب را بررسی کرده‌اید.'
+                : 'با رخ‌دادن رویداد جدید، اعلان آن اینجا نمایش داده می‌شود.'
+            "
           >
-            <AppButton v-if="readFilter === 'unread'" variant="secondary" @click="readFilter = 'all'">نمایش همه
-              اعلان‌ها
+            <AppButton
+              v-if="readFilter === 'unread'"
+              variant="secondary"
+              @click="readFilter = 'all'"
+            >
+              نمایش همه اعلان‌ها
             </AppButton>
           </EmptyState>
 
           <div v-else class="notification-list">
             <article
-                v-for="item in notifications.items"
-                :key="item.id"
-                class="notification-item"
-                :class="{ unread: !item.read }"
+              v-for="item in notifications.items"
+              :key="item.id"
+              class="notification-item"
+              :class="{ unread: !item.read }"
             >
-              <span class="category-icon" :class="`category-${item.category}`">
-                <AppIcon :name="categoryMeta(item.category).icon" :size="22"/>
-                <i v-if="!item.read" aria-label="خوانده‌نشده"/>
+              <span
+                class="category-icon"
+                :class="`category-${item.category}`"
+              >
+                <AppIcon :name="categoryMeta(item.category).icon" :size="22" />
+                <i v-if="!item.read" aria-label="خوانده‌نشده" />
               </span>
+
               <div class="notification-copy">
-                <div class="item-heading"><h3>{{ item.title }}</h3>
-                  <time :datetime="item.createdAt" :title="formatPersianDateTime(item.createdAt)">
+                <div class="item-heading">
+                  <h3>{{ item.title }}</h3>
+
+                  <time
+                    :datetime="item.createdAt"
+                    :title="formatPersianDateTime(item.createdAt)"
+                  >
                     {{ formatRelativeTime(item.createdAt) }}
                   </time>
                 </div>
+
                 <p>{{ item.message }}</p>
+
                 <div class="item-footer">
-                  <span class="category-label">{{ categoryMeta(item.category).label }}</span>
+                  <span class="category-label">
+                    {{ categoryMeta(item.category).label }}
+                  </span>
+
                   <button
-                      v-if="!item.read"
-                      type="button"
-                      :disabled="actionLoadingId === item.id"
-                      :aria-busy="actionLoadingId === item.id || undefined"
-                      @click.stop="markRead(item)"
-                      @keydown.stop
-                  ><span v-if="actionLoadingId === item.id" class="mini-spinner"/>خواندم
+                    v-if="!item.read"
+                    type="button"
+                    :disabled="Boolean(actionLoadingId)"
+                    :aria-busy="actionLoadingId === item.id || undefined"
+                    @click.stop="markRead(item)"
+                  >
+                    <span
+                      v-if="actionLoadingId === item.id"
+                      class="mini-spinner"
+                    />
+                    خواندم
                   </button>
+
                   <RouterLink
-                      v-if="item.action"
-                      :to="item.action.to"
-                      class="action-link"
-                      @click.prevent="openNotification(item)"
-                  >{{ item.action.label }}
-                    <AppIcon name="chevronLeft" :size="16"/>
+                    v-if="item.action"
+                    :to="item.action.to"
+                    class="action-link"
+                    @click.prevent="openNotification(item)"
+                  >
+                    {{ item.action.label }}
+                    <AppIcon name="chevronLeft" :size="16" />
                   </RouterLink>
                 </div>
               </div>
@@ -395,7 +548,7 @@ onMounted(load)
   gap: var(--space-2);
 }
 
-.filters-card button:hover {
+.filters-card button:hover:not(:disabled) {
   background: var(--color-surface-2);
   color: var(--color-text-primary);
 }
@@ -404,6 +557,11 @@ onMounted(load)
   background: var(--color-primary-soft);
   color: var(--color-primary);
   font-weight: 600;
+}
+
+.filters-card button:disabled {
+  cursor: wait;
+  opacity: .7;
 }
 
 .notifications-main {
@@ -434,9 +592,72 @@ onMounted(load)
   font-size: var(--font-size-xs);
 }
 
-
+/* کادر اعلان‌ها؛ ارتفاع متناسب با ۵ ردیف */
 .notification-list-card {
+  --notification-row-height: 11.5rem;
+
+  max-height: calc(
+    var(--notification-row-height) * 5 + 4px
+  );
+
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+}
+
+/* هر اعلان ارتفاع یکسان دارد */
+.notification-list {
+  display: grid;
+}
+
+.notification-item {
+  height: var(--notification-row-height);
+  min-height: 0;
+  box-sizing: border-box;
   overflow: hidden;
+}
+
+/* جلوگیری از بلندشدن ردیف به‌دلیل متن زیاد */
+.notification-copy > p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* اسکرول‌بار */
+.notification-list-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notification-list-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-list-card::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--color-border-hover);
+}
+
+/* موبایل */
+@media (max-width: 767px) {
+  .notification-list-card {
+    --notification-row-height: 13rem;
+  }
+
+  .notification-copy > p {
+    -webkit-line-clamp: 3;
+  }
+}
+
+@media (max-width: 399px) {
+  .notification-list-card {
+    --notification-row-height: 14rem;
+  }
 }
 
 .notification-skeletons {
@@ -496,7 +717,7 @@ onMounted(load)
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-4);
   padding: var(--space-5);
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 .notification-item + .notification-item {
@@ -565,7 +786,7 @@ onMounted(load)
 
 .item-heading {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -685,7 +906,8 @@ onMounted(load)
   z-index: 1;
 }
 
-.filters-card button:focus-visible, .item-footer button:focus-visible {
+.filters-card button:focus-visible,
+.item-footer button:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
@@ -700,14 +922,11 @@ onMounted(load)
   content: '';
 }
 
-.item-footer button, .action-link {
+.item-footer button,
+.action-link {
   min-height: 2.75rem;
   padding-inline: var(--space-2);
   border-radius: var(--radius-sm);
-}
-
-.notification-item {
-  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 @media (hover: hover) {
@@ -744,10 +963,6 @@ onMounted(load)
 
   .filters-card button {
     border: 1px solid var(--color-border-soft);
-  }
-
-  .filters-card button > svg {
-    display: none;
   }
 }
 

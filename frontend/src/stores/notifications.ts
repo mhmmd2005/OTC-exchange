@@ -25,28 +25,57 @@ export const useNotificationsStore = defineStore('notifications', () => {
         }
     }
 
-    async function fetchNotifications(filters: NotificationFilters = {}): Promise<NotificationItem[]> {
+
+    let latestFetchId = 0
+
+    async function fetchNotifications(
+        filters: NotificationFilters = {},
+    ): Promise<NotificationItem[]> {
+        const requestId = ++latestFetchId
+
         loading.value = true
         error.value = null
 
         try {
-            const [result, unread] = await Promise.all([
-                notificationService.list({pageSize: 50, ...filters}),
+            const [listResult, unreadResult] = await Promise.allSettled([
+                notificationService.list({
+                    pageSize: 50,
+                    ...filters,
+                }),
                 notificationService.getUnreadCount(),
             ])
 
-            items.value = result.items ?? []
-            total.value = result.total ?? items.value.length
-            globalUnreadCount.value = unread
+            if (requestId !== latestFetchId) {
+                return items.value
+            }
+
+            if (listResult.status === 'rejected') {
+                throw listResult.reason
+            }
+
+            items.value = listResult.value.items ?? []
+            total.value = listResult.value.total ?? items.value.length
+
+            if (unreadResult.status === 'fulfilled') {
+                globalUnreadCount.value = unreadResult.value
+            }
 
             return items.value
         } catch (caught) {
-            error.value = caught instanceof Error ? caught.message : 'اعلان‌ها بارگیری نشدند.'
+            if (requestId === latestFetchId) {
+                error.value = caught instanceof Error
+                    ? caught.message
+                    : 'اعلان‌ها بارگیری نشدند.'
+            }
+
             throw caught
         } finally {
-            loading.value = false
+            if (requestId === latestFetchId) {
+                loading.value = false
+            }
         }
     }
+
 
     async function markAsRead(id: string): Promise<void> {
         const item = items.value.find((notification) => notification.id === id)
