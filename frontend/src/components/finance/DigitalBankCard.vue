@@ -162,39 +162,90 @@ const lastCardDigits = computed(() => toPersianDigits(props.account.cardNumber.r
 
 .card-face {
   position: relative;
+  isolation: isolate;
   display: flex;
   min-height: 17rem;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
   padding: var(--space-6);
-  background: linear-gradient(128deg, color-mix(in srgb, var(--bank-accent) 15%, transparent), transparent 45%),
-  radial-gradient(circle at 2% 110%, color-mix(in srgb, var(--bank-accent-soft) 16%, transparent), transparent 45%),
-  linear-gradient(145deg, var(--surface-tertiary), var(--surface-primary) 68%);
+
+  background: radial-gradient(
+      ellipse at 100% 0%,
+      color-mix(in srgb, var(--bank-accent) 20%, transparent) 0%,
+      transparent 45%
+  ),
+  radial-gradient(
+      ellipse at 0% 100%,
+      color-mix(in srgb, var(--bank-accent-soft) 18%, transparent) 0%,
+      transparent 44%
+  ),
+  linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-tertiary) 94%, var(--bank-accent) 6%) 0%,
+      var(--surface-primary) 55%,
+      color-mix(in srgb, var(--surface-secondary) 92%, var(--bank-accent-soft) 8%) 100%
+  );
 }
 
 .card-face::before {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(color-mix(in srgb, var(--bank-accent) 8%, transparent) 1px, transparent 1px),
-  linear-gradient(90deg, color-mix(in srgb, var(--bank-accent) 8%, transparent) 1px, transparent 1px);
-  background-size: 2.5rem 2.5rem;
+  z-index: 0;
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--bank-accent) 9%, transparent) 1px,
+      transparent 1px
+  ),
+  linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bank-accent) 9%, transparent) 1px,
+      transparent 1px
+  );
+  background-size: 2.75rem 2.75rem;
   content: '';
-  mask-image: linear-gradient(120deg, black, transparent 66%);
-  opacity: .34;
+  mask-image: linear-gradient(
+      125deg,
+      black 0%,
+      rgba(0, 0, 0, 0.65) 28%,
+      transparent 72%
+  );
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.card-face::after {
+  position: absolute;
+  z-index: 0;
+  inset-inline-end: -5rem;
+  inset-block-end: -9rem;
+  width: 18rem;
+  height: 18rem;
+  border: 1px solid color-mix(in srgb, var(--bank-accent) 24%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--bank-accent) 9%, transparent) 0%,
+      transparent 68%
+  );
+  box-shadow: 0 0 0 1.5rem color-mix(in srgb, var(--bank-accent) 3%, transparent),
+  0 0 0 3rem color-mix(in srgb, var(--bank-accent) 2%, transparent),
+  inset 0 0 3rem color-mix(in srgb, var(--bank-accent) 4%, transparent);
+  content: '';
   pointer-events: none;
 }
 
 .card-face__glow {
   position: absolute;
-  width: 10rem;
-  height: 10rem;
-  inset-block-start: -6.5rem;
+  z-index: 0;
+  inset-block-start: -6rem;
   inset-inline-start: -3rem;
+  width: 12rem;
+  height: 12rem;
   border-radius: 50%;
   background: var(--bank-accent);
-  filter: blur(3.5rem);
-  opacity: .12;
+  filter: blur(4rem);
+  opacity: 0.14;
+  pointer-events: none;
 }
 
 .card-header, .card-pan, .card-details {
