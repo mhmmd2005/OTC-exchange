@@ -796,41 +796,47 @@ onMounted(load)
 
           <div class="hero-copy">
             <div class="hero-title">
-<span class="eyebrow">
-  سطح امنیت فعلی
-</span>
+              <span class="eyebrow">سطح امنیت فعلی</span>
 
-              <h2>{{ securityLevelLabel }}</h2>
+              <div class="security-level-line">
+                <h2>{{ securityLevelLabel }}</h2>
 
-              <StatusBadge
-                  domain="kyc"
-                  :status="summary.status"
-              />
+                <span
+                  v-if="securityScore !== null"
+                  class="security-score"
+                >
+                  <AppIcon name="shield" :size="15" />
+                  امتیاز امنیت: {{ toPersianDigits(securityScore) }}٪
+                </span>
+
+                <span v-else class="security-score security-score--unavailable">
+                  امتیاز امنیت در دسترس نیست
+                </span>
+              </div>
             </div>
 
-            <p>
-              {{ summary.message }}
-            </p>
+            <div class="kyc-status-panel">
+              <div class="kyc-status-heading">
+                <span>وضعیت احراز هویت</span>
+                <StatusBadge
+                  domain="kyc"
+                  :status="summary.status"
+                />
+              </div>
 
-            <div
+              <p>{{ summary.message }}</p>
+
+              <div
                 v-if="nextLevel"
                 class="next-level"
-            >
-              <AppIcon
-                  name="sparkle"
-                  :size="19"
-              />
+              >
+                <AppIcon name="sparkle" :size="19" />
 
-              <span>
-                گام بعدی:
-                <strong>
-                  {{
-                    levelTitle(
-                        nextLevel,
-                    )
-                  }}
-                </strong>
-              </span>
+                <span>
+                  گام بعدی احراز هویت:
+                  <strong>{{ levelTitle(nextLevel) }}</strong>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1201,11 +1207,11 @@ onMounted(load)
           <div class="section-heading">
             <div>
               <h2>
-                سطوح کاربری
+                سطوح احراز هویت
               </h2>
 
               <p>
-                با تکمیل مراحل بعدی، سقف‌ها و خدمات بیشتری در دسترس قرار می‌گیرد.
+                با تکمیل مراحل احراز هویت، سقف‌ها و خدمات بیشتری در دسترس قرار می‌گیرد.
               </p>
             </div>
           </div>
@@ -1729,14 +1735,65 @@ onMounted(load)
   font-weight: 600;
 }
 
-.hero-title h2 {
+.security-level-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.security-level-line h2 {
   margin: 0;
   font-size: var(--font-size-2xl);
 }
 
-.hero-copy > p {
-  margin: var(--space-2) 0;
+.security-score {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: .35rem .65rem;
+  border: 1px solid rgba(67, 139, 255, .2);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.security-score--unavailable {
+  border-color: var(--color-border-soft);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.kyc-status-panel {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.kyc-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.kyc-status-heading > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.kyc-status-panel > p {
+  margin: 0;
   color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
 }
 
 .next-level {
@@ -2281,7 +2338,7 @@ onMounted(load)
     width: calc(100% - 7rem);
   }
 
-  .hero-title h2 {
+  .security-level-line h2 {
     font-size: var(--font-size-xl);
   }
 
@@ -2372,8 +2429,16 @@ onMounted(load)
     gap: var(--space-2);
   }
 
-  .hero-title h2 {
+  .security-level-line h2 {
     font-size: var(--font-size-lg);
+  }
+
+  .security-level-line {
+    gap: var(--space-2);
+  }
+
+  .kyc-status-heading {
+    align-items: flex-start;
   }
 
   .next-level {

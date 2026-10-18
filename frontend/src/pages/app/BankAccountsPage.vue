@@ -10,7 +10,7 @@ import AppModal from '@/components/ui/AppModal.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import {ApiError, bankService} from '@/services'
+
 import type {BankAccount, IranianBank} from '@/types'
 import {
   formatCardNumber,
@@ -39,7 +39,24 @@ const form = reactive({
   iban: '',
   accountNumber: '',
 })
+import {
+  ApiError,
+  bankService,
+  securityService,
+} from '@/services'
 
+const twoFactorEnabled = ref<boolean | null>(null)
+
+async function loadTwoFactorStatus(): Promise<void> {
+  try {
+    const overview = await securityService.getOverview()
+
+    twoFactorEnabled.value = overview.twoFactorEnabled
+  } catch {
+    // وضعیت نامشخص است؛ نباید آن را غیرفعال فرض کنیم.
+    twoFactorEnabled.value = null
+  }
+}
 const formErrors = reactive<Record<string, string>>({})
 
 const verifiedCount = computed(() => (
