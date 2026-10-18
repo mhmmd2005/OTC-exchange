@@ -428,6 +428,10 @@ class BankAccountSerializer(serializers.ModelSerializer):
         source="is_usable",
         read_only=True,
     )
+    isTemporarilyDisabled = serializers.BooleanField(
+        source="is_temporarily_disabled",
+        read_only=True,
+    )
 
     class Meta:
         model = BankAccount
@@ -444,6 +448,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "createdAt",
             "verifiedAt",
             "isUsable",
+            "isTemporarilyDisabled",
         ]
 
 

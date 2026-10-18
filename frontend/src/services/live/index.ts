@@ -484,6 +484,25 @@ export const bankService: BankService = {
         api.delete<void>(
             `/bank-accounts/${id}`,
         ),
+    setTemporaryAvailability: (
+        id: string,
+        input: Parameters<BankService['setTemporaryAvailability']>[1],
+    ) =>
+        api.patch<BankAccount>(
+            `/bank-accounts/${encodeURIComponent(id)}/availability`,
+            {
+                isTemporarilyDisabled:
+                input.isTemporarilyDisabled,
+
+                ...(input.twoFactorCode
+                    ? {
+                        twoFactorCode: normalizeDigits(
+                            input.twoFactorCode,
+                        ).replace(/\D/g, ''),
+                    }
+                    : {}),
+            },
+        ),
 }
 
 export const marketService: MarketService = {

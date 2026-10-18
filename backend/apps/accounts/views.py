@@ -2,6 +2,7 @@ import jdatetime
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import generics
 from rest_framework import status
@@ -11,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-from django.db.models import Prefetch
+
 from apps.accounts.models import BankAccount, BankVerificationObservation, IranianBank, UserPreferences
 from apps.accounts.serializers import (
     BankAccountSerializer,
@@ -48,6 +49,7 @@ from apps.accounts.services.session import (
 )
 from apps.kyc.models import KycApplication
 from apps.kyc.services.ehraz import EhrazAPIError, EhrazService
+from apps.security.services import TwoFactorService
 
 User = get_user_model()
 
@@ -529,6 +531,7 @@ class UserPreferencesAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class DashboardSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1269,6 +1272,117 @@ class BankAccountDetailAPIView(APIView):
         )
 
 
+class BankAccountAvailabilityAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        target_disabled = request.data.get(
+            "isTemporarilyDisabled"
+        )
+
+        if not isinstance(target_disabled, bool):
+            return Response(
+                {
+                    "detail": (
+                        "وضعیت غیرفعال‌سازی موقت معتبر نیست."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            account = BankAccount.objects.get(
+                pk=pk,
+                user=request.user,
+            )
+        except BankAccount.DoesNotExist:
+            return Response(
+                {"detail": "حساب بانکی پیدا نشد."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if account.status != "verified":
+            return Response(
+                {
+                    "detail": (
+                        "فقط حساب بانکی تأییدشده "
+                        "قابل فعال یا غیرفعال‌سازی است."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if account.is_temporarily_disabled == target_disabled:
+            if target_disabled and account.preferred:
+                account.preferred = False
+                account.save(update_fields=["preferred"])
+
+            return Response(
+                BankAccountSerializer(account).data,
+                status=status.HTTP_200_OK,
+            )
+
+        if TwoFactorService.is_enabled(request.user):
+            code = str(
+                request.data.get("twoFactorCode") or ""
+            ).strip()
+
+            if not code:
+                detail = (
+                    "برای تغییر وضعیت کارت، "
+                    "کد ورود دومرحله‌ای را وارد کنید."
+                )
+
+                return Response(
+                    {
+                        "requiresTwoFactor": True,
+                        "detail": detail,
+                        "fields": {
+                            "twoFactorCode": detail,
+                        },
+                    },
+                    status=status.HTTP_428_PRECONDITION_REQUIRED,
+                )
+
+            try:
+                TwoFactorService.verify_code(
+                    user=request.user,
+                    code=code,
+                )
+            except DjangoValidationError as exc:
+                messages = getattr(exc, "messages", [])
+                detail = (
+                    " ".join(messages)
+                    if messages
+                    else str(exc)
+                )
+
+                return Response(
+                    {
+                        "detail": detail,
+                        "fields": {
+                            "twoFactorCode": detail,
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        account.is_temporarily_disabled = target_disabled
+
+        fields_to_update = ["is_temporarily_disabled"]
+
+        if target_disabled and account.preferred:
+            account.preferred = False
+            fields_to_update.append("preferred")
+
+        account.save(update_fields=fields_to_update)
+
+        return Response(
+            BankAccountSerializer(account).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class BankDetectAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1301,10 +1415,15 @@ class BankAccountPreferredAPIView(APIView):
     def post(self, request, pk):
         try:
             account = BankAccount.objects.get(id=pk, user=request.user)
-            if account.status != "verified":
+            if not account.is_usable:
                 return Response(
-                    {"detail": "Only verified accounts can be preferred"},
-                    status=status.HTTP_409_CONFLICT
+                    {
+                        "detail": (
+                            "Only verified and enabled accounts "
+                            "can be preferred."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
                 )
             # Set all other accounts to non-preferred
             BankAccount.objects.filter(user=request.user).update(preferred=False)

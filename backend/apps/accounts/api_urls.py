@@ -9,7 +9,9 @@ from .views import (
     UserPreferencesAPIView,
     UserProfileAPIView,
     BankAccountDetailAPIView,
-    EmailVerificationAPIView
+    EmailVerificationAPIView,
+    BankAccountAvailabilityAPIView,
+
 )
 
 urlpatterns = [
@@ -57,5 +59,10 @@ urlpatterns = [
         "users/me/email/verify",
         EmailVerificationAPIView.as_view(),
         name="user-email-verify",
+    ),
+    path(
+        "bank-accounts/<int:pk>/availability",
+        BankAccountAvailabilityAPIView.as_view(),
+        name="bank-account-availability",
     ),
 ]

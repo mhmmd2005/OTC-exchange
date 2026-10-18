@@ -1,5 +1,5 @@
-from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -509,6 +509,10 @@ class BankAccount(models.Model):
         default="pending",
     )
 
+    is_temporarily_disabled = models.BooleanField(
+        default=False,
+    )
+
     preferred = models.BooleanField(
         default=False,
     )
@@ -558,7 +562,10 @@ class BankAccount(models.Model):
 
     @property
     def is_usable(self):
-        return self.status == "verified"
+        return (
+                self.status == "verified"
+                and not self.is_temporarily_disabled
+        )
 
     def approve(self):
         if self.status != "pending":

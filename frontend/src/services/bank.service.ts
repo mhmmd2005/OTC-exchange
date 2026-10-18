@@ -11,6 +11,14 @@ export interface BankService {
 
     addAccount(input: AddBankAccountInput): Promise<BankAccount>
 
+    setTemporaryAvailability(
+        id: string,
+        input: {
+            isTemporarilyDisabled: boolean
+            twoFactorCode?: string
+        },
+    ): Promise<BankAccount>
+
     setPreferred(id: string): Promise<BankAccount>
 
     removeAccount(id: string): Promise<void>
@@ -34,6 +42,20 @@ function cleanAccountNumber(value: string | undefined): string | undefined {
 export const bankService: BankService = {
     async listBanks() {
         return api.get<IranianBank[]>('/banks')
+    },
+
+    async setTemporaryAvailability(id, input) {
+        const twoFactorCode = input.twoFactorCode
+            ? normalizeDigits(input.twoFactorCode).replace(/\D/g, '')
+            : ''
+
+        return api.patch<BankAccount>(
+            `/bank-accounts/${encodeURIComponent(id)}/availability`,
+            {
+                isTemporarilyDisabled: input.isTemporarilyDisabled,
+                ...(twoFactorCode ? {twoFactorCode} : {}),
+            },
+        )
     },
 
     async listAccounts() {

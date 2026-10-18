@@ -53,3 +53,6 @@ review.txt
 
 celerybeat-schedule
 celerybeat-schedule.*
+# Local backup files
+*.bak
+*.preferences-backup

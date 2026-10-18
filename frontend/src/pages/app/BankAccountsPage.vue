@@ -10,8 +10,8 @@ import AppModal from '@/components/ui/AppModal.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-
 import type {BankAccount, IranianBank} from '@/types'
+import OtpInput from '@/components/ui/OtpInput.vue'
 import {
   formatCardNumber,
   formatIban,
@@ -20,6 +20,7 @@ import {
   toPersianDigits,
 } from '@/utils/formatters'
 import {isValidIranianCardNumber, isValidIranianIban} from '@/utils/validators'
+import {ApiError, bankService} from '@/services'
 
 const accounts = ref<BankAccount[]>([])
 const loading = ref(true)
@@ -33,34 +34,27 @@ const deleting = ref(false)
 
 const detectedBank = ref<IranianBank | null>(null)
 const detectingBank = ref(false)
-
+const availabilityTarget = ref<BankAccount | null>(null)
+const availabilityLoading = ref(false)
+const availabilityTwoFactorRequired = ref(false)
+const twoFactorCode = ref('')
+const twoFactorError = ref('')
+const availabilityError = ref('')
 const form = reactive({
   cardNumber: '',
   iban: '',
   accountNumber: '',
 })
-import {
-  ApiError,
-  bankService,
-  securityService,
-} from '@/services'
 
-const twoFactorEnabled = ref<boolean | null>(null)
 
-async function loadTwoFactorStatus(): Promise<void> {
-  try {
-    const overview = await securityService.getOverview()
-
-    twoFactorEnabled.value = overview.twoFactorEnabled
-  } catch {
-    // وضعیت نامشخص است؛ نباید آن را غیرفعال فرض کنیم.
-    twoFactorEnabled.value = null
-  }
-}
 const formErrors = reactive<Record<string, string>>({})
 
 const verifiedCount = computed(() => (
-    accounts.value.filter((account) => account.status === 'verified').length
+    accounts.value.filter((account) =>
+        account.status === 'verified'
+        && account.isTemporarilyDisabled !== true
+        && account.isUsable !== false
+    ).length
 ))
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -226,6 +220,106 @@ async function setPreferred(account: BankAccount): Promise<void> {
   }
 }
 
+function openAvailabilityDialog(account: BankAccount): void {
+  if (account.status !== 'verified') return
+
+  availabilityTarget.value = account
+  availabilityTwoFactorRequired.value = false
+  twoFactorCode.value = ''
+  twoFactorError.value = ''
+  availabilityError.value = ''
+}
+
+function closeAvailabilityDialog(): void {
+  if (availabilityLoading.value) return
+
+  availabilityTarget.value = null
+  availabilityTwoFactorRequired.value = false
+  twoFactorCode.value = ''
+  twoFactorError.value = ''
+  availabilityError.value = ''
+}
+
+watch(twoFactorCode, () => {
+  twoFactorError.value = ''
+})
+
+async function saveAvailabilityChange(): Promise<void> {
+  const target = availabilityTarget.value
+
+  if (!target || availabilityLoading.value) return
+
+  if (
+      availabilityTwoFactorRequired.value
+      && !/^\d{6}$/.test(twoFactorCode.value)
+  ) {
+    twoFactorError.value = 'کد Authenticator باید ۶ رقمی باشد.'
+    return
+  }
+
+  availabilityLoading.value = true
+  availabilityError.value = ''
+  twoFactorError.value = ''
+
+  try {
+    const shouldDisable =
+        target.isTemporarilyDisabled !== true
+
+    const updatedAccount =
+        await bankService.setTemporaryAvailability(
+            target.id,
+            {
+              isTemporarilyDisabled: shouldDisable,
+              ...(availabilityTwoFactorRequired.value
+                  ? {twoFactorCode: twoFactorCode.value}
+                  : {}),
+            },
+        )
+
+    accounts.value = accounts.value.map((account) =>
+        account.id === updatedAccount.id
+            ? updatedAccount
+            : account,
+    )
+
+    feedback.value = updatedAccount.isTemporarilyDisabled
+        ? `حساب ${updatedAccount.bank.nameFa} موقتاً غیرفعال شد.`
+        : `حساب ${updatedAccount.bank.nameFa} دوباره فعال شد.`
+
+    availabilityTarget.value = null
+    availabilityTwoFactorRequired.value = false
+    twoFactorCode.value = ''
+  } catch (error) {
+    if (
+        error instanceof ApiError
+        && error.status === 428
+    ) {
+      availabilityTwoFactorRequired.value = true
+      twoFactorCode.value = ''
+      twoFactorError.value = ''
+      return
+    }
+
+    if (
+        error instanceof ApiError
+        && availabilityTwoFactorRequired.value
+        && error.status === 400
+    ) {
+      twoFactorError.value =
+          error.details?.fields?.twoFactorCode
+          || error.message
+      return
+    }
+
+    availabilityError.value = errorMessage(
+        error,
+        'تغییر وضعیت حساب بانکی انجام نشد.',
+    )
+  } finally {
+    availabilityLoading.value = false
+  }
+}
+
 async function removeAccount(): Promise<void> {
   if (!deleteTarget.value) return
 
@@ -343,6 +437,7 @@ onMounted(loadAccounts)
           :preferred-loading="preferredLoadingId === account.id"
           @preferred="setPreferred"
           @remove="deleteTarget = $event"
+          @availability="openAvailabilityDialog"
       />
     </div>
 
@@ -371,6 +466,7 @@ onMounted(loadAccounts)
           </span>
         </div>
         <AppInput
+            class="iban-input"
             :model-value="form.iban"
             label="شماره شبا"
             placeholder="IR82 0560 0800 8010 2735 0510 01"
@@ -404,7 +500,99 @@ onMounted(loadAccounts)
         </div>
       </template>
     </AppModal>
+    <AppModal
+        :model-value="Boolean(availabilityTarget)"
+        :title="
+    availabilityTarget?.isTemporarilyDisabled
+      ? 'فعال‌سازی مجدد حساب بانکی'
+      : 'غیرفعال‌سازی موقت حساب بانکی'
+  "
+        :description="
+    availabilityTarget?.isTemporarilyDisabled
+      ? 'می‌توانید استفاده از این حساب را دوباره فعال کنید.'
+      : 'تا زمان فعال‌سازی مجدد، استفاده از این حساب برای برداشت مسدود خواهد بود.'
+  "
+        size="sm"
+        :dismissible="!availabilityLoading"
+        @update:model-value="(value) => {
+    if (!value) closeAvailabilityDialog()
+  }"
+    >
+      <div v-if="availabilityTarget" class="availability-dialog">
+        <div class="delete-summary">
+          <BankLogo :bank="availabilityTarget.bank" size="md"/>
+          <span>
+        <strong>{{ availabilityTarget.bank.nameFa }}</strong>
+        <small class="ltr">
+          {{
+            formatMaskedCardOverview(
+                availabilityTarget.cardNumber,
+                {usePersianDigits: true},
+            )
+          }}
+        </small>
+      </span>
+        </div>
 
+        <div
+            v-if="availabilityError"
+            class="form-error"
+            role="alert"
+        >
+          {{ availabilityError }}
+        </div>
+
+        <div
+            v-if="availabilityTwoFactorRequired"
+            class="availability-two-factor"
+        >
+          <p>
+            ورود دومرحله‌ای برای این عملیات فعال است.
+            کد شش‌رقمی برنامه Authenticator را وارد کنید.
+          </p>
+
+          <OtpInput
+              v-model="twoFactorCode"
+              label="کد تأیید Authenticator"
+              status-text="کد را از برنامه Authenticator خود وارد کنید."
+              :show-resend="false"
+              :countdown-seconds="0"
+              :loading="availabilityLoading"
+              :error="twoFactorError"
+              :disabled="availabilityLoading"
+              autofocus
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton
+            block
+            :loading="availabilityLoading"
+            :disabled="
+        availabilityTwoFactorRequired
+        && twoFactorCode.length !== 6
+      "
+            @click="saveAvailabilityChange"
+        >
+          {{
+            availabilityTwoFactorRequired
+                ? 'تأیید کد و ادامه'
+                : availabilityTarget?.isTemporarilyDisabled
+                    ? 'فعال‌سازی مجدد'
+                    : 'تأیید غیرفعال‌سازی موقت'
+          }}
+        </AppButton>
+
+        <AppButton
+            variant="secondary"
+            :disabled="availabilityLoading"
+            @click="closeAvailabilityDialog"
+        >
+          انصراف
+        </AppButton>
+      </template>
+    </AppModal>
     <AppModal
         :model-value="Boolean(deleteTarget)"
         title="حذف حساب بانکی؟"
@@ -741,5 +929,26 @@ onMounted(loadAccounts)
   .bank-overview strong {
     font-size: var(--font-size-md);
   }
+}
+
+.iban-input :deep(.field__label) {
+  margin-top: 4px;
+}
+
+.availability-dialog {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.availability-two-factor {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.availability-two-factor > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
 }
 </style>
