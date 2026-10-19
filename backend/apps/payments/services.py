@@ -296,7 +296,7 @@ def _get_verified_bank_account(
         )
 
     try:
-        return (
+        account = (
             BankAccount.objects
             .select_related("bank")
             .get(
@@ -320,6 +320,18 @@ def _get_verified_bank_account(
             },
             status_code=409,
         ) from exc
+
+    if account.is_temporarily_disabled:
+        raise TomanDepositValidationError(
+            message="کارت انتخاب‌شده غیرفعال است.",
+            code="BANK_ACCOUNT_DISABLED",
+            fields={
+                "bankAccountId": "کارت انتخاب‌شده غیرفعال است.",
+            },
+            status_code=409,
+        )
+
+    return account
 
 
 def _get_kyc(

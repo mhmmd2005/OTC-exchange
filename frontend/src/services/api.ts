@@ -19,6 +19,7 @@ export type ApiErrorCode =
     | 'DAILY_LIMIT_EXCEEDED'
     | 'KYC_REQUIRED'
     | 'BANK_ACCOUNT_REQUIRED'
+    | 'BANK_ACCOUNT_DISABLED'
     | 'ASSET_DISABLED'
     | 'NETWORK_DISABLED'
 
@@ -80,6 +81,7 @@ const apiErrorCodes: ApiErrorCode[] = [
     'DAILY_LIMIT_EXCEEDED',
     'KYC_REQUIRED',
     'BANK_ACCOUNT_REQUIRED',
+    'BANK_ACCOUNT_DISABLED',
     'ASSET_DISABLED',
     'NETWORK_DISABLED',
 ]

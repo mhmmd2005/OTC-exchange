@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import type {BankAccount, TomanDepositResult, VerificationSummary} from '@/types'
-import {ApiError, isTestPaymentEnabled,} from '@/services/api'
+
+import type {BankAccount, TomanDepositResult, VerificationSummary,} from '@/types'
+
+import {ApiError, isTestPaymentEnabled} from '@/services/api'
 import {bankService} from '@/services/bank.service'
 import {verificationService} from '@/services/verification.service'
 import {walletService} from '@/services/wallet.service'
+
 import {compareDecimal, subtractDecimal} from '@/utils/decimal'
-import {formatCardNumber, formatPersianDateTime, formatToman} from '@/utils/formatters'
+import {formatCardNumber, formatPersianDateTime, formatToman,} from '@/utils/formatters'
 import {resolvePaymentRedirect} from '@/utils/paymentRedirect'
+
 import AppAmountInput from '@/components/ui/AppAmountInput.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -19,42 +23,108 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import VerifiedBankAccountPicker from '@/components/wallet/VerifiedBankAccountPicker.vue'
 
-const amountPresets = ['1000000', '5000000', '10000000', '25000000', '50000000']
+const amountPresets = [
+  '1000000',
+  '5000000',
+  '10000000',
+  '25000000',
+  '50000000',
+]
+
 const approvedPaymentHosts = new Set(
     String(import.meta.env.VITE_PAYMENT_ALLOWED_HOSTS ?? '')
         .split(',')
         .map((host) => host.trim().toLowerCase())
         .filter(Boolean),
 )
+
 const router = useRouter()
+
 const accounts = ref<BankAccount[]>([])
 const verification = ref<VerificationSummary | null>(null)
+
 const amount = ref('')
 const bankAccountId = ref('')
 const depositIdempotencyKey = ref('')
+
 const amountError = ref('')
 const bankError = ref('')
 const requestError = ref('')
+
 const loading = ref(true)
 const submitting = ref(false)
 const reviewOpen = ref(false)
+
 const result = ref<TomanDepositResult | null>(null)
 const resultHeading = ref<HTMLElement | null>(null)
 
-const verifiedAccounts = computed(() => accounts.value.filter((account) => account.status === 'verified'))
-const selectedAccount = computed(() => verifiedAccounts.value.find((account) => account.id === bankAccountId.value))
+const verifiedAccounts = computed(() =>
+    accounts.value.filter(
+        (account) => account.status === 'verified',
+    ),
+)
+
+const selectedAccount = computed(() =>
+    verifiedAccounts.value.find(
+        (account) => account.id === bankAccountId.value,
+    ),
+)
+
+const availableVerifiedAccounts = computed(() =>
+    verifiedAccounts.value.filter(
+        (account) =>
+            !account.isTemporarilyDisabled &&
+            account.isUsable !== false,
+    ),
+)
+
+const selectedAccountDisabled = computed(
+    () => Boolean(selectedAccount.value?.isTemporarilyDisabled),
+)
+
+function chooseAlternativeAccount() {
+  const account =
+      availableVerifiedAccounts.value.find(
+          (item) => item.preferred,
+      ) || availableVerifiedAccounts.value[0]
+
+  if (account) {
+    bankAccountId.value = account.id
+    bankError.value = ''
+    requestError.value = ''
+    return
+  }
+
+  void router.push('/app/bank-accounts')
+}
+
 const dailyRemaining = computed(() => {
   if (!verification.value) return ''
+
   const remaining = subtractDecimal(
       verification.value.limits.dailyTomanDeposit,
       verification.value.limits.usedTomanDeposit,
   )
-  return compareDecimal(remaining, '0') > 0 ? remaining : '0'
+
+  return compareDecimal(remaining, '0') > 0
+      ? remaining
+      : '0'
 })
 
 function selectDefaultAccount() {
-  if (bankAccountId.value && verifiedAccounts.value.some((account) => account.id === bankAccountId.value)) return
-  bankAccountId.value = verifiedAccounts.value.find((account) => account.preferred)?.id
+  if (
+      bankAccountId.value
+      && verifiedAccounts.value.some(
+          (account) => account.id === bankAccountId.value,
+      )
+  ) {
+    return
+  }
+
+  bankAccountId.value =
+      verifiedAccounts.value.find(
+          (account) => account.preferred,
+      )?.id
       || verifiedAccounts.value[0]?.id
       || ''
 }
@@ -62,16 +132,23 @@ function selectDefaultAccount() {
 async function load() {
   loading.value = true
   requestError.value = ''
+
   try {
-    const [bankAccounts, verificationSummary] = await Promise.all([
-      bankService.listAccounts(),
-      verificationService.getSummary(),
-    ])
+    const [bankAccounts, verificationSummary] =
+        await Promise.all([
+          bankService.listAccounts(),
+          verificationService.getSummary(),
+        ])
+
     accounts.value = bankAccounts
     verification.value = verificationSummary
+
     selectDefaultAccount()
   } catch (caught) {
-    requestError.value = caught instanceof Error ? caught.message : 'اطلاعات واریز دریافت نشد.'
+    requestError.value =
+        caught instanceof Error
+            ? caught.message
+            : 'اطلاعات واریز دریافت نشد.'
   } finally {
     loading.value = false
   }
@@ -81,19 +158,44 @@ function validate(): boolean {
   amountError.value = ''
   bankError.value = ''
   requestError.value = ''
-  if (!amount.value || compareDecimal(amount.value, '0') <= 0) {
+
+  if (
+      !amount.value
+      || compareDecimal(amount.value, '0') <= 0
+  ) {
     amountError.value = 'مبلغ واریز را وارد کنید.'
-  } else if (compareDecimal(amount.value, '100000') < 0) {
+  } else if (
+      compareDecimal(amount.value, '100000') < 0
+  ) {
     amountError.value = 'حداقل مبلغ واریز ۱۰۰ هزار تومان است.'
-  } else if (dailyRemaining.value && compareDecimal(amount.value, dailyRemaining.value) > 0) {
-    amountError.value = 'مبلغ واردشده بیشتر از سقف باقی‌مانده امروز است.'
+  } else if (
+      dailyRemaining.value
+      && compareDecimal(
+          amount.value,
+          dailyRemaining.value,
+      ) > 0
+  ) {
+    amountError.value =
+        'مبلغ واردشده بیشتر از سقف باقی‌مانده امروز است.'
   }
-  if (!selectedAccount.value) bankError.value = 'یک کارت بانکی تأییدشده انتخاب کنید.'
+
+  if (!selectedAccount.value) {
+    bankError.value =
+        'یک کارت بانکی تأییدشده انتخاب کنید.'
+  } else if (
+      selectedAccount.value.isTemporarilyDisabled
+  ) {
+    bankError.value =
+        'کارت انتخاب‌شده غیرفعال است.'
+  }
+
   return !amountError.value && !bankError.value
 }
 
 function openReview() {
-  if (validate()) reviewOpen.value = true
+  if (validate()) {
+    reviewOpen.value = true
+  }
 }
 
 async function createDeposit() {
@@ -106,36 +208,29 @@ async function createDeposit() {
   requestError.value = ''
 
   if (!depositIdempotencyKey.value) {
-    depositIdempotencyKey.value =
-        crypto.randomUUID()
+    depositIdempotencyKey.value = crypto.randomUUID()
   }
 
   try {
-    result.value =
-        await walletService.createTomanDeposit(
-            {
-              amount: amount.value,
-              bankAccountId:
-              bankAccountId.value,
-            },
-            depositIdempotencyKey.value,
-        )
+    result.value = await walletService.createTomanDeposit(
+        {
+          amount: amount.value,
+          bankAccountId: bankAccountId.value,
+        },
+        depositIdempotencyKey.value,
+    )
 
     reviewOpen.value = false
 
-    // The create request succeeded.
-    // A future new deposit must receive
-    // a fresh idempotency key.
+    // درخواست موفق شد؛ واریز جدید باید کلید تازه داشته باشد.
     depositIdempotencyKey.value = ''
   } catch (caught) {
     if (caught instanceof ApiError) {
       amountError.value =
-          caught.details?.fields?.amount
-          || ''
+          caught.details?.fields?.amount || ''
 
       bankError.value =
-          caught.details?.fields?.bankAccountId
-          || ''
+          caught.details?.fields?.bankAccountId || ''
     }
 
     requestError.value =
@@ -145,11 +240,7 @@ async function createDeposit() {
 
     reviewOpen.value = false
 
-    // IMPORTANT:
-    // Do not reset depositIdempotencyKey here.
-    //
-    // A retry of the same request must use
-    // the same Idempotency-Key.
+    // در صورت خطا، کلید درخواست برای تلاش مجدد حفظ می‌شود.
   } finally {
     submitting.value = false
   }
@@ -157,102 +248,191 @@ async function createDeposit() {
 
 function resetForm() {
   amount.value = ''
+  amountError.value = ''
+  bankError.value = ''
   result.value = null
   requestError.value = ''
   depositIdempotencyKey.value = ''
+
   selectDefaultAccount()
 }
 
 async function goToPayment() {
-  if (!result.value || typeof window === 'undefined') return
+  if (!result.value || typeof window === 'undefined') {
+    return
+  }
+
   requestError.value = ''
+
   const decision = resolvePaymentRedirect(
       result.value.paymentUrl,
       window.location.origin,
       isTestPaymentEnabled,
       approvedPaymentHosts,
   )
+
   if (decision.kind === 'internal-mock') {
     await router.push(decision.target)
     return
   }
+
   if (decision.kind === 'blocked') {
-    requestError.value = decision.reason === 'invalid'
-        ? 'نشانی درگاه معتبر نیست. پرداخت تازه‌ای بسازید یا با پشتیبانی تماس بگیرید.'
-        : decision.reason === 'mock-disabled'
-            ? 'درگاه آزمایشی در نسخه انتشار قابل استفاده نیست.'
-            : 'نشانی درگاه مورد تأیید نیست. برای امنیت حساب، به این مقصد هدایت نشدید.'
+    requestError.value =
+        decision.reason === 'invalid'
+            ? 'نشانی درگاه معتبر نیست. پرداخت تازه‌ای بسازید یا با پشتیبانی تماس بگیرید.'
+            : decision.reason === 'mock-disabled'
+                ? 'درگاه آزمایشی در نسخه انتشار قابل استفاده نیست.'
+                : 'نشانی درگاه مورد تأیید نیست. برای امنیت حساب، به این مقصد هدایت نشدید.'
+
     return
   }
+
   window.location.assign(decision.href)
 }
 
 watch(amount, () => {
-  amountError.value = '';
+  amountError.value = ''
   requestError.value = ''
 })
+
 watch(bankAccountId, () => {
-  bankError.value = '';
+  bankError.value =
+      selectedAccount.value?.isTemporarilyDisabled
+          ? 'کارت انتخاب‌شده غیرفعال است.'
+          : ''
+
   requestError.value = ''
 })
-watch(result, async (value) => {
-  if (!value) return
-  await nextTick()
-  resultHeading.value?.focus({preventScroll: true})
-}, {flush: 'post'})
+
+watch(
+    result,
+    async (value) => {
+      if (!value) return
+
+      await nextTick()
+
+      resultHeading.value?.focus({
+        preventScroll: true,
+      })
+    },
+    {flush: 'post'},
+)
+
 onMounted(load)
 </script>
 
 <template>
   <div class="page page--mobile-cta money-flow-page">
-    <PageHeader title="واریز تومان" description="افزایش موجودی کیف پول از کارت بانکی تأییدشده" back-to="/app/wallet"/>
+    <PageHeader
+        title="واریز تومان"
+        description="افزایش موجودی کیف پول از کارت بانکی تأییدشده"
+        back-to="/app/wallet"
+    />
 
     <div v-if="loading" class="flow-layout">
       <AppSkeleton height="33rem" radius="var(--radius-xl)"/>
       <AppSkeleton height="19rem" radius="var(--radius-xl)"/>
     </div>
 
-    <AppCard v-else-if="requestError && !accounts.length" class="load-state">
-      <EmptyState icon="warning" title="اطلاعات واریز آماده نشد" :description="requestError">
-        <AppButton @click="load">تلاش دوباره</AppButton>
+    <AppCard
+        v-else-if="requestError && !accounts.length"
+        class="load-state"
+    >
+      <EmptyState
+          icon="warning"
+          title="اطلاعات واریز آماده نشد"
+          :description="requestError"
+      >
+        <AppButton @click="load">
+          تلاش دوباره
+        </AppButton>
       </EmptyState>
     </AppCard>
 
-    <AppCard v-else-if="!verifiedAccounts.length" class="load-state">
-      <EmptyState icon="bank" title="کارت تأییدشده‌ای ندارید"
-                  description="برای واریز تومان ابتدا یک کارت بانکی به نام خودتان ثبت و تأیید کنید.">
-        <AppButton to="/app/bank-accounts">افزودن حساب بانکی</AppButton>
+    <AppCard
+        v-else-if="!verifiedAccounts.length"
+        class="load-state"
+    >
+      <EmptyState
+          icon="bank"
+          title="کارت تأییدشده‌ای ندارید"
+          description="برای واریز تومان ابتدا یک کارت بانکی به نام خودتان ثبت و تأیید کنید."
+      >
+        <AppButton to="/app/bank-accounts">
+          افزودن حساب بانکی
+        </AppButton>
       </EmptyState>
     </AppCard>
 
     <div v-else-if="result" class="result-wrap">
       <AppCard class="result-card" padding="lg">
-        <span class="result-icon"><AppIcon name="check" :size="31"/></span>
-        <span class="eyebrow">درگاه پرداخت آماده است</span>
-        <h2 ref="resultHeading" tabindex="-1"><span
-            class="sr-only">درگاه پرداخت آماده است، مبلغ </span>{{ formatToman(result.amount) }}</h2>
-        <p>برای تکمیل واریز، وارد درگاه بانکی شوید. مبلغ پس از بازگشت موفق به کیف پول شما اضافه می‌شود.</p>
+        <span class="result-icon">
+          <AppIcon name="check" :size="31"/>
+        </span>
+
+        <span class="eyebrow">
+          درگاه پرداخت آماده است
+        </span>
+
+        <h2 ref="resultHeading" tabindex="-1">
+          <span class="sr-only">
+            درگاه پرداخت آماده است، مبلغ
+          </span>
+          {{ formatToman(result.amount) }}
+        </h2>
+
+        <p>
+          برای تکمیل واریز، وارد درگاه بانکی شوید.
+          مبلغ پس از بازگشت موفق به کیف پول شما اضافه می‌شود.
+        </p>
+
         <dl>
           <div>
             <dt>شناسه پرداخت</dt>
             <dd dir="ltr">{{ result.id }}</dd>
           </div>
+
           <div>
             <dt>مهلت پرداخت</dt>
-            <dd>{{ formatPersianDateTime(result.expiresAt) }}</dd>
+            <dd>
+              {{ formatPersianDateTime(result.expiresAt) }}
+            </dd>
           </div>
+
           <div v-if="selectedAccount">
             <dt>کارت پرداخت</dt>
             <dd>{{ selectedAccount.bank.nameFa }}</dd>
           </div>
         </dl>
-        <div v-if="requestError" class="form-error result-error" role="alert">
+
+        <div
+            v-if="requestError"
+            class="form-error result-error"
+            role="alert"
+        >
           <AppIcon name="warning" :size="18"/>
-          <span>{{ requestError }}</span></div>
-        <div class="result-actions">
-          <AppButton block size="lg" icon="bank" @click="goToPayment">ورود به درگاه پرداخت</AppButton>
-          <AppButton block variant="secondary" @click="resetForm">تغییر مبلغ</AppButton>
+          <span>{{ requestError }}</span>
         </div>
+
+        <div class="result-actions">
+          <AppButton
+              block
+              size="lg"
+              icon="bank"
+              @click="goToPayment"
+          >
+            ورود به درگاه پرداخت
+          </AppButton>
+
+          <AppButton
+              block
+              variant="secondary"
+              @click="resetForm"
+          >
+            تغییر مبلغ
+          </AppButton>
+        </div>
+
         <div class="payment-warning">
           <AppIcon name="warning" :size="18"/>
           فقط با کارت انتخاب‌شده و متعلق به صاحب حساب پرداخت کنید.
@@ -262,88 +442,186 @@ onMounted(load)
 
     <div v-else class="flow-layout">
       <AppCard class="flow-card" padding="lg">
-        <div class="flow-intro"><span><AppIcon name="download" :size="24"/></span>
-          <div><h2>مبلغ و کارت پرداخت</h2>
-            <p>پرداخت در درگاه امن بانکی تکمیل می‌شود.</p></div>
+        <div class="flow-intro">
+          <span>
+            <AppIcon name="download" :size="24"/>
+          </span>
+
+          <div>
+            <h2>مبلغ و کارت پرداخت</h2>
+            <p>پرداخت در درگاه امن بانکی تکمیل می‌شود.</p>
+          </div>
         </div>
 
-        <form class="deposit-form" @submit.prevent="openReview">
-          <AppAmountInput v-model="amount" label="مبلغ واریز" suffix="تومان" :error="amountError"/>
-          <div class="preset-list" aria-label="مبالغ پیشنهادی">
-            <button v-for="preset in amountPresets" :key="preset" type="button" :class="{ active: amount === preset }"
-                    @click="amount = preset">{{ formatToman(preset) }}
+        <form
+            class="deposit-form"
+            @submit.prevent="openReview"
+        >
+          <AppAmountInput
+              v-model="amount"
+              label="مبلغ واریز"
+              suffix="تومان"
+              :error="amountError"
+          />
+
+          <div
+              class="preset-list"
+              aria-label="مبالغ پیشنهادی"
+          >
+            <button
+                v-for="preset in amountPresets"
+                :key="preset"
+                type="button"
+                :class="{ active: amount === preset }"
+                @click="amount = preset"
+            >
+              {{ formatToman(preset) }}
             </button>
           </div>
-          <VerifiedBankAccountPicker v-model="bankAccountId" :accounts="verifiedAccounts" label="کارت مبدأ"
-                                     :error="bankError"/>
-          <div v-if="requestError" class="form-error" role="alert">
+
+          <VerifiedBankAccountPicker
+              v-model="bankAccountId"
+              :accounts="verifiedAccounts"
+              label="کارت مبدأ"
+              :error="selectedAccountDisabled ? '' : bankError"
+              @manage-accounts="router.push('/app/bank-accounts')"
+          />
+
+          <div
+              v-if="requestError"
+              class="form-error"
+              role="alert"
+          >
             <AppIcon name="warning" :size="18"/>
-            <span>{{ requestError }}</span></div>
+            <span>{{ requestError }}</span>
+          </div>
+
           <div class="mobile-cta">
-            <AppButton block size="lg" type="submit">ادامه و پرداخت</AppButton>
+            <AppButton
+                block
+                size="lg"
+                type="submit"
+                :disabled="selectedAccountDisabled"
+            >
+              ادامه و پرداخت
+            </AppButton>
           </div>
         </form>
       </AppCard>
 
       <aside class="flow-aside">
         <AppCard>
-          <div class="aside-title"><span><AppIcon name="info" :size="20"/></span>
-            <div><h3>سقف واریز امروز</h3>
-              <p>بر اساس سطح حساب شما</p></div>
+          <div class="aside-title">
+            <span>
+              <AppIcon name="info" :size="20"/>
+            </span>
+
+            <div>
+              <h3>سقف واریز امروز</h3>
+              <p>بر اساس سطح حساب شما</p>
+            </div>
           </div>
+
           <dl class="limits">
             <div>
               <dt>حداقل واریز</dt>
               <dd>{{ formatToman('100000') }}</dd>
             </div>
+
             <div v-if="verification">
               <dt>سقف روزانه</dt>
-              <dd>{{ formatToman(verification.limits.dailyTomanDeposit) }}</dd>
+              <dd>
+                {{ formatToman(verification.limits.dailyTomanDeposit) }}
+              </dd>
             </div>
+
             <div v-if="dailyRemaining">
               <dt>باقی‌مانده امروز</dt>
-              <dd class="success">{{ formatToman(dailyRemaining) }}</dd>
+              <dd class="success">
+                {{ formatToman(dailyRemaining) }}
+              </dd>
             </div>
           </dl>
         </AppCard>
+
         <div class="trust-note">
           <AppIcon name="shield" :size="20"/>
-          <span><strong>پرداخت به نام خودتان</strong><small>واریز از کارت اشخاص دیگر پذیرفته نمی‌شود.</small></span>
+          <span>
+            <strong>پرداخت به نام خودتان</strong>
+            <small>
+              واریز از کارت اشخاص دیگر پذیرفته نمی‌شود.
+            </small>
+          </span>
         </div>
       </aside>
     </div>
 
-    <AppModal v-model="reviewOpen" title="تأیید و ساخت پرداخت"
-              description="پیش از ورود به درگاه، اطلاعات را بررسی کنید." size="sm" :dismissible="!submitting">
+    <AppModal
+        v-model="reviewOpen"
+        title="تأیید و ساخت پرداخت"
+        description="پیش از ورود به درگاه، اطلاعات را بررسی کنید."
+        size="sm"
+        :dismissible="!submitting"
+    >
       <div class="review">
-        <div class="review-amount"><span>مبلغ پرداخت</span><strong>{{ formatToman(amount) }}</strong></div>
+        <div class="review-amount">
+          <span>مبلغ پرداخت</span>
+          <strong>{{ formatToman(amount) }}</strong>
+        </div>
+
         <dl>
           <div v-if="selectedAccount">
             <dt>کارت مبدأ</dt>
-            <dd>{{ selectedAccount.bank.nameFa }} ·
-              <bdi dir="ltr">{{
-                  formatCardNumber(selectedAccount.cardNumber, {masked: true, usePersianDigits: true})
+            <dd>
+              {{ selectedAccount.bank.nameFa }} ·
+              <bdi dir="ltr">
+                {{
+                  formatCardNumber(
+                      selectedAccount.cardNumber,
+                      {
+                        masked: true,
+                        usePersianDigits: true,
+                      },
+                  )
                 }}
               </bdi>
             </dd>
           </div>
+
           <div>
             <dt>کارمزد واریز</dt>
             <dd class="success">رایگان</dd>
           </div>
+
           <div>
             <dt>افزایش موجودی</dt>
             <dd>{{ formatToman(amount) }}</dd>
           </div>
         </dl>
+
         <div class="review-note">
           <AppIcon name="info" :size="17"/>
           تا ۱۰ دقیقه برای تکمیل پرداخت فرصت دارید.
         </div>
       </div>
+
       <template #footer>
-        <AppButton block :loading="submitting" @click="createDeposit">تأیید و ساخت درگاه</AppButton>
-        <AppButton block variant="secondary" :disabled="submitting" @click="reviewOpen = false">بازگشت</AppButton>
+        <AppButton
+            block
+            :loading="submitting"
+            @click="createDeposit"
+        >
+          تأیید و ساخت درگاه
+        </AppButton>
+
+        <AppButton
+            block
+            variant="secondary"
+            :disabled="submitting"
+            @click="reviewOpen = false"
+        >
+          بازگشت
+        </AppButton>
       </template>
     </AppModal>
   </div>
@@ -365,13 +643,15 @@ onMounted(load)
   overflow: hidden;
 }
 
-.flow-intro, .aside-title {
+.flow-intro,
+.aside-title {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.flow-intro > span, .aside-title > span {
+.flow-intro > span,
+.aside-title > span {
   display: grid;
   width: 3rem;
   height: 3rem;
@@ -382,12 +662,14 @@ onMounted(load)
   place-items: center;
 }
 
-.flow-intro h2, .aside-title h3 {
+.flow-intro h2,
+.aside-title h3 {
   margin: 0;
   font-size: var(--font-size-lg);
 }
 
-.flow-intro p, .aside-title p {
+.flow-intro p,
+.aside-title p {
   margin: .1rem 0 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
@@ -417,7 +699,8 @@ onMounted(load)
   white-space: nowrap;
 }
 
-.preset-list button:hover, .preset-list button.active {
+.preset-list button:hover,
+.preset-list button.active {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
   color: var(--color-primary);
@@ -469,7 +752,8 @@ onMounted(load)
   font-weight: 600;
 }
 
-.limits .success, .success {
+.limits .success,
+.success {
   color: var(--color-success);
 }
 
@@ -532,13 +816,15 @@ onMounted(load)
   font-size: var(--font-size-2xl);
 }
 
-.review dl, .result-card dl {
+.review dl,
+.result-card dl {
   display: grid;
   gap: var(--space-3);
   margin: 0;
 }
 
-.review dl div, .result-card dl div {
+.review dl div,
+.result-card dl div {
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
@@ -546,17 +832,20 @@ onMounted(load)
   border-block-end: 1px solid var(--color-border-soft);
 }
 
-.review dt, .result-card dt {
+.review dt,
+.result-card dt {
   color: var(--color-text-muted);
 }
 
-.review dd, .result-card dd {
+.review dd,
+.result-card dd {
   margin: 0;
   font-weight: 600;
   text-align: end;
 }
 
-.review-note, .payment-warning {
+.review-note,
+.payment-warning {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -665,4 +954,5 @@ onMounted(load)
     grid-column: 1 / -1;
   }
 }
+
 </style>

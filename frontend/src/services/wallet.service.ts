@@ -15,23 +15,10 @@ import type {
     WithdrawalEstimate,
     WithdrawalOtpChallenge,
 } from '@/types'
-import {
-    addDecimal,
-    calculateQuoteTotal,
-    compareDecimal,
-    subtractDecimal,
-} from '@/utils/decimal'
+import {addDecimal, calculateQuoteTotal, compareDecimal, subtractDecimal,} from '@/utils/decimal'
 import {normalizeDigits} from '@/utils/formatters'
-import {
-    api,
-    ApiError,
-    resolveApi,
-} from './api'
-import {
-    createMockId,
-    futureIso,
-    nowIso,
-} from './mock/helpers'
+import {api, ApiError, resolveApi,} from './api'
+import {createMockId, futureIso, nowIso,} from './mock/helpers'
 import {mockDb} from './mock/state'
 import {mockAssets} from './mock/data'
 import {isMockTwoFactorEnabled} from './security.service'
@@ -367,10 +354,10 @@ function findNetwork(
     const network =
         findWalletAsset(symbol)
             .networks.find(
-                (item) =>
-                    item.code.toUpperCase()
-                    === networkCode.toUpperCase(),
-            )
+            (item) =>
+                item.code.toUpperCase()
+                === networkCode.toUpperCase(),
+        )
 
     if (!network) {
         throw new ApiError(
@@ -534,7 +521,7 @@ export const walletService: WalletService = {
                         }:${
                             network.code.toUpperCase()
                         }`
-                    ]
+                        ]
 
                 if (!destination) {
                     throw new ApiError(
@@ -547,15 +534,15 @@ export const walletService: WalletService = {
                 return {
                     assetSymbol: symbol,
                     networkCode:
-                        network.code,
+                    network.code,
                     address:
-                        destination.address,
+                    destination.address,
                     memo:
-                        destination.memo,
+                    destination.memo,
                     minimumDeposit:
-                        network.minimumDeposit,
+                    network.minimumDeposit,
                     requiredConfirmations:
-                        network.confirmations,
+                    network.confirmations,
                     createdAt: nowIso(),
                 }
             },
@@ -568,7 +555,7 @@ export const walletService: WalletService = {
                     {
                         query: {
                             network:
-                                networkCode,
+                            networkCode,
                         },
                     },
                 ),
@@ -628,7 +615,6 @@ export const walletService: WalletService = {
                         },
                     )
                 }
-
                 const account =
                     mockDb.bankAccounts.find(
                         (item) =>
@@ -636,6 +622,36 @@ export const walletService: WalletService = {
                             === input.bankAccountId,
                     )
 
+
+                if (account?.isTemporarilyDisabled) {
+                    throw new ApiError(
+                        'کارت انتخاب‌شده غیرفعال است.',
+                        'BANK_ACCOUNT_DISABLED',
+                        409,
+                        {
+                            fields: {
+                                bankAccountId:
+                                    'کارت انتخاب‌شده غیرفعال است.',
+                            },
+                        },
+                    )
+                }
+
+// اعتبارسنجی معمول حساب بانکی
+                if (
+                    !account
+                    || account.status !== 'verified'
+                ) {
+                    throw new ApiError(
+                        'برای واریز، یک کارت بانکی تأییدشده انتخاب کنید.',
+                        'BANK_ACCOUNT_REQUIRED',
+                        409,
+                        {
+                            actionLabel: 'افزودن حساب بانکی',
+                            actionRoute: '/app/bank-accounts',
+                        },
+                    )
+                }
                 if (
                     !account
                     || account.status
@@ -664,7 +680,7 @@ export const walletService: WalletService = {
                     {
                         id,
                         amount:
-                            input.amount,
+                        input.amount,
                         paymentUrl:
                             `/mock-payment/${id}`,
                         expiresAt:
@@ -688,7 +704,7 @@ export const walletService: WalletService = {
                     {
                         headers: {
                             'Idempotency-Key':
-                                idempotencyKey,
+                            idempotencyKey,
                         },
                     },
                 ),
@@ -848,7 +864,7 @@ export const walletService: WalletService = {
                         amount,
 
                         tomanAmount:
-                            amount,
+                        amount,
 
                         fee: '0',
 
@@ -1026,7 +1042,7 @@ export const walletService: WalletService = {
                             ),
 
                         estimateVersion:
-                            withdrawalEstimateVersion,
+                        withdrawalEstimateVersion,
 
                         expiresAt:
                             futureIso(
@@ -1036,7 +1052,7 @@ export const walletService: WalletService = {
                         amount,
 
                         bankAccountId:
-                            account.id,
+                        account.id,
 
                         fee,
 
@@ -1193,16 +1209,16 @@ export const walletService: WalletService = {
                             'IRT',
 
                         amount:
-                            estimate.amount,
+                        estimate.amount,
 
                         tomanAmount:
-                            estimate.receivable,
+                        estimate.receivable,
 
                         fee:
-                            estimate.fee,
+                        estimate.fee,
 
                         bankAccountId:
-                            account.id,
+                        account.id,
 
                         title:
                             'برداشت تومان',
@@ -1244,7 +1260,7 @@ export const walletService: WalletService = {
                     input.idempotencyKey,
                     {
                         estimateToken:
-                            estimate.estimateToken,
+                        estimate.estimateToken,
                         transaction,
                     },
                 )
@@ -1268,7 +1284,7 @@ export const walletService: WalletService = {
                     {
                         headers: {
                             'Idempotency-Key':
-                                idempotencyKey,
+                            idempotencyKey,
                         },
                     },
                 )
@@ -1396,7 +1412,7 @@ export const walletService: WalletService = {
                         409,
                         {
                             remaining:
-                                dailyRemaining,
+                            dailyRemaining,
                             actionLabel:
                                 'مشاهده سقف‌ها',
                             actionRoute:
@@ -1460,7 +1476,7 @@ export const walletService: WalletService = {
                             ),
 
                         estimateVersion:
-                            withdrawalEstimateVersion,
+                        withdrawalEstimateVersion,
 
                         expiresAt:
                             futureIso(
@@ -1468,22 +1484,22 @@ export const walletService: WalletService = {
                             ),
 
                         assetSymbol:
-                            input.assetSymbol,
+                        input.assetSymbol,
 
                         networkCode:
-                            network.code,
+                        network.code,
 
                         address,
 
                         memo,
 
                         amount:
-                            input.amount,
+                        input.amount,
 
                         tomanEquivalent,
 
                         fee:
-                            network.withdrawalFee,
+                        network.withdrawalFee,
 
                         receivable:
                             subtractDecimal(
@@ -1492,7 +1508,7 @@ export const walletService: WalletService = {
                             ),
 
                         estimatedArrivalMinutes:
-                            network.estimatedArrivalMinutes,
+                        network.estimatedArrivalMinutes,
                     }
 
                 mockCryptoWithdrawalIntents.set(
@@ -1968,24 +1984,24 @@ export const walletService: WalletService = {
                             'pending',
 
                         assetSymbol:
-                            estimate.assetSymbol,
+                        estimate.assetSymbol,
 
                         amount:
-                            estimate.amount,
+                        estimate.amount,
 
                         fee:
-                            estimate.fee,
+                        estimate.fee,
 
                         networkCode:
-                            estimate.networkCode,
+                        estimate.networkCode,
 
                         address:
-                            estimate.address,
+                        estimate.address,
 
                         confirmations: 0,
 
                         requiredConfirmations:
-                            network.confirmations,
+                        network.confirmations,
 
                         title:
                             `برداشت ${asset.nameFa}`,
@@ -2025,7 +2041,7 @@ export const walletService: WalletService = {
                     input.idempotencyKey,
                     {
                         estimateToken:
-                            estimate.estimateToken,
+                        estimate.estimateToken,
                         transaction,
                     },
                 )
@@ -2074,7 +2090,7 @@ export const walletService: WalletService = {
                     {
                         headers: {
                             'Idempotency-Key':
-                                idempotencyKey,
+                            idempotencyKey,
                         },
                     },
                 )
