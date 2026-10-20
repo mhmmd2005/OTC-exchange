@@ -405,7 +405,19 @@ class SecurityPasswordAPIView(APIView):
                 "REMOTE_ADDR"
             ),
         )
+        from apps.notifications.services import create_notification
 
+        create_notification(
+            user=user,
+            category="security",
+            title="هشدار امنیتی: رمز عبور تغییر کرد",
+            message=(
+                "رمز عبور حساب روشای شما با موفقیت تغییر کرد. "
+                "اگر این تغییر توسط شما انجام نشده است، "
+                "حساب خود را بررسی کنید."
+            ),
+            force_email=True,
+        )
         return Response(
             {
                 "message": (

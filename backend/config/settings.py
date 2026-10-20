@@ -167,9 +167,43 @@ FRONTEND_URL = env(
     default="http://localhost:5173",
 )
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "noreply@rosha.test"
-EMAIL_TIMEOUT = 30
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.smtp.EmailBackend",
+)
+
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+
+EMAIL_USE_TLS = env.bool(
+    "EMAIL_USE_TLS",
+    default=True,
+)
+
+EMAIL_USE_SSL = env.bool(
+    "EMAIL_USE_SSL",
+    default=False,
+)
+
+EMAIL_HOST_USER = env(
+    "EMAIL_HOST_USER",
+    default="",
+)
+
+EMAIL_HOST_PASSWORD = env(
+    "EMAIL_HOST_PASSWORD",
+    default="",
+)
+
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    default="noreply@rosha.test",
+)
+
+EMAIL_TIMEOUT = env.int(
+    "EMAIL_TIMEOUT",
+    default=30,
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"

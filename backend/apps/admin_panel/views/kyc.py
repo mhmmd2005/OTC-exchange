@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import BankAccount
 from apps.kyc.models import KycApplication
+from apps.notifications.services import create_notification
 from ..authentication import AdminJWTAuthentication
 from ..permissions import IsAdminAuthenticated
 from ..serializers import (
@@ -149,8 +150,16 @@ class AdminKycApproveStepAPIView(APIView):
                 )
 
             if step == "identity":
-                kyc.approve_identity(
-                    request.user,
+                kyc.approve_identity(request.user)
+
+                create_notification(
+                    user=kyc.user,
+                    category="kyc",
+                    title="مدارک هویتی شما تأیید شد",
+                    message=(
+                        "مدارک هویتی شما پس از بررسی ادمین روشا تأیید شد."
+                    ),
+                    send_email=True,
                 )
             else:
                 return Response(
@@ -233,6 +242,18 @@ class AdminKycRejectStepAPIView(APIView):
             kyc.reject_identity(
                 serializer.validated_data["reason"],
                 request.user,
+            )
+
+            create_notification(
+                user=kyc.user,
+                category="kyc",
+                title="مدارک هویتی شما تأیید نشد",
+                message=(
+                    "مدرک هویتی شما توسط ادمین روشا رد شد.\n"
+                    "دلیل رد: "
+                    f"{serializer.validated_data['reason']}"
+                ),
+                send_email=True,
             )
         except DjangoValidationError as exc:
             return Response(

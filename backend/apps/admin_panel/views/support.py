@@ -7,6 +7,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.notifications.services import create_notification
 from apps.support.models import Ticket, TicketMessage
 from apps.support.realtime import broadcast_ticket_message
 from ..authentication import AdminJWTAuthentication
@@ -205,10 +206,19 @@ class AdminTicketReplyAPIView(APIView):
             message=serializer.validated_data["body"],
         )
 
-        # پاسخ ادمین برای کاربر به‌عنوان پاسخ داده‌شده نمایش داده می‌شود.
         ticket.status = "resolved"
         ticket.save(
             update_fields=["status", "updated_at"],
+        )
+        create_notification(
+            user=ticket.user,
+            category="support",
+            title="پاسخ جدید از پشتیبانی روشا",
+            message=(
+                "پشتیبانی روشا به تیکت شما پاسخ داده است.\n\n"
+                f"{message.message}"
+            ),
+            send_email=True,
         )
         transaction.on_commit(
             lambda message_id=message.pk: broadcast_ticket_message(

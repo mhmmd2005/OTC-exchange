@@ -1038,6 +1038,19 @@ class AuthService:
             ),
             ip_address=request_ip,
         )
+        from apps.notifications.services import create_notification
+
+        create_notification(
+            user=user,
+            category="security",
+            title="هشدار امنیتی: رمز عبور تغییر کرد",
+            message=(
+                "رمز عبور حساب روشای شما با موفقیت بازنشانی شد. "
+                "اگر این عملیات را انجام نداده‌اید، "
+                "فوراً حساب خود را بررسی و برای ایمن‌سازی آن اقدام کنید."
+            ),
+            force_email=True,
+        )
 
         return {
             "message": "Password reset successfully.",

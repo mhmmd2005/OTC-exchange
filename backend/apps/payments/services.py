@@ -16,6 +16,7 @@ from django.utils import timezone
 from apps.accounts.models import BankAccount
 from apps.assets.models import Asset
 from apps.kyc.models import KycApplication
+from apps.notifications.services import create_notification
 from apps.transactions.models import Transaction
 from apps.wallets.services import credit_wallet
 from .gateways import get_payment_gateway
@@ -586,8 +587,9 @@ def _mark_gateway_failure(
         payment_attempt: PaymentAttempt,
         gateway_error: PaymentGatewayError,
 ) -> None:
-    payment_attempt.status = "failed"
+    was_already_failed = payment_attempt.status == "failed"
 
+    payment_attempt.status = "failed"
     payment_attempt.failed_at = timezone.now()
 
     payment_attempt.gateway_code = (
@@ -596,9 +598,7 @@ def _mark_gateway_failure(
         else ""
     )
 
-    payment_attempt.gateway_message = (
-        gateway_error.message
-    )
+    payment_attempt.gateway_message = gateway_error.message
 
     payment_attempt.save(
         update_fields=[
@@ -609,6 +609,18 @@ def _mark_gateway_failure(
             "updated_at",
         ],
     )
+
+    if not was_already_failed:
+        create_notification(
+            user=payment_attempt.user,
+            category="deposit",
+            title="واریز ناموفق بود",
+            message=(
+                "عملیات واریز شما با موفقیت تکمیل نشد. "
+                "وضعیت پرداخت را در پنل روشا بررسی کنید."
+            ),
+            send_email=True,
+        )
 
 
 def _mark_payment_attempt_failed(
@@ -621,13 +633,13 @@ def _mark_payment_attempt_failed(
         locked_attempt = (
             PaymentAttempt.objects
             .select_for_update()
-            .get(
-                pk=payment_attempt_id,
-            )
+            .get(pk=payment_attempt_id)
         )
 
         if locked_attempt.status == "succeeded":
             return
+
+        was_already_failed = locked_attempt.status == "failed"
 
         locked_attempt.status = "failed"
         locked_attempt.failed_at = timezone.now()
@@ -643,6 +655,18 @@ def _mark_payment_attempt_failed(
                 "updated_at",
             ],
         )
+
+        if not was_already_failed:
+            create_notification(
+                user=locked_attempt.user,
+                category="deposit",
+                title="واریز ناموفق بود",
+                message=(
+                    "عملیات واریز شما با موفقیت تکمیل نشد. "
+                    "وضعیت پرداخت را در پنل روشا بررسی کنید."
+                ),
+                send_email=True,
+            )
 
 
 def _get_attempt_invoice_id(
@@ -1562,7 +1586,16 @@ def settle_toman_deposit(
             "updated_at",
         ],
     )
-
+    create_notification(
+        user=payment_attempt.user,
+        category="deposit",
+        title="واریز تومان موفق بود",
+        message=(
+            f"مبلغ {payment_attempt.amount:,.0f} تومان "
+            "با موفقیت به کیف پول شما اضافه شد."
+        ),
+        send_email=True,
+    )
     return deposit_transaction
 
 
