@@ -1,9 +1,10 @@
 from celery import shared_task
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 
 from apps.accounts.models import UserPreferences
 from apps.notifications.models import Notification
+from apps.notifications.email_templates import render_notification_email
 
 
 @shared_task(
@@ -20,13 +21,13 @@ def send_notification_email_task(
     notification_id,
     force_email=False,
 ):
-    """
-    Send email for an explicitly email-enabled notification.
+    """Send a notification as HTML plus a plain-text fallback.
 
-    A forced email bypasses the preference only for security alerts.
-    A verified email address is always required.
+    Existing delivery rules are preserved:
+    - The user's email must be present and verified.
+    - Only security notifications may bypass the email preference.
+    - Celery retries transient errors up to three times.
     """
-
     notification = (
         Notification.objects
         .select_related("user")
@@ -39,11 +40,11 @@ def send_notification_email_task(
 
     user = notification.user
 
-    # Never send account notifications to an unverified address.
+    # Never send account notifications to an unverified email address.
     if not user.email or not user.email_verified_at:
         return False
 
-    # Prevent force-email from bypassing preferences for other categories.
+    # Only security notifications may bypass the user's email preference.
     force_email = bool(
         force_email
         and notification.category == "security"
@@ -69,6 +70,7 @@ def send_notification_email_task(
         "http://localhost:5173",
     ).rstrip("/")
 
+    # Plain-text fallback for clients that do not display HTML email.
     lines = [
         f"سلام {user.full_name or 'کاربر عزیز'}،",
         "",
@@ -107,13 +109,23 @@ def send_notification_email_task(
 
     lines.append("تیم روشا")
 
-    sent_count = send_mail(
-        subject=notification.title,
-        message="\n".join(lines),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
+    # Render a topic-specific HTML design from the central templates module.
+    html_content = render_notification_email(
+        notification=notification,
+        user=user,
+        frontend_url=frontend_url,
+        force_email=force_email,
     )
+
+    email = EmailMultiAlternatives(
+        subject=notification.title,
+        body="\n".join(lines),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email.attach_alternative(html_content, "text/html")
+
+    sent_count = email.send(fail_silently=False)
 
     if sent_count != 1:
         raise RuntimeError(
