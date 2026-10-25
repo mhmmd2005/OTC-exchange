@@ -97,4 +97,16 @@ const colors: Record<string, string> = { USDT: '#26A17B', BTC: '#F7931A', ETH: '
   .order-card { width: 100%; max-width: 100%; min-width: 0; }
 }
 @container order-data (max-width: 24rem) { .order-card { padding-inline: var(--space-3); }.order-card header { align-items: flex-start; }.order-card__identity { gap: var(--space-2); }.order-card__amounts { grid-template-columns: 1fr; } }
+
+/* FIX: Preserve native table-cell layout for order values. */
+.order-table tbody td.order-value {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.order-table tbody td.order-date > strong,
+.order-table tbody td.order-date > small {
+  display: block;
+}
+
 </style>
