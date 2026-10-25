@@ -1,7 +1,6 @@
-
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import {computed, onMounted, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
 
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -11,13 +10,9 @@ import AppTabs from '@/components/ui/AppTabs.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 
-import { useNotificationsStore } from '@/stores/notifications'
-import type { NotificationCategory, NotificationItem } from '@/types'
-import {
-  formatPersianDateTime,
-  formatRelativeTime,
-  toPersianDigits,
-} from '@/utils/formatters'
+import {useNotificationsStore} from '@/stores/notifications'
+import type {NotificationCategory, NotificationItem} from '@/types'
+import {formatPersianDateTime, formatRelativeTime, toPersianDigits,} from '@/utils/formatters'
 
 const router = useRouter()
 const notifications = useNotificationsStore()
@@ -28,8 +23,8 @@ const actionLoadingId = ref('')
 const feedback = ref('')
 
 const viewTabs = [
-  { label: 'همه اعلان‌ها', value: 'all' },
-  { label: 'خوانده‌نشده', value: 'unread' },
+  {label: 'همه اعلان‌ها', value: 'all'},
+  {label: 'خوانده‌نشده', value: 'unread'},
 ]
 
 const categories: Array<{
@@ -37,36 +32,36 @@ const categories: Array<{
   label: string
   icon: string
 }> = [
-  { value: '', label: 'همه', icon: 'bell' },
-  { value: 'order', label: 'سفارش', icon: 'orders' },
-  { value: 'deposit', label: 'واریز', icon: 'arrowDown' },
-  { value: 'withdrawal', label: 'برداشت', icon: 'arrowUp' },
-  { value: 'verification', label: 'احراز هویت', icon: 'verify' },
-  { value: 'security', label: 'امنیت', icon: 'shield' },
-  { value: 'support', label: 'پشتیبانی', icon: 'help' },
-  { value: 'system', label: 'سیستم', icon: 'settings' },
+  {value: '', label: 'همه', icon: 'bell'},
+  {value: 'order', label: 'سفارش', icon: 'orders'},
+  {value: 'deposit', label: 'واریز', icon: 'arrowDown'},
+  {value: 'withdrawal', label: 'برداشت', icon: 'arrowUp'},
+  {value: 'verification', label: 'احراز هویت', icon: 'verify'},
+  {value: 'security', label: 'امنیت', icon: 'shield'},
+  {value: 'support', label: 'پشتیبانی', icon: 'help'},
+  {value: 'system', label: 'سیستم', icon: 'settings'},
 ]
 
 const visibleTitle = computed(() => {
   const selected = categories.find(
-    (item) => item.value === category.value,
+      (item) => item.value === category.value,
   )
 
   return category.value
-    ? `اعلان‌های ${selected?.label ?? ''}`
-    : 'آخرین اعلان‌ها'
+      ? `اعلان‌های ${selected?.label ?? ''}`
+      : 'آخرین اعلان‌ها'
 })
 
 function categoryMeta(value: NotificationCategory) {
   return categories.find(
-    (item) => item.value === value,
+      (item) => item.value === value,
   ) ?? categories[0]
 }
 
 function readableError(error: unknown): string {
   return error instanceof Error
-    ? error.message
-    : 'عملیات انجام نشد. لطفاً دوباره تلاش کنید.'
+      ? error.message
+      : 'عملیات انجام نشد. لطفاً دوباره تلاش کنید.'
 }
 
 function currentFilters() {
@@ -112,8 +107,8 @@ async function markAll(): Promise<void> {
     }
 
     feedback.value = refreshed
-      ? 'همه اعلان‌ها خوانده شدند.'
-      : 'اعلان‌ها خوانده شدند، اما به‌روزرسانی فهرست انجام نشد.'
+        ? 'همه اعلان‌ها خوانده شدند.'
+        : 'اعلان‌ها خوانده شدند، اما به‌روزرسانی فهرست انجام نشد.'
   } catch (error) {
     // خطای عملیات در پیام صفحه نشان داده می‌شود، نه به‌عنوان خطای بارگیری فهرست.
     notifications.error = null
@@ -174,28 +169,28 @@ onMounted(() => {
 <template>
   <div class="page notifications-page">
     <PageHeader
-      title="اعلان‌ها"
-      description="رویدادهای مهم حساب و آخرین وضعیت درخواست‌ها را دنبال کنید."
+        title="اعلان‌ها"
+        description="رویدادهای مهم حساب و آخرین وضعیت درخواست‌ها را دنبال کنید."
     >
       <template #actions>
         <div class="notifications-header-actions">
           <AppButton
-            variant="secondary"
-            size="sm"
-            icon="refresh"
-            :loading="notifications.loading"
-            :disabled="Boolean(actionLoadingId)"
-            @click="load"
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              :loading="notifications.loading"
+              :disabled="Boolean(actionLoadingId)"
+              @click="load"
           >
             به‌روزرسانی
           </AppButton>
 
           <AppButton
-            variant="secondary"
-            icon="check"
-            :disabled="!notifications.unreadCount || Boolean(actionLoadingId)"
-            :loading="actionLoadingId === 'all'"
-            @click="markAll"
+              variant="secondary"
+              icon="check"
+              :disabled="!notifications.unreadCount || Boolean(actionLoadingId)"
+              :loading="actionLoadingId === 'all'"
+              @click="markAll"
           >
             خواندن همه
           </AppButton>
@@ -205,8 +200,8 @@ onMounted(() => {
 
     <AppCard class="notification-summary" padding="lg">
       <span class="summary-icon">
-        <AppIcon name="bell" :size="27" />
-        <i v-if="notifications.unreadCount" />
+        <AppIcon name="bell" :size="27"/>
+        <i v-if="notifications.unreadCount"/>
       </span>
 
       <div>
@@ -220,8 +215,8 @@ onMounted(() => {
         <p>
           {{
             notifications.unreadCount
-              ? 'رویدادهای مهم را از همین صفحه بررسی کنید.'
-              : 'اعلان تازه‌ای برای بررسی باقی نمانده است.'
+                ? 'رویدادهای مهم را از همین صفحه بررسی کنید.'
+                : 'اعلان تازه‌ای برای بررسی باقی نمانده است.'
           }}
         </p>
       </div>
@@ -230,15 +225,15 @@ onMounted(() => {
     </AppCard>
 
     <div v-if="feedback" class="feedback" role="status">
-      <AppIcon name="info" :size="18" />
+      <AppIcon name="info" :size="18"/>
       <span>{{ feedback }}</span>
 
       <button
-        type="button"
-        aria-label="بستن"
-        @click="feedback = ''"
+          type="button"
+          aria-label="بستن"
+          @click="feedback = ''"
       >
-        <AppIcon name="close" :size="16" />
+        <AppIcon name="close" :size="16"/>
       </button>
     </div>
 
@@ -248,23 +243,23 @@ onMounted(() => {
 
         <nav aria-label="فیلتر دسته اعلان‌ها">
           <button
-            v-for="item in categories"
-            :key="item.value || 'all'"
-            type="button"
-            :class="{ active: category === item.value }"
-            :aria-pressed="category === item.value"
-            :disabled="Boolean(actionLoadingId)"
-            @click="category = item.value"
+              v-for="item in categories"
+              :key="item.value || 'all'"
+              type="button"
+              :class="{ active: category === item.value }"
+              :aria-pressed="category === item.value"
+              :disabled="Boolean(actionLoadingId)"
+              @click="category = item.value"
           >
             <span>
-              <AppIcon :name="item.icon" :size="19" />
+              <AppIcon :name="item.icon" :size="19"/>
               {{ item.label }}
             </span>
 
             <AppIcon
-              v-if="category === item.value"
-              name="check"
-              :size="16"
+                v-if="category === item.value"
+                name="check"
+                :size="16"
             />
           </button>
         </nav>
@@ -280,36 +275,36 @@ onMounted(() => {
             </span>
           </div>
 
-          <AppTabs v-model="readFilter" :items="viewTabs" />
+          <AppTabs v-model="readFilter" :items="viewTabs"/>
         </div>
 
         <AppCard padding="none" class="notification-list-card">
           <div
-            v-if="notifications.loading"
-            class="notification-skeletons"
+              v-if="notifications.loading"
+              class="notification-skeletons"
           >
             <div
-              v-for="index in 5"
-              :key="index"
-              class="notification-skeleton"
+                v-for="index in 5"
+                :key="index"
+                class="notification-skeleton"
             >
-              <AppSkeleton width="3rem" height="3rem" radius="1rem" />
+              <AppSkeleton width="3rem" height="3rem" radius="1rem"/>
 
               <div>
-                <AppSkeleton width="45%" height="1rem" />
-                <AppSkeleton width="85%" height=".8rem" />
-                <AppSkeleton width="25%" height=".7rem" />
+                <AppSkeleton width="45%" height="1rem"/>
+                <AppSkeleton width="85%" height=".8rem"/>
+                <AppSkeleton width="25%" height=".7rem"/>
               </div>
             </div>
           </div>
 
           <div
-            v-else-if="notifications.error"
-            class="error-state"
-            role="alert"
+              v-else-if="notifications.error"
+              class="error-state"
+              role="alert"
           >
             <span>
-              <AppIcon name="warning" :size="25" />
+              <AppIcon name="warning" :size="25"/>
             </span>
 
             <div>
@@ -318,33 +313,33 @@ onMounted(() => {
             </div>
 
             <AppButton
-              variant="secondary"
-              size="sm"
-              icon="refresh"
-              @click="load"
+                variant="secondary"
+                size="sm"
+                icon="refresh"
+                @click="load"
             >
               تلاش دوباره
             </AppButton>
           </div>
 
           <EmptyState
-            v-else-if="!notifications.items?.length"
-            icon="bell"
-            :title="
+              v-else-if="!notifications.items?.length"
+              icon="bell"
+              :title="
               readFilter === 'unread'
                 ? 'اعلان خوانده‌نشده‌ای ندارید'
                 : 'اعلانی در این دسته نیست'
             "
-            :description="
+              :description="
               readFilter === 'unread'
                 ? 'تمام رویدادهای مهم حساب را بررسی کرده‌اید.'
                 : 'با رخ‌دادن رویداد جدید، اعلان آن اینجا نمایش داده می‌شود.'
             "
           >
             <AppButton
-              v-if="readFilter === 'unread'"
-              variant="secondary"
-              @click="readFilter = 'all'"
+                v-if="readFilter === 'unread'"
+                variant="secondary"
+                @click="readFilter = 'all'"
             >
               نمایش همه اعلان‌ها
             </AppButton>
@@ -352,17 +347,17 @@ onMounted(() => {
 
           <div v-else class="notification-list">
             <article
-              v-for="item in notifications.items"
-              :key="item.id"
-              class="notification-item"
-              :class="{ unread: !item.read }"
+                v-for="item in notifications.items"
+                :key="item.id"
+                class="notification-item"
+                :class="{ unread: !item.read }"
             >
               <span
-                class="category-icon"
-                :class="`category-${item.category}`"
+                  class="category-icon"
+                  :class="`category-${item.category}`"
               >
-                <AppIcon :name="categoryMeta(item.category).icon" :size="22" />
-                <i v-if="!item.read" aria-label="خوانده‌نشده" />
+                <AppIcon :name="categoryMeta(item.category).icon" :size="22"/>
+                <i v-if="!item.read" aria-label="خوانده‌نشده"/>
               </span>
 
               <div class="notification-copy">
@@ -370,8 +365,8 @@ onMounted(() => {
                   <h3>{{ item.title }}</h3>
 
                   <time
-                    :datetime="item.createdAt"
-                    :title="formatPersianDateTime(item.createdAt)"
+                      :datetime="item.createdAt"
+                      :title="formatPersianDateTime(item.createdAt)"
                   >
                     {{ formatRelativeTime(item.createdAt) }}
                   </time>
@@ -380,33 +375,44 @@ onMounted(() => {
                 <p>{{ item.message }}</p>
 
                 <div class="item-footer">
-                  <span class="category-label">
-                    {{ categoryMeta(item.category).label }}
-                  </span>
+                  <div class="item-footer-meta">
+                    <span class="category-label">
+                      {{ categoryMeta(item.category).label }}
+                    </span>
+
+                    <RouterLink
+                        v-if="item.action"
+                        :to="item.action.to"
+                        class="action-link"
+                        @click.prevent="openNotification(item)"
+                    >
+                      {{ item.action.label }}
+                      <AppIcon name="chevronLeft" :size="16"/>
+                    </RouterLink>
+                  </div>
 
                   <button
-                    v-if="!item.read"
-                    type="button"
-                    :disabled="Boolean(actionLoadingId)"
-                    :aria-busy="actionLoadingId === item.id || undefined"
-                    @click.stop="markRead(item)"
+                      v-if="!item.read"
+                      type="button"
+                      class="mark-read-button"
+                      :disabled="Boolean(actionLoadingId)"
+                      :aria-busy="actionLoadingId === item.id || undefined"
+                      aria-label="علامت‌گذاری اعلان به‌عنوان خوانده‌شده"
+                      @click.stop="markRead(item)"
                   >
                     <span
-                      v-if="actionLoadingId === item.id"
-                      class="mini-spinner"
+                        v-if="actionLoadingId === item.id"
+                        class="mini-spinner"
+                        aria-hidden="true"
                     />
-                    خواندم
+                    <AppIcon
+                        v-else
+                        name="check"
+                        :size="15"
+                        aria-hidden="true"
+                    />
+                    <span>خواندم</span>
                   </button>
-
-                  <RouterLink
-                    v-if="item.action"
-                    :to="item.action.to"
-                    class="action-link"
-                    @click.prevent="openNotification(item)"
-                  >
-                    {{ item.action.label }}
-                    <AppIcon name="chevronLeft" :size="16" />
-                  </RouterLink>
                 </div>
               </div>
             </article>
@@ -597,7 +603,7 @@ onMounted(() => {
   --notification-row-height: 11.5rem;
 
   max-height: calc(
-    var(--notification-row-height) * 5 + 4px
+      var(--notification-row-height) * 5 + 4px
   );
 
   overflow-x: hidden;
@@ -816,25 +822,71 @@ onMounted(() => {
 .item-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.item-footer-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
 }
 
 .category-label {
-  padding: .15rem .5rem;
+  display: inline-flex;
+  align-items: center;
+  padding: .2rem .55rem;
   border-radius: var(--radius-pill);
   background: var(--color-surface-2);
   color: var(--color-text-muted);
   font-size: .68rem;
+  line-height: 1.6;
 }
 
-.item-footer button {
+.mark-read-button {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--space-1);
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
+  justify-content: center;
+  gap: .45rem;
+  min-height: 2.4rem;
+  padding: .55rem .9rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, transparent);
+  border-radius: .65rem;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff;
+  font-family: inherit;
   font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  transition: background var(--transition-fast),
+  box-shadow var(--transition-fast),
+  transform var(--transition-fast),
+  opacity var(--transition-fast);
+}
+
+.mark-read-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.mark-read-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.mark-read-button:disabled {
+  cursor: wait;
+  opacity: .65;
+  box-shadow: none;
+  transform: none;
 }
 
 .action-link {
@@ -842,7 +894,6 @@ onMounted(() => {
   align-items: center;
   gap: .15rem;
   min-height: 2rem;
-  margin-inline-start: auto;
   border-radius: var(--radius-sm);
   color: var(--color-primary);
   font-size: var(--font-size-xs);
@@ -907,7 +958,7 @@ onMounted(() => {
 }
 
 .filters-card button:focus-visible,
-.item-footer button:focus-visible {
+.mark-read-button:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
@@ -922,7 +973,6 @@ onMounted(() => {
   content: '';
 }
 
-.item-footer button,
 .action-link {
   min-height: 2.75rem;
   padding-inline: var(--space-2);
@@ -1007,8 +1057,20 @@ onMounted(() => {
   }
 
   .item-footer {
+    align-items: flex-start;
     flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .item-footer-meta {
+    flex: 1 1 100%;
+    justify-content: flex-start;
     gap: var(--space-1) var(--space-2);
+  }
+
+  .mark-read-button {
+    margin-inline-start: auto;
+    min-height: 2.5rem;
   }
 
   .action-link {

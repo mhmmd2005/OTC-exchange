@@ -921,7 +921,7 @@ def start_toman_deposit_payment(
             )
         )
 
-        locked_attempt.gateway = "nexpal"
+        locked_attempt.gateway = gateway.name
 
         locked_attempt.gateway_token = (
             result.token
@@ -987,6 +987,7 @@ def process_toman_deposit_callback(
         callback_status,
         reference_number: str = "",
         track_id: str = "",
+        gateway_name: str = "nexpal",
 ) -> Transaction | None:
     invoice_id = str(
         invoice_id or "",
@@ -1013,7 +1014,7 @@ def process_toman_deposit_callback(
             )
             .filter(
                 invoice_id=invoice_id,
-                gateway="nexpal",
+                gateway=gateway_name,
             )
             .first()
         )
@@ -1028,7 +1029,7 @@ def process_toman_deposit_callback(
                 )
                 .filter(
                     gateway_reference=invoice_id,
-                    gateway="nexpal",
+                    gateway=gateway_name,
                 )
                 .first()
             )

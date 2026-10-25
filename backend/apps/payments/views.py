@@ -275,6 +275,96 @@ class NexpalTomanDepositCallbackAPIView(APIView):
         )
 
 
+
+class ZarinpalTomanDepositCallbackAPIView(APIView):
+    """Browser callback for ZarinPal. Callback parameters are not proof of payment."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        authority = str(
+            request.query_params.get("Authority")
+            or request.query_params.get("authority")
+            or ""
+        ).strip()
+        provider_status = str(
+            request.query_params.get("Status")
+            or request.query_params.get("status")
+            or ""
+        ).strip().upper()
+
+        if not authority or len(authority) > 255:
+            return Response(
+                {"detail": "شناسه Authority زرین‌پال معتبر نیست.", "code": "AUTHORITY_REQUIRED"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if provider_status not in {"OK", "NOK"}:
+            return Response(
+                {"detail": "وضعیت بازگشت زرین‌پال معتبر نیست.", "code": "CALLBACK_STATUS_INVALID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payment_attempt = PaymentAttempt.objects.filter(
+            gateway="zarinpal",
+            gateway_token=authority,
+        ).first()
+        if payment_attempt is None:
+            payment_attempt = PaymentAttempt.objects.filter(
+                gateway="zarinpal",
+                gateway_authority=authority,
+            ).first()
+
+        if payment_attempt is None:
+            return Response(
+                {"detail": "درخواست پرداخت متناظر با این Authority پیدا نشد.", "code": "PAYMENT_NOT_FOUND"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not payment_attempt.invoice_id:
+            return Response(
+                {"detail": "شناسه داخلی پرداخت موجود نیست.", "code": "PAYMENT_STATE_INVALID"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        amount_rial = int(payment_attempt.amount * Decimal("10"))
+        try:
+            transaction = process_toman_deposit_callback(
+                invoice_id=payment_attempt.invoice_id,
+                amount_rial=amount_rial,
+                callback_status=(provider_status == "OK"),
+                reference_number="",
+                track_id=authority,
+                gateway_name="zarinpal",
+            )
+        except TomanDepositValidationError as exc:
+            return validation_error_response(exc)
+        except PaymentGatewayError as exc:
+            return Response(
+                {
+                    "detail": "استعلام یا تأیید پرداخت زرین‌پال انجام نشد.",
+                    "code": "ZARINPAL_VERIFICATION_UNAVAILABLE",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        refreshed = PaymentAttempt.objects.filter(pk=payment_attempt.pk).first()
+        if refreshed is None:
+            return Response(
+                {"detail": "درخواست پرداخت پیدا نشد.", "code": "PAYMENT_NOT_FOUND"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "status": refreshed.status,
+                "paymentAttemptId": str(refreshed.pk),
+                "transactionId": str(transaction.pk) if transaction is not None else None,
+                "gatewayCode": refreshed.gateway_code or None,
+            },
+            status=status.HTTP_200_OK if refreshed.status == "succeeded" else status.HTTP_202_ACCEPTED,
+        )
+
 class TomanDepositTestPaymentAPIView(APIView):
     """
     Development-only payment page API.

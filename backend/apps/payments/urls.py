@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     NexpalTomanDepositCallbackAPIView,
+    ZarinpalTomanDepositCallbackAPIView,
     TomanDepositCreateAPIView,
     TomanDepositDetailAPIView,
     TomanDepositTestPaymentAPIView,
@@ -18,6 +19,11 @@ urlpatterns = [
         "callback/",
         NexpalTomanDepositCallbackAPIView.as_view(),
         name="nexpal-toman-deposit-callback",
+    ),
+    path(
+        "zarinpal/callback/",
+        ZarinpalTomanDepositCallbackAPIView.as_view(),
+        name="zarinpal-toman-deposit-callback",
     ),
     path(
         "test-pay/<str:token>/",

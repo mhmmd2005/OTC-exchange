@@ -382,6 +382,18 @@ WITHDRAWAL_ADDRESS_COOLDOWN_SECONDS = int(
     )
 )
 
+ZARINPAL_MERCHANT_ID = os.environ.get("ZARINPAL_MERCHANT_ID", "").strip()
+ZARINPAL_BASE_URL = os.environ.get(
+    "ZARINPAL_BASE_URL",
+    "https://sandbox.zarinpal.com/pg/v4/payment",
+).strip().rstrip("/")
+ZARINPAL_STARTPAY_BASE_URL = os.environ.get(
+    "ZARINPAL_STARTPAY_BASE_URL",
+    "https://sandbox.zarinpal.com/pg/StartPay",
+).strip().rstrip("/")
+ZARINPAL_CALLBACK_URL = os.environ.get("ZARINPAL_CALLBACK_URL", "").strip()
+ZARINPAL_TIMEOUT = float(os.environ.get("ZARINPAL_TIMEOUT", "15"))
+
 PAYMENT_GATEWAY = os.environ.get(
     "PAYMENT_GATEWAY",
     "test_nexpal",

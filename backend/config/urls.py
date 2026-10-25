@@ -35,6 +35,7 @@ def api_v1_root(request):
 
 
 urlpatterns = [
+    path("api/v1/payments/toman/deposits/", include("apps.payments.urls")),
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.accounts.api_urls")),

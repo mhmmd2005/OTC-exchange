@@ -5,6 +5,7 @@ from django.conf import settings
 from .base import PaymentGateway
 from .nexpal import NexPalGateway
 from .test_nexpal import TestNexPalGateway
+from .zarinpal import ZarinPalGateway
 
 
 def get_payment_gateway() -> PaymentGateway:
@@ -22,6 +23,9 @@ def get_payment_gateway() -> PaymentGateway:
         "sandbox",
     }:
         return TestNexPalGateway()
+
+    if configured in {"zarinpal", "zarinpal_sandbox"}:
+        return ZarinPalGateway()
 
     if configured == "nexpal":
         return NexPalGateway()
