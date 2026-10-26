@@ -24,7 +24,7 @@ const colors: Record<string, string> = { USDT: '#26A17B', BTC: '#F7931A', ETH: '
         <td class="order-value order-value--total"><MoneyValue :value="order.finalTomanAmount" label="با احتساب کارمزد" /></td>
         <td class="order-value order-date priority-secondary"><strong>{{ formatPersianDate(order.createdAt) }}</strong><small>{{ formatTime(order.createdAt) }}</small></td>
         <td><StatusBadge domain="order" :status="order.status" /></td>
-        <td><RouterLink :to="`/app/orders/${order.id}`" class="row-chevron" :aria-label="`مشاهده جزئیات ${order.orderNumber}`"><AppIcon name="chevronLeft" :size="17" /></RouterLink></td>
+        <td><RouterLink :to="`/app/orders/${order.id}`" class="row-chevron" :aria-label="`مشاهده جزئیات ${order.orderNumber}`"><AppIcon name="chevronLeft" :size="23" /></RouterLink></td>
       </tr></tbody>
     </table>
 
@@ -65,7 +65,7 @@ const colors: Record<string, string> = { USDT: '#26A17B', BTC: '#F7931A', ETH: '
 .order-asset i.sell { background: var(--color-danger-soft); color: var(--color-danger); }
 .order-value--total > :deep(.money-value strong) { color: var(--color-text-primary); font-weight: 650; }
 .order-date strong { color: var(--color-text-secondary); font-weight: 500; }
-.row-chevron { display: grid; width: 1.8rem; height: 1.8rem; border-radius: var(--radius-sm); color: var(--color-text-muted); place-items: center; }
+.row-chevron { display: grid; width: 1.8rem; height: 1.8rem; border-radius: var(--radius-sm); color: var(--color-text-muted); place-items: center; transform: translateX(20px); }
 .order-row:hover .row-chevron { background: var(--color-surface-3); color: var(--color-primary); }
 .compact .order-table thead, .compact .order-amount, .compact .priority-tertiary, .compact .priority-secondary, .compact .column-amount { display: none; }
 .compact .order-table tbody th, .compact .order-table tbody td { height: 4.85rem; padding-inline: var(--space-4); }

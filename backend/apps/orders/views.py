@@ -41,7 +41,6 @@ class OrderListAPIView(generics.ListAPIView):
             if status_filter == "active":
                 queryset = queryset.filter(
                     status__in=[
-                        "pending_payment",
                         "payment_confirmed",
                         "processing",
                     ]
