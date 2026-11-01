@@ -33,7 +33,6 @@ import CryptoValue from '@/components/finance/CryptoValue.vue'
 import MoneyValue from '@/components/finance/MoneyValue.vue'
 
 
-
 const PAGE_SIZE = 8
 
 const transactionTypes = new Set([
@@ -175,7 +174,6 @@ const filterQueryKeys = [
 ] as const
 
 
-
 const route = useRoute()
 const router = useRouter()
 
@@ -208,6 +206,34 @@ const status = ref(
     ),
 )
 
+
+function getTodayPersianDate(): string {
+  const parts = new Intl.DateTimeFormat(
+      'en-US-u-ca-persian-nu-latn',
+      {
+        timeZone: 'Asia/Tehran',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      },
+  ).formatToParts(new Date())
+
+  const getPart = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? ''
+
+  const year = getPart('year')
+  const month = getPart('month')
+  const day = getPart('day')
+
+  if (!year || !month || !day) return ''
+
+  return toPersianDigits(`${year}/${month}/${day}`)
+}
+
+const todayDatePlaceholder = ref(getTodayPersianDate())
+
+let datePlaceholderTimer: number | undefined
+
 const asset = ref(
     queryString(route.query.asset)
         .toUpperCase()
@@ -235,7 +261,6 @@ let listRequestSequence = 0
 let detailRequestSequence = 0
 
 let syncingFromRoute = false
-
 
 
 function queryString(
@@ -311,7 +336,6 @@ function queryDateInput(
 }
 
 
-
 const parsedDateRange = computed(() => {
   const from =
       fromDate.value.trim()
@@ -365,7 +389,6 @@ const parsedDateRange = computed(() => {
 })
 
 
-
 const hasActiveFilters = computed(() =>
         type.value !== 'all'
         || asset.value !== 'all'
@@ -377,7 +400,6 @@ const hasActiveFilters = computed(() =>
             || toDate.value,
         ),
 )
-
 
 
 const load = async () => {
@@ -731,7 +753,6 @@ function applyRouteFilters() {
 }
 
 
-
 function normalizeNetwork() {
   network.value =
       normalizeDigits(
@@ -855,11 +876,18 @@ onMounted(() => {
           ? route.query.detail
           : null,
   )
+
+  datePlaceholderTimer = window.setInterval(() => {
+    todayDatePlaceholder.value = getTodayPersianDate()
+  }, 60_000)
 })
 
 onBeforeUnmount(() => {
   listRequestSequence += 1
   detailRequestSequence += 1
+  if (datePlaceholderTimer !== undefined) {
+    window.clearInterval(datePlaceholderTimer)
+  }
 
   window.clearTimeout(
       commitTimer,
@@ -898,27 +926,19 @@ onBeforeUnmount(() => {
       <!-- --------------------------------------------------------------- -->
       <!-- Filters                                                         -->
       <!-- --------------------------------------------------------------- -->
-
       <section
           class="transaction-filters"
           aria-label="فیلتر تراکنش‌ها"
       >
-
+        <!-- Header -->
         <div class="filters-header">
-
           <div class="filters-title">
-    <span class="filters-title-icon">
-      <AppIcon
-          name="filter"
-          :size="17"
-      />
-    </span>
+      <span class="filters-title-icon">
+        <AppIcon name="filter" :size="17"/>
+      </span>
 
             <div>
-              <strong>
-                فیلتر تراکنش‌ها
-              </strong>
-
+              <strong>فیلتر تراکنش‌ها</strong>
               <small>
                 جست‌وجو و محدود کردن نتایج بر اساس مشخصات تراکنش
               </small>
@@ -926,7 +946,6 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="filters-header-actions">
-
             <button
                 class="reset-filters-button"
                 :class="{ 'is-disabled': !hasActiveFilters }"
@@ -934,12 +953,8 @@ onBeforeUnmount(() => {
                 :disabled="!hasActiveFilters"
                 @click="clearFilters"
             >
-              <AppIcon
-                  name="refresh"
-                  :size="15"
-              />
-
-              ریست فیلترها
+              <AppIcon name="refresh" :size="15"/>
+              پاک کردن فیلترها
             </button>
 
             <button
@@ -947,39 +962,24 @@ onBeforeUnmount(() => {
                 type="button"
                 :aria-expanded="mobileFiltersOpen"
                 aria-controls="transaction-filter-panel"
-                @click="
-        mobileFiltersOpen =
-          !mobileFiltersOpen
-      "
+                @click="mobileFiltersOpen = !mobileFiltersOpen"
             >
-              <AppIcon
-                  name="filter"
-                  :size="17"
-              />
-
+              <AppIcon name="filter" :size="17"/>
               فیلترها
 
-              <span
-                  v-if="hasActiveFilters"
-              >
-        فعال
-      </span>
+              <span v-if="hasActiveFilters">
+          فعال
+        </span>
             </button>
-
           </div>
-
         </div>
 
-
+        <!-- Main filters -->
         <div
             id="transaction-filter-panel"
             class="transaction-filter-panel"
-            :class="{
-            'is-mobile-open':
-              mobileFiltersOpen,
-          }"
+            :class="{ 'is-mobile-open': mobileFiltersOpen }"
         >
-
           <div class="filter-field search-field">
             <AppInput
                 v-model="search"
@@ -991,19 +991,15 @@ onBeforeUnmount(() => {
             />
           </div>
 
-
           <div class="filter-field">
             <AppSelect
                 v-model="type"
-                :options="
-                transactionTypeOptions
-              "
+                :options="transactionTypeOptions"
                 label="نوع تراکنش"
                 searchable
                 search-placeholder="جست‌وجوی نوع تراکنش"
             />
           </div>
-
 
           <div class="filter-field">
             <AppSelect
@@ -1015,55 +1011,38 @@ onBeforeUnmount(() => {
             />
           </div>
 
-
           <div class="filter-field">
             <AppSelect
                 v-model="status"
-                :options="
-                transactionStatusOptions
-              "
+                :options="transactionStatusOptions"
                 label="وضعیت"
             />
           </div>
-
         </div>
 
-
+        <!-- Date range and network -->
         <div
             class="date-range-section"
-            :class="{
-            'is-mobile-open':
-              mobileFiltersOpen,
-          }"
+            :class="{ 'is-mobile-open': mobileFiltersOpen }"
         >
-
           <div class="date-range-heading">
-
-            <span class="date-range-icon">
-              <AppIcon
-                  name="calendar"
-                  :size="18"
-              />
-            </span>
+      <span class="date-range-icon">
+        <AppIcon name="calendar" :size="18"/>
+      </span>
 
             <div>
-              <strong>
-                بازه زمانی
-              </strong>
-
+              <strong>بازه زمانی</strong>
               <small>
                 تاریخ‌ها بر اساس زمان تهران محاسبه می‌شوند.
               </small>
             </div>
-
           </div>
-
 
           <div class="filter-field">
             <PersianDatePicker
                 v-model="fromDate"
                 label="از تاریخ"
-                placeholder="۱۴۰۵/۰۶/۰۱"
+                :placeholder="todayDatePlaceholder"
                 :error="parsedDateRange.fromError"
             />
           </div>
@@ -1072,11 +1051,10 @@ onBeforeUnmount(() => {
             <PersianDatePicker
                 v-model="toDate"
                 label="تا تاریخ"
-                placeholder="۱۴۰۵/۰۶/۳۱"
+                :placeholder="todayDatePlaceholder"
                 :error="parsedDateRange.toError"
             />
           </div>
-
 
           <div class="filter-field">
             <AppInput
@@ -1089,39 +1067,29 @@ onBeforeUnmount(() => {
                 @blur="normalizeNetwork"
             />
           </div>
-
         </div>
 
-
+        <!-- Filter summary -->
         <div class="filter-summary">
-
           <div class="filter-summary-left">
-            <span class="result-indicator">
-              <AppIcon
-                  name="filter"
-                  :size="15"
-              />
+      <span class="result-indicator">
+        <AppIcon name="filter" :size="15"/>
 
-              <strong>
-                {{ totalResults.toLocaleString('fa-IR') }}
-              </strong>
+        <strong>
+          {{ totalResults.toLocaleString('fa-IR') }}
+        </strong>
 
-              <span>
-                نتیجه
-              </span>
-            </span>
+        <span>نتیجه</span>
+      </span>
 
             <span
                 v-if="hasActiveFilters"
                 class="active-filter-indicator"
             >
-              فیلتر فعال است
-            </span>
+        فیلتر فعال است
+      </span>
           </div>
-
-
         </div>
-
       </section>
 
 
@@ -1322,14 +1290,14 @@ onBeforeUnmount(() => {
 
             <div class="transaction-action-cell">
 
-              <span class="transaction-details-link">
-                مشاهده
+<span class="transaction-details-link">
+  <span class="transaction-details-label">مشاهده</span>
 
-                <AppIcon
-                    name="chevronLeft"
-                    :size="15"
-                />
-              </span>
+  <AppIcon
+      name="chevronLeft"
+      :size="15"
+  />
+</span>
 
             </div>
 
@@ -2124,6 +2092,7 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-xs);
   font-weight: 650;
   white-space: nowrap;
+  transform: translateY(3px);
 }
 
 .muted-value {
@@ -2518,6 +2487,260 @@ onBeforeUnmount(() => {
   .reset-filters-button {
     min-height: 2.55rem;
     padding-inline: .65rem;
+  }
+}
+
+.transaction-details-label {
+  display: inline-block;
+  transform: translateY(1px);
+}
+
+/* =========================================
+   Transaction Detail Modal - Visual Upgrade
+========================================= */
+
+/* Transaction header */
+
+.detail-top {
+  position: relative;
+  overflow: hidden;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: 1.15rem;
+  border: 1px solid rgba(67, 139, 255, .24);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+      135deg,
+      rgba(67, 139, 255, .13),
+      var(--color-surface-2) 75%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.detail-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 1px solid rgba(67, 139, 255, .2);
+  border-radius: 1rem;
+  background: linear-gradient(
+      145deg,
+      var(--color-primary-soft),
+      rgba(67, 139, 255, .16)
+  );
+  color: var(--color-primary);
+}
+
+.detail-heading {
+  gap: .4rem;
+}
+
+.detail-heading > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.detail-heading :deep(.money-value strong),
+.detail-heading :deep(.crypto-value strong) {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+
+/* Transaction information */
+
+.transaction-details {
+  display: grid;
+  gap: .45rem;
+  margin: var(--space-5) 0;
+}
+
+.transaction-details > div {
+  display: flex;
+  min-width: 0;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: .8rem .95rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  transition: border-color .2s ease,
+  background .2s ease;
+}
+
+.transaction-details dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 550;
+}
+
+.transaction-details dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .55rem;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  line-height: 1.8;
+  text-align: end;
+}
+
+/* Reference number */
+
+.transaction-details > div:first-child {
+  border-color: rgba(67, 139, 255, .2);
+  background: rgba(67, 139, 255, .07);
+}
+
+.transaction-details > div:first-child dd bdi {
+  color: var(--color-primary);
+  font-weight: 750;
+  letter-spacing: .2px;
+}
+
+
+/* Technical information: Address and TXID */
+
+.transaction-details > div.technical {
+  align-items: flex-start;
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+}
+
+.technical dt {
+  padding-top: .15rem;
+  white-space: nowrap;
+}
+
+.technical dd {
+  flex: 1;
+  max-width: 75%;
+  justify-content: flex-end;
+}
+
+.technical dd bdi {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  direction: ltr;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .7rem;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+
+/* Description and network note */
+
+.detail-description,
+.network-note {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  padding: .9rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  line-height: 1.9;
+}
+
+.detail-description {
+  margin-top: var(--space-3);
+  border-color: var(--color-border-soft);
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+
+.detail-description svg {
+  flex: 0 0 auto;
+  margin-top: .15rem;
+  color: var(--color-primary);
+}
+
+.network-note {
+  margin-top: var(--space-3);
+  border-color: rgba(67, 139, 255, .16);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.network-note svg {
+  flex: 0 0 auto;
+  margin-top: .15rem;
+}
+
+
+/* Modal footer buttons */
+
+.close-detail,
+.support-link {
+  min-height: 2.8rem;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  transition: background .2s ease,
+  border-color .2s ease,
+  transform .2s ease;
+}
+
+.close-detail {
+  border: 1px solid var(--color-border);
+}
+
+.support-link {
+  border: 1px solid var(--action-primary);
+}
+
+@media (hover: hover) {
+  .transaction-details > div:not(.technical):hover {
+    border-color: var(--color-border-hover);
+    background: var(--color-surface-2);
+  }
+
+  .close-detail:hover,
+  .support-link:hover {
+    transform: translateY(-1px);
+  }
+}
+
+
+/* Responsive */
+
+@media (max-width: 560px) {
+  .detail-top {
+    gap: .75rem;
+    padding: .9rem;
+  }
+
+  .detail-icon {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .transaction-details > div {
+    min-height: auto;
+    padding: .8rem;
+  }
+
+  .transaction-details dd {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: start;
+  }
+
+  .technical dd {
+    max-width: 100%;
+  }
+
+  .technical dd bdi {
+    text-align: left;
   }
 }
 </style>

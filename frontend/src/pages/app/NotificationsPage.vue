@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, onMounted, onUpdated, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 
 import AppButton from '@/components/ui/AppButton.vue'
@@ -21,6 +21,17 @@ const readFilter = ref<'all' | 'unread'>('all')
 const category = ref<NotificationCategory | ''>('')
 const actionLoadingId = ref('')
 const feedback = ref('')
+
+// ارتفاع محدوده اسکرول بر اساس ارتفاع واقعی پنج اعلان اول محاسبه می‌شود.
+const notificationListScrollRef = ref<HTMLElement | null>(null)
+const notificationListMaxHeight = ref<number | null>(null)
+let notificationRowsObserver: ResizeObserver | null = null
+
+const notificationListStyle = computed(() => ({
+  maxHeight: notificationListMaxHeight.value === null
+      ? undefined
+      : `${notificationListMaxHeight.value}px`,
+}))
 
 const viewTabs = [
   {label: 'همه اعلان‌ها', value: 'all'},
@@ -69,6 +80,73 @@ function currentFilters() {
     category: category.value || undefined,
     read: readFilter.value === 'unread' ? false : undefined,
   }
+}
+
+/**
+ * ارتفاع پنج ردیف اول را از روی ارتفاع واقعی DOM محاسبه می‌کند.
+ * ردیف پنجم حتی با متن طولانی هم کامل نمایش داده می‌شود.
+ */
+function measureNotificationListHeight(): void {
+  const viewport = notificationListScrollRef.value
+
+  if (!viewport) {
+    if (notificationListMaxHeight.value !== null) {
+      notificationListMaxHeight.value = null
+    }
+    return
+  }
+
+  const rows = Array.from(
+      viewport.querySelectorAll<HTMLElement>('.notification-item'),
+  )
+
+  if (rows.length <= 5) {
+    if (notificationListMaxHeight.value !== null) {
+      notificationListMaxHeight.value = null
+    }
+    return
+  }
+
+  const firstFiveHeight = rows
+      .slice(0, 5)
+      .reduce(
+          (total, row) => total + row.getBoundingClientRect().height,
+          0,
+      )
+
+  const measuredHeight = Math.ceil(firstFiveHeight)
+
+  if (
+      measuredHeight > 0
+      && (
+          notificationListMaxHeight.value === null
+          || Math.abs(notificationListMaxHeight.value - measuredHeight) > 1
+      )
+  ) {
+    notificationListMaxHeight.value = measuredHeight
+  }
+}
+
+/**
+ * پنج ردیف اول مشاهده می‌شوند تا تغییر اندازه متن یا عرض صفحه
+ * باعث نصفه‌شدن ردیف پنجم نشود.
+ */
+function syncNotificationListHeight(): void {
+  measureNotificationListHeight()
+  notificationRowsObserver?.disconnect()
+
+  const viewport = notificationListScrollRef.value
+  if (!viewport || !notificationRowsObserver) return
+
+  const rows = Array.from(
+      viewport.querySelectorAll<HTMLElement>('.notification-item'),
+  )
+
+  if (rows.length <= 5) return
+
+  rows.slice(0, 5).forEach((row) => {
+    notificationRowsObserver?.observe(row)
+  })
 }
 
 /**
@@ -162,7 +240,22 @@ watch([readFilter, category], () => {
 })
 
 onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') {
+    notificationRowsObserver = new ResizeObserver(() => {
+      measureNotificationListHeight()
+    })
+  }
+
   void load()
+})
+
+onUpdated(() => {
+  syncNotificationListHeight()
+})
+
+onBeforeUnmount(() => {
+  notificationRowsObserver?.disconnect()
+  notificationRowsObserver = null
 })
 </script>
 
@@ -345,13 +438,19 @@ onMounted(() => {
             </AppButton>
           </EmptyState>
 
-          <div v-else class="notification-list">
-            <article
-                v-for="item in notifications.items"
-                :key="item.id"
-                class="notification-item"
-                :class="{ unread: !item.read }"
-            >
+          <div
+              v-else
+              ref="notificationListScrollRef"
+              class="notification-list-scroll"
+              :style="notificationListStyle"
+          >
+            <div class="notification-list">
+              <article
+                  v-for="item in notifications.items"
+                  :key="item.id"
+                  class="notification-item"
+                  :class="{ unread: !item.read }"
+              >
               <span
                   class="category-icon"
                   :class="`category-${item.category}`"
@@ -415,7 +514,8 @@ onMounted(() => {
                   </button>
                 </div>
               </div>
-            </article>
+              </article>
+            </div>
           </div>
         </AppCard>
       </section>
@@ -427,7 +527,11 @@ onMounted(() => {
 .notifications-page {
   display: grid;
   align-content: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   gap: var(--space-5);
+  box-sizing: border-box;
 }
 
 .notifications-header-actions {
@@ -513,9 +617,18 @@ onMounted(() => {
 
 .notification-layout {
   display: grid;
-  grid-template-columns: 15.5rem minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(13rem, 15.5rem) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-5);
+  box-sizing: border-box;
+}
+
+.notification-layout > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .filters-card {
@@ -598,72 +711,46 @@ onMounted(() => {
   font-size: var(--font-size-xs);
 }
 
-/* کادر اعلان‌ها؛ ارتفاع متناسب با ۵ ردیف */
+/* کارت میزبان فهرست؛ اسکرول فقط روی فهرست داخلی انجام می‌شود */
 .notification-list-card {
-  --notification-row-height: 11.5rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
 
-  max-height: calc(
-      var(--notification-row-height) * 5 + 4px
-  );
-
+/* پنج اعلان اول کامل دیده می‌شوند؛ از اعلان ششم اسکرول فعال می‌شود */
+.notification-list-scroll {
+  width: 100%;
+  min-width: 0;
+  max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-hover) transparent;
   scroll-behavior: smooth;
   box-sizing: border-box;
 }
 
-/* هر اعلان ارتفاع یکسان دارد */
-.notification-list {
-  display: grid;
-}
-
-.notification-item {
-  height: var(--notification-row-height);
-  min-height: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-/* جلوگیری از بلندشدن ردیف به‌دلیل متن زیاد */
-.notification-copy > p {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-/* اسکرول‌بار */
-.notification-list-card::-webkit-scrollbar {
+.notification-list-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.notification-list-card::-webkit-scrollbar-track {
+.notification-list-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.notification-list-card::-webkit-scrollbar-thumb {
+.notification-list-scroll::-webkit-scrollbar-thumb {
   border-radius: var(--radius-pill);
   background: var(--color-border-hover);
 }
 
-/* موبایل */
-@media (max-width: 767px) {
-  .notification-list-card {
-    --notification-row-height: 13rem;
-  }
-
-  .notification-copy > p {
-    -webkit-line-clamp: 3;
-  }
-}
-
-@media (max-width: 399px) {
-  .notification-list-card {
-    --notification-row-height: 14rem;
-  }
+/* ارتفاع ردیف‌ها متناسب با محتوای واقعی است */
+.notification-list {
+  display: grid;
+  min-width: 0;
 }
 
 .notification-skeletons {
@@ -713,16 +800,18 @@ onMounted(() => {
   font-size: var(--font-size-sm);
 }
 
-.notification-list {
-  display: grid;
-}
-
 .notification-item {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-4);
+  min-width: 0;
+  min-height: 5.5rem;
+  height: auto;
+  overflow: visible;
   padding: var(--space-5);
+  box-sizing: border-box;
   transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -794,11 +883,14 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-4);
 }
 
 .item-heading h3 {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-md);
 }
 
@@ -823,6 +915,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
@@ -833,6 +927,7 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .category-label {
@@ -985,38 +1080,52 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .notification-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .filters-card {
     position: static;
-    padding: var(--space-3) !important;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-  }
-
-  .filters-card::-webkit-scrollbar {
-    display: none;
+    width: 100%;
+    min-width: 0;
+    padding: var(--space-4) !important;
+    overflow: visible;
   }
 
   .filters-card h2 {
-    display: none;
+    display: block;
+    margin-bottom: var(--space-3);
   }
 
   .filters-card nav {
-    display: flex;
-    width: max-content;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, 8rem), 1fr)
+    );
+    gap: var(--space-2);
   }
 
   .filters-card button {
+    width: 100%;
+    min-width: 0;
     border: 1px solid var(--color-border-soft);
+    white-space: nowrap;
+  }
+
+  .notifications-main {
+    width: 100%;
+    min-width: 0;
   }
 }
 
 @media (max-width: 767px) {
+  .filters-card nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .notification-summary {
     align-items: flex-start;
   }
@@ -1050,10 +1159,10 @@ onMounted(() => {
   }
 
   .notification-copy > p {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    overflow-wrap: anywhere;
   }
 
   .item-footer {
