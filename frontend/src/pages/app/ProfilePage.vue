@@ -412,7 +412,7 @@ onMounted(load)
                   size="sm"
                   icon="help"
               >
-                تماس با پشتیبانی
+                ارتباط با پشتیبانی
               </AppButton>
             </div>
           </AppCard>

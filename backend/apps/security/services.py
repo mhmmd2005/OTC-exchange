@@ -24,7 +24,7 @@ class SecurityAuditService:
 class TwoFactorService:
     SETUP_CACHE_PREFIX = "security:2fa:setup:"
     SETUP_TTL_SECONDS = 10 * 60
-    ISSUER_NAME = "Rosha"
+    ISSUER_NAME = "Rosha Login"
 
     @staticmethod
     def _encryption_key() -> bytes:
