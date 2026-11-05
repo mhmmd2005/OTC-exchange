@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "apps.accounts",
     "apps.assets",
+    "apps.pricing.apps.PricingConfig",
+
     "apps.wallets",
     "apps.otc",
     "apps.orders",
@@ -72,6 +74,7 @@ INSTALLED_APPS = [
     "apps.withdrawals",
     "apps.payments",
     "channels",
+
 ]
 
 MIDDLEWARE = [

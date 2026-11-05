@@ -225,11 +225,11 @@ class PriceSnapshot(models.Model):
         indexes = [
             models.Index(
                 fields=["asset", "-captured_at"],
-                name="pricing_snapshot_asset_time_idx",
+                name="pr_snap_asset_time_idx",
             ),
             models.Index(
                 fields=["source", "-captured_at"],
-                name="pricing_snapshot_source_time_idx",
+                name="pr_snap_source_time_idx",
             ),
         ]
         verbose_name = "تاریخچه قیمت"
@@ -298,7 +298,7 @@ class ManualPriceOverride(models.Model):
         indexes = [
             models.Index(
                 fields=["asset", "starts_at", "expires_at"],
-                name="pricing_override_asset_time_idx",
+                name="pr_ovr_asset_time_idx",
             ),
         ]
         verbose_name = "قیمت پایه دستی"
